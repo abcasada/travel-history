@@ -1,0 +1,34 @@
+# gitleaks config: default rules plus project-specific ones.
+[extend]
+useDefault = true
+
+[[rules]]
+id = "travel-device-token"
+description = "Tracker device token (trk_ prefix)"
+regex = '''\btrk_[A-Za-z0-9_-]{32,}\b'''
+keywords = ["trk_"]
+
+[[rules]]
+id = "age-secret-key"
+description = "age private key"
+regex = '''AGE-SECRET-KEY-1[0-9A-Z]{58}'''
+keywords = ["AGE-SECRET-KEY"]
+
+[allowlist]
+description = "Synthetic test values and documented dummy keys"
+regexes = [
+  # Cloudflare Turnstile documented test keys (public, always-pass/fail)
+  '''1x0000000000000000000000000000000AA''',
+  '''2x0000000000000000000000000000000AA''',
+  '''3x0000000000000000000000000000000AA''',
+  '''1x00000000000000000000AA''',
+  '''2x00000000000000000000AB''',
+  '''3x00000000000000000000FF''',
+  # obviously fake values used in tests and examples
+  '''changeme[-_a-z0-9]*''',
+  '''dev-only-[A-Za-z0-9_-]+''',
+  '''test-only-[A-Za-z0-9_-]+''',
+]
+paths = [
+  '''(^|/)package-lock\.json$''',
+]

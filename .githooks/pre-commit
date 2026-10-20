@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Pre-commit guard: secret scan (gitleaks, in Docker) + personal-data guard.
+# Installed with: git config core.hooksPath .githooks   (./dev setup does this)
+set -euo pipefail
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root"
+
+# 1. Personal-data guard (fast, no Docker).
+scripts/check-staged-data.sh
+
+# 2. Secret scan of the staged diff. Pinned image, nothing installed on the host.
+GITLEAKS_IMAGE="${GITLEAKS_IMAGE:-zricethezav/gitleaks:v8.30.1}"
+if ! command -v docker >/dev/null 2>&1; then
+  echo "pre-commit: docker not found; cannot run gitleaks. Refusing to commit." >&2
+  exit 1
+fi
+docker run --rm -v "$repo_root:/repo" -w /repo --user "$(id -u):$(id -g)" \
+  "$GITLEAKS_IMAGE" git --pre-commit --staged --redact --no-banner \
+  --config /repo/.gitleaks.toml /repo

@@ -1,0 +1,55 @@
+# --- Personal data: never commit ---
+data/private/
+*.Timeline.json
+Timeline*.json
+location-history*.json
+*.gpx.private
+# Runtime state (DB volumes, bulk storage in dev, backups)
+var/
+backups/
+*.dump
+*.dump.zst
+*.age
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+age-identity*.txt
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+.venv/
+# Node / frontend
+node_modules/
+frontend/dist/
+frontend/dev-dist/
+frontend/coverage/
+frontend/playwright-report/
+frontend/test-results/
+# Android
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/*.apk
+# Valhalla data (tiles, pbf extracts)
+valhalla/data/
+*.osm.pbf
+# Reference dataset downloads (fetched at runtime, never committed)
+datasets/
+# Editors / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
