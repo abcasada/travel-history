@@ -1,7 +1,8 @@
-from django.urls import path
+from django.urls import path, re_path
 
 from config.api import api
 from travel.accounts import views as auth_views
+from travel.core import spa
 from travel.core import views as core_views
 
 urlpatterns = [
@@ -12,4 +13,5 @@ urlpatterns = [
     path("auth/logout", auth_views.logout_view, name="auth-logout"),
     path("auth/reauth", auth_views.reauth_view, name="auth-reauth"),
     path("api/v1/", api.urls),
+    re_path(r"^app/(?P<path>.*)$", spa.spa_index, name="spa"),
 ]

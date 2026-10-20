@@ -50,8 +50,10 @@ All commands run in containers through `./dev` (see `./dev help`):
 - `./dev psql` — psql as the owner role (never expose the DB port)
 - `./dev manage set_role <email> admin` — make a user Admin (after their first sign-in)
 - Dev sign-in: open the app, choose Sign in, and type `dev-admin`, `dev-member` or `dev-outsider` (no group → refused) at the mock provider
+- `./dev e2e [base-url]` — headless-Chrome smoke test of sign-in, honesty notice, map and both shells (dev stack; screenshots in `e2e/out/`)
+- After changing the API: `./dev manage export_openapi > frontend/src/api/openapi.json && ./dev npm run gen:api` (commit both generated files)
 - `./dev restore-test` — backup → restore into a scratch DB → verify
-- Dev URLs (LAN/VPN only): app `http://<lan-host>:8780`, mock OIDC `:8781`, Mailpit `:8782`, Vite `:5173`
+- Dev URLs (LAN/VPN only): app with hot reload `http://<lan-host>:5173/app/`, Django `:8780`, mock OIDC `:8781`, Mailpit `:8782`
 
 ## Coding conventions
 

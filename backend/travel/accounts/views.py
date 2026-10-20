@@ -118,5 +118,8 @@ def has_recent_auth(request: HttpRequest, max_age: int | None = None) -> bool:
 
 
 def landing_view(request: HttpRequest) -> HttpResponse:
-    """Public landing page; the full version (request access, explanation) comes in phase 8."""
+    """Public landing page; signed-in users go straight to the app. The full version (request
+    access, explanation) comes in phase 8."""
+    if request.user.is_authenticated:
+        return redirect("/app/")
     return render(request, "landing.html", {"user": request.user})

@@ -11,13 +11,15 @@ PUBLIC_EXACT = frozenset(
         "/auth/login",
         "/auth/callback",
         "/request-access",
-        "/manifest.webmanifest",
-        "/sw.js",
+        "/app/manifest.webmanifest",  # fetched without cookies by browsers
+        "/app/sw.js",
         "/favicon.ico",
         "/robots.txt",
     }
 )
 PUBLIC_PREFIXES = (
+    "/app/assets/",  # hashed JS/CSS bundles (no data)
+    "/app/icons/",
     "/invite/",
     "/api/v1/ingest/",  # tracker endpoints authenticate with device tokens
     "/t/",  # unlisted public trips (public renderer)

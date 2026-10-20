@@ -63,6 +63,20 @@ case "$cmd" in
     node_run npx biome check --write src
     ;;
   npm)      node_run npm "$@" ;;
+  e2e)
+    # Headless Chrome (host network: containers can't reach the host's LAN address otherwise).
+    base="${1:-http://$(env_value TRAVEL_DEV_HOST):5173}"
+    mkdir -p e2e/out
+    [ -d e2e/node_modules ] || docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp \
+      -v "$PWD/e2e:/w" -w /w node:24-trixie-slim npm ci --no-audit --no-fund
+    docker run -d --rm --name travel-e2e-chrome --network host zenika/alpine-chrome:124 \
+      --no-sandbox --remote-debugging-address=127.0.0.1 --remote-debugging-port=9222 \
+      --use-gl=swiftshader --enable-unsafe-swiftshader about:blank >/dev/null
+    trap 'docker stop travel-e2e-chrome >/dev/null' EXIT
+    sleep 3
+    docker run --rm --network host --user "$(id -u):$(id -g)" -e HOME=/tmp \
+      -v "$PWD/e2e:/w" -w /w node:24-trixie-slim node smoke.mjs "$base"
+    ;;
   help|*)
     cat <<'HELP'
 ./dev setup               first-time setup: git hooks, .env with generated secrets, bulk dirs, networks
@@ -74,6 +88,7 @@ case "$cmd" in
 ./dev manage <cmd>        Django management command (runs as the OWNER role)
 ./dev shell | psql        Django shell / psql (owner role)
 ./dev npm <args>          npm inside the Node container (frontend/)
+./dev e2e [base-url]      browser smoke test (sign-in, notice, map, both shells; screenshots in e2e/out/)
 HELP
     ;;
 esac

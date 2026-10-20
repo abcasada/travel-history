@@ -1,0 +1,269 @@
+{
+  "components": {
+    "schemas": {
+      "DeviceClass": {
+        "enum": ["any", "desktop", "mobile"],
+        "title": "DeviceClass",
+        "type": "string"
+      },
+      "MeOut": {
+        "properties": {
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "onboarding_done_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Onboarding Done At"
+          },
+          "person_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Person Id"
+          },
+          "privacy_notice_ack_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Privacy Notice Ack At"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "display_name",
+          "role",
+          "person_id",
+          "privacy_notice_ack_at",
+          "onboarding_done_at"
+        ],
+        "title": "MeOut",
+        "type": "object"
+      },
+      "PreferenceIn": {
+        "properties": {
+          "device_class": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DeviceClass"
+              }
+            ],
+            "default": "any"
+          },
+          "value": {
+            "title": "Value"
+          }
+        },
+        "required": ["value"],
+        "title": "PreferenceIn",
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "BrowserSession": {
+        "in": "cookie",
+        "name": "sessionid",
+        "type": "apiKey"
+      },
+      "OidcBearer": {
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
+  "info": {
+    "description": "",
+    "title": "Travel History API",
+    "version": "1"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/me": {
+      "get": {
+        "operationId": "getMe",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeOut"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Me",
+        "tags": ["me"]
+      }
+    },
+    "/api/v1/me/privacy-ack": {
+      "post": {
+        "description": "The honesty notice (PLAN.md \u00a76.7) is acknowledged once.",
+        "operationId": "acknowledgePrivacyNotice",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeOut"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Acknowledge Privacy Notice",
+        "tags": ["me"]
+      }
+    },
+    "/api/v1/preferences": {
+      "get": {
+        "description": "Values for `any`, overridden by values stored for the given device class.",
+        "operationId": "listPreferences",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "device_class",
+            "required": false,
+            "schema": {
+              "allOf": [
+                {
+                  "enum": ["any", "desktop", "mobile"],
+                  "title": "DeviceClass",
+                  "type": "string"
+                }
+              ],
+              "default": "any"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "List Preferences",
+        "tags": ["me"]
+      }
+    },
+    "/api/v1/preferences/{key}": {
+      "put": {
+        "operationId": "setPreference",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "title": "Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreferenceIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Set Preference",
+        "tags": ["me"]
+      }
+    }
+  },
+  "servers": []
+}

@@ -55,3 +55,6 @@ datasets/
 .vscode/
 *.swp
 .DS_Store
+backend/spa_root/
+e2e/node_modules/
+e2e/out/

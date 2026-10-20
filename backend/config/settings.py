@@ -119,6 +119,11 @@ USE_TZ = True
 
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+# Built SPA (production image): files live in SPA_ROOT/app/ and are served at /app/ by WhiteNoise.
+SPA_ROOT = Path(env.str("SPA_ROOT", str(BASE_DIR / "spa_root")))
+if SPA_ROOT.exists():
+    WHITENOISE_ROOT = SPA_ROOT
+WHITENOISE_MIMETYPES = {".webmanifest": "application/manifest+json"}
 
 # Bulk storage on the HDD: raw import files, photo derivatives, backup outbox.
 BULK_DIR = Path(env.str("TRAVEL_BULK_DIR_IN_CONTAINER", "/bulk"))
@@ -151,6 +156,13 @@ SECURE_CSP = {
     "base-uri": ["'self'"],
     "form-action": ["'self'"],
 }
+# Sign-out is a form POST that redirects to the provider's end-session page; Chrome applies
+# form-action to that redirect, so the provider's origin must be allowed.
+if OIDC_ISSUER:
+    from urllib.parse import urlsplit
+
+    _issuer = urlsplit(OIDC_ISSUER)
+    SECURE_CSP["form-action"].append(f"{_issuer.scheme}://{_issuer.netloc}")
 
 # --- Logging --------------------------------------------------------------------------------
 LOGGING = {
