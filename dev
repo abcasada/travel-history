@@ -62,6 +62,52 @@ case "$cmd" in
     compose run --rm --no-deps tools ruff check --fix .
     node_run npx biome check --write src
     ;;
+  backup-now)
+    compose run --rm backup /backup/backup.sh
+    ;;
+  restore-test)
+    # Backup -> restore -> verify, end to end, with a throwaway key (never the real one).
+    set -e
+    rt="$PWD/var/restore-test"; rm -rf "$rt"; mkdir -p "$rt/outbox"
+    compose build backup >/dev/null
+    img=travel-history-backup:latest
+    docker run --rm "$img" age-keygen 2>/dev/null > "$rt/test.key"
+    pub="$(grep -m1 'public key:' "$rt/test.key" | awk '{print $4}')"
+    compose up -d db >/dev/null 2>&1
+    echo "1/4 backup with a test key"
+    compose run --rm -e AGE_RECIPIENT="$pub" -e BACKUP_OUTBOX=/rt/outbox -v "$rt:/rt" \
+      backup /backup/backup.sh
+    dump="$(ls -1 "$rt"/outbox/db/*.age | head -1)"
+    echo "2/4 restore into a scratch database"
+    net=travel-restore-test; db=travel-restore-db; pw="$(random_secret)"
+    docker network create "$net" >/dev/null
+    trap 'docker rm -f "$db" >/dev/null 2>&1; docker network rm "$net" >/dev/null 2>&1; rm -rf "$rt"' EXIT
+    docker run -d --name "$db" --network "$net" --user 999:999 -e POSTGRES_PASSWORD="$pw" \
+      -e TRAVEL_OWNER_PASSWORD="$pw" -e TRAVEL_APP_PASSWORD="$pw" -e TRAVEL_PUBLIC_PASSWORD="$pw" \
+      -v "$PWD/db/init:/docker-entrypoint-initdb.d:ro" postgis/postgis:18-3.6 >/dev/null
+    for _ in $(seq 1 60); do
+      docker exec "$db" psql -U postgres -d travel -c 'select 1' >/dev/null 2>&1 \
+        && docker logs "$db" 2>&1 | grep -q 'PostgreSQL init process complete' && break
+      sleep 2
+    done
+    sleep 2
+    scratch=(docker run --rm --network "$net" --user "$(id -u):$(id -g)" -e HOME=/tmp
+      -e PGHOST="$db" -e PGUSER=travel_owner -e PGPASSWORD="$pw" -e PGDATABASE=travel
+      -e AGE_IDENTITY_FILE=/rt/test.key -v "$rt:/rt" "$img")
+    "${scratch[@]}" /backup/restore.sh "/rt/outbox/db/$(basename "$dump")"
+    echo "3/4 compare every table's row count and the security policies"
+    counts_sql="SELECT table_name || '=' || (xpath('/row/c/text()', query_to_xml(format('select count(*) as c from %I', table_name), false, true, '')))[1]::text FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE' UNION ALL SELECT 'policies=' || count(*) FROM pg_policies UNION ALL SELECT 'app_functions=' || count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'app' ORDER BY 1"
+    compose exec -T db psql -U travel_owner -d travel -At -c "$counts_sql" > "$rt/source.txt"
+    "${scratch[@]}" psql -At -c "$counts_sql" > "$rt/restored.txt"
+    if diff -u "$rt/source.txt" "$rt/restored.txt"; then
+      echo "    $(wc -l < "$rt/source.txt") tables/checks identical"
+    else
+      echo "RESTORE TEST FAILED: differences above" >&2; exit 1
+    fi
+    echo "4/4 verify raw import files against their checksums"
+    "${scratch[@]}" python3 /backup/verify_raw.py /rt/outbox /rt/test.key
+    echo "restore test passed"
+    ;;
   npm)      node_run npm "$@" ;;
   e2e)
     # Headless Chrome (host network: containers can't reach the host's LAN address otherwise).
@@ -88,6 +134,8 @@ case "$cmd" in
 ./dev manage <cmd>        Django management command (runs as the OWNER role)
 ./dev shell | psql        Django shell / psql (owner role)
 ./dev npm <args>          npm inside the Node container (frontend/)
+./dev backup-now          run one encrypted backup into the outbox (needs AGE_RECIPIENT in .env)
+./dev restore-test        backup -> restore into a scratch DB -> verify (throwaway key)
 ./dev e2e [base-url]      browser smoke test (sign-in, notice, map, both shells; screenshots in e2e/out/)
 HELP
     ;;

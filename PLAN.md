@@ -5,7 +5,7 @@
 > This file is the single source of truth for design and progress. Keep it current
 > (CLAUDE.md requires it).
 
-**Status:** Phase 1 (Skeleton) in progress — milestones 1.0–1.5 done. Last updated 2026-10-20.
+**Status:** Phase 1 (Skeleton) complete; phase 2 (Timeline and tracking) next. Last updated 2026-10-20.
 
 Contents
 
@@ -1387,9 +1387,10 @@ cannot hold the North America build, and the 60 GB SSD budget does not fit until
 
 ### 22.2 Restore (tested)
 
-`./dev restore-test` (also part of the phase-1 acceptance): creates a throwaway PostGIS container,
-decrypts the latest dump with a **test** key, `pg_restore`s it, runs the migrations check and
-row-count comparisons, and verifies raw-file checksums. Real restore runbook in
+`./dev restore-test` (part of the phase-1 acceptance): generates a throwaway age key, runs a real
+backup with it, restores into a scratch PostGIS container initialized by `db/init`, compares the row
+count of every table plus the RLS policy and `app` function counts with the source, and verifies
+each raw file's checksum after decryption and decompression. Real restore runbook in
 `docs/restore.md`: provision host → clone repo → restore `.env` from password manager → start
 `db` → decrypt and `pg_restore` → copy raw/media back → `./dev up`.
 
@@ -1427,8 +1428,12 @@ Status markers: ✅ done · 🔄 in progress · ⏳ not started · ⛔ blocked o
 - [ ] Store the raw export in three places, one of them offline.
 - [ ] Put the flight spreadsheet in `data/private/` (git-ignored).
 - [ ] Optional now, needed by phase 8: decide on GitHub repo visibility (currently public).
+- [ ] Create the backup key **on your laptop** (`age-keygen -o travel-backup.key`), keep the private
+      key offline + in your password manager, put the public key in the server's `.env` as
+      `AGE_RECIPIENT` (until then the nightly job writes nothing). See `docs/backup-nas.md`.
+- [ ] Set up the NAS pull (read-only `rrsync` key + nightly rsync + snapshots): `docs/backup-nas.md`.
 
-### Phase 1 — Skeleton 🔄
+### Phase 1 — Skeleton ✅ (completed 2026-10-20)
 
 | Milestone | Acceptance criteria | Status |
 |---|---|---|
@@ -1438,13 +1443,13 @@ Status markers: ✅ done · 🔄 in progress · ⏳ not started · ⛔ blocked o
 | 1.3 RLS + permission tests | RLS on every user-owned table (meta-test enumerates tables); permission matrix §6.3 tested at the SQL level as `travel_app` **and** against the app policy layer (`travel.core.policy`) that every endpoint must use; visibility rules §6.2 tested. Each API endpoint added later ships with its own API-level permission tests (CLAUDE.md rule 3) | ✅ 2026-10-20 (45 actions × 7 actors) |
 | 1.4 OIDC + login wall | Login/callback/logout/re-auth against the mock provider; public-route allowlist test (§7.6); CSRF on; secure-cookie settings in production config | ✅ 2026-10-20 (also verified live against the running mock provider) |
 | 1.5 Frontend shell + basemap | React + TS + MapLibre app with desktop/mobile shells and manual switch, OpenFreeMap basemap, auth state, PWA manifest; platform adapters stubbed; Vitest + type-check + build pass | ✅ 2026-10-20 (also verified in headless Chrome against the dev server and the production image: `./dev e2e`) |
-| 1.6 Backups | Nightly backup job (pg_dump → zstd → age; raw/media incremental); `./dev restore-test` restores into a scratch DB and verifies; NAS pull instructions written | ⏳ |
+| 1.6 Backups | Nightly backup job (pg_dump → zstd → age; raw/media incremental); `./dev restore-test` restores into a scratch DB and verifies; NAS pull instructions written | ✅ 2026-10-20 (restore test: all 64 tables/checks identical; raw-file checksum verification exercised from milestone 2.1 on, when raw files exist) |
 
 ### Phase 2 — Timeline and tracking ⏳ (← history becomes viewable)
 
 | Milestone | Acceptance criteria |
 |---|---|
-| 2.1 Uploads + raw store | Resumable chunked upload API; raw file stored zstd, 0440, checksum-verified; identical re-upload detected by hash; per-user quota |
+| 2.1 Uploads + raw store | Resumable chunked upload API; raw file stored zstd, 0440, checksum-verified; identical re-upload detected by hash; per-user quota; `./dev restore-test` verifies raw-file checksums end to end |
 | 2.2 Timeline import + diff | Streaming parse (memory bounded: a 1 GB synthetic file stays under the worker limit); staging + diff per §8.3; versions kept; absent ≠ deleted; in-app edits win; review flags; import summary page. iOS marked unverified until a real sample is checked |
 | 2.3 Raw-history map | MVT endpoint (own points only, RLS), date filter, segment overlay, coverage strip |
 | 2.4 Tracker ingestion | OwnTracks + Overland endpoints with device tokens (create/revoke/rate-limit); setup pages with QR/deep links; Colota evaluated; battery notes |
@@ -1586,6 +1591,7 @@ and can be revisited. Newest at the bottom.
 | D-61 | 2026-10-20 | MapLibre's worker is bundled explicitly (`?worker&url` + `setWorkerUrl`) | MapLibre builds the worker URL at runtime, which bundlers can't see: without this the worker was missing from builds and Vite dev, and vector layers didn't render (caught by the browser smoke test). |
 | D-62 | 2026-10-20 | Typed client generated by orval from the Ninja OpenAPI schema with explicit `operation_id`s; regenerate after API changes (`./dev manage export_openapi > frontend/src/api/openapi.json && ./dev npm run gen:api`) and commit both files | One source of truth for request/response types; openapi-typescript needs TypeScript 5 (we use 6). |
 | D-63 | 2026-10-20 | Browser smoke test (`./dev e2e`): headless Chrome (`zenika/alpine-chrome`) on the host network, driven by playwright-core | Catches what jsdom can't (WebGL map, workers, CSP, real OIDC redirects); host networking avoids the container-to-host firewall restriction. |
+| D-64 | 2026-10-20 | Backup implementation: a `backup` container (PostGIS image + age + zstd) with a daily loop at 03:30 local; refuses to run without an age public key; dumps exclude `spatial_ref_sys` data (owned by PostGIS, recreated by `db/init`); restores use `pg_restore --no-comments --exit-on-error` into a database freshly initialized by `db/init` | No unencrypted backup can ever be written; restores work as the owner role without superuser rights; verified by `./dev restore-test`. |
 
 ---
 

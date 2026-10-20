@@ -116,6 +116,31 @@ services:
     pids_limit: 200
     restart: unless-stopped
 
+  # Nightly encrypted backups into the outbox the NAS pulls (PLAN.md §22). Connects as the owner
+  # role so the dump is complete (the owner is not subject to row-level security).
+  backup:
+    image: travel-history-backup:latest
+    build: ./backup
+    user: "${APP_UID:-1000}:${APP_GID:-1000}"
+    environment:
+      PGHOST: db
+      PGDATABASE: travel
+      PGUSER: travel_owner
+      PGPASSWORD: ${TRAVEL_OWNER_PASSWORD:?set in .env}
+      AGE_RECIPIENT: ${AGE_RECIPIENT:-}
+      BACKUP_TIME: ${BACKUP_TIME:-03:30}
+      KEEP_DUMPS: ${KEEP_DUMPS:-7}
+      TZ: ${TZ:-America/Chicago}
+      HOME: /tmp
+    volumes:
+      - ${TRAVEL_BULK_DIR:?set in .env}:/bulk
+    networks: [internal]
+    depends_on:
+      db: { condition: service_healthy }
+    mem_limit: 512m
+    restart: unless-stopped
+    <<: *hardening
+
 networks:
   internal:
     internal: true
