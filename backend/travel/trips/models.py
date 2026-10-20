@@ -21,7 +21,7 @@ def new_public_slug() -> str:
 class Purpose(models.Model):
     """User-editable list of trip purposes; seeded per user (Work, Vacation, …)."""
 
-    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="purposes")
+    owner = models.ForeignKey(User, on_delete=models.DB_CASCADE, related_name="purposes")
     name = models.CharField(max_length=64)
     default_visibility = models.CharField(
         max_length=16, choices=Visibility.choices, default=Visibility.PARTICIPANTS
@@ -54,10 +54,10 @@ class Trip(models.Model):
         FLIGHT_IMPORT = "flight_import", "Flight import"
         MERGED = "merged", "Merged"
 
-    owner = models.ForeignKey(User, on_delete=models.PROTECT, related_name="trips")
+    owner = models.ForeignKey(User, on_delete=models.DO_NOTHING, related_name="trips")
     title = models.CharField(max_length=200)
     purpose = models.ForeignKey(
-        Purpose, null=True, blank=True, on_delete=models.SET_NULL, related_name="trips"
+        Purpose, null=True, blank=True, on_delete=models.DB_SET_NULL, related_name="trips"
     )
     start_date = models.DateField()
     end_date = models.DateField()
@@ -75,7 +75,7 @@ class Trip(models.Model):
     privacy_zone_enabled = models.BooleanField(default=True)
     privacy_zone_radius_m = models.PositiveIntegerField(default=1000)
     cover_media = models.ForeignKey(
-        "media.Media", null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+        "media.Media", null=True, blank=True, on_delete=models.DB_SET_NULL, related_name="+"
     )
     notes = models.TextField(blank=True)
     photo_limit_per_contributor = models.PositiveSmallIntegerField(default=10)
@@ -120,7 +120,7 @@ class Leg(models.Model):
         TRIP = "trip", "Trip participants"
         AUTHOR = "author", "Only the author"
 
-    trip = models.ForeignKey(Trip, on_delete=models.CASCADE, related_name="legs")
+    trip = models.ForeignKey(Trip, on_delete=models.DB_CASCADE, related_name="legs")
     sequence = models.PositiveIntegerField()
     mode = models.CharField(max_length=16, choices=TravelMode.choices)
     start_utc = models.DateTimeField(null=True, blank=True)
@@ -131,38 +131,42 @@ class Leg(models.Model):
         max_length=16, choices=DatePrecision.choices, default=DatePrecision.EXACT
     )
     origin_stop = models.ForeignKey(
-        "trips.Stop", null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+        "trips.Stop", null=True, blank=True, on_delete=models.DB_SET_NULL, related_name="+"
     )
     destination_stop = models.ForeignKey(
-        "trips.Stop", null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+        "trips.Stop", null=True, blank=True, on_delete=models.DB_SET_NULL, related_name="+"
     )
     origin_label = models.CharField(max_length=200, blank=True)
     destination_label = models.CharField(max_length=200, blank=True)
     vehicle = models.ForeignKey(
-        "vehicles.Vehicle", null=True, blank=True, on_delete=models.SET_NULL, related_name="legs"
+        "vehicles.Vehicle",
+        null=True,
+        blank=True,
+        on_delete=models.DB_SET_NULL,
+        related_name="legs",
     )
-    author = models.ForeignKey(User, on_delete=models.PROTECT, related_name="legs_authored")
+    author = models.ForeignKey(User, on_delete=models.DO_NOTHING, related_name="legs_authored")
     is_contribution = models.BooleanField(default=False)
     participant_scope = models.CharField(
         max_length=16, choices=ParticipantScope.choices, default=ParticipantScope.TRIP
     )
     current_route = models.ForeignKey(
-        "trips.Route", null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+        "trips.Route", null=True, blank=True, on_delete=models.DB_SET_NULL, related_name="+"
     )
     distance_m = models.FloatField(null=True, blank=True)
     # Flight fields
     airline = models.ForeignKey(
-        "geo.Airline", null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+        "geo.Airline", null=True, blank=True, on_delete=models.DB_SET_NULL, related_name="+"
     )
     flight_number = models.CharField(max_length=16, blank=True)
     origin_airport = models.ForeignKey(
-        "geo.Airport", null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+        "geo.Airport", null=True, blank=True, on_delete=models.DB_SET_NULL, related_name="+"
     )
     destination_airport = models.ForeignKey(
-        "geo.Airport", null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+        "geo.Airport", null=True, blank=True, on_delete=models.DB_SET_NULL, related_name="+"
     )
     aircraft_type = models.ForeignKey(
-        "geo.AircraftType", null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+        "geo.AircraftType", null=True, blank=True, on_delete=models.DB_SET_NULL, related_name="+"
     )
     aircraft_registration = models.CharField(max_length=16, blank=True)
     seat = models.CharField(max_length=8, blank=True)
@@ -170,7 +174,11 @@ class Leg(models.Model):
     # Provenance: references to raw data (never copies of points)
     source_segments = ArrayField(models.BigIntegerField(), default=list, blank=True)
     import_batch = models.ForeignKey(
-        "history.ImportBatch", null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+        "history.ImportBatch",
+        null=True,
+        blank=True,
+        on_delete=models.DB_SET_NULL,
+        related_name="+",
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -206,7 +214,7 @@ class Route(models.Model):
         HAND_EDITED = "hand_edited", "Hand-edited"
         GREAT_CIRCLE = "great_circle", "Great circle"
 
-    leg = models.ForeignKey(Leg, on_delete=models.CASCADE, related_name="routes")
+    leg = models.ForeignKey(Leg, on_delete=models.DB_CASCADE, related_name="routes")
     version = models.PositiveIntegerField()
     geom = gis.MultiLineStringField(srid=4326)
     kind = models.CharField(max_length=16, choices=Kind.choices)
@@ -215,7 +223,7 @@ class Route(models.Model):
     engine_version = models.CharField(max_length=32, blank=True)
     engine_data_date = models.DateField(null=True, blank=True)
     produced_at = models.DateTimeField()
-    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="+")
+    created_by = models.ForeignKey(User, on_delete=models.DO_NOTHING, related_name="+")
     source_time_range = DateTimeRangeField(null=True, blank=True)
     length_m = models.FloatField()
     note = models.CharField(max_length=255, blank=True)
@@ -232,7 +240,7 @@ class Route(models.Model):
 class RouteSimplified(models.Model):
     """Per-zoom simplified copy of a route version, built once when the version is created."""
 
-    route = models.ForeignKey(Route, on_delete=models.CASCADE, related_name="simplified")
+    route = models.ForeignKey(Route, on_delete=models.DB_CASCADE, related_name="simplified")
     zoom = models.PositiveSmallIntegerField()
     geom = gis.MultiLineStringField(srid=4326)
 
@@ -246,11 +254,11 @@ class RouteSimplified(models.Model):
 
 
 class TripParticipant(models.Model):
-    trip = models.ForeignKey(Trip, on_delete=models.CASCADE, related_name="participants")
+    trip = models.ForeignKey(Trip, on_delete=models.DB_CASCADE, related_name="participants")
     person = models.ForeignKey(
-        "accounts.Person", on_delete=models.PROTECT, related_name="participations"
+        "accounts.Person", on_delete=models.DO_NOTHING, related_name="participations"
     )
-    added_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="+")
+    added_by = models.ForeignKey(User, on_delete=models.DO_NOTHING, related_name="+")
     public_consent = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -266,10 +274,10 @@ class TripParticipant(models.Model):
 class LegParticipantOverride(models.Model):
     """Per-leg add (`include=True`) or remove (`include=False`) relative to the leg's base set."""
 
-    leg = models.ForeignKey(Leg, on_delete=models.CASCADE, related_name="participant_overrides")
-    person = models.ForeignKey("accounts.Person", on_delete=models.PROTECT, related_name="+")
+    leg = models.ForeignKey(Leg, on_delete=models.DB_CASCADE, related_name="participant_overrides")
+    person = models.ForeignKey("accounts.Person", on_delete=models.DO_NOTHING, related_name="+")
     include = models.BooleanField()
-    set_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="+")
+    set_by = models.ForeignKey(User, on_delete=models.DO_NOTHING, related_name="+")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -287,7 +295,7 @@ class Place(models.Model):
         TIMELINE = "timeline", "Timeline"
         GEOCODED = "geocoded", "Geocoded"
 
-    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="places")
+    owner = models.ForeignKey(User, on_delete=models.DB_CASCADE, related_name="places")
     name = models.CharField(max_length=200, blank=True)
     point = gis.PointField(srid=4326)
     address = models.CharField(max_length=300, blank=True)
@@ -310,21 +318,21 @@ class Stop(models.Model):
         VISIT = "visit", "Visit"
         WAYPOINT = "waypoint", "Waypoint"
 
-    trip = models.ForeignKey(Trip, on_delete=models.CASCADE, related_name="stops")
+    trip = models.ForeignKey(Trip, on_delete=models.DB_CASCADE, related_name="stops")
     leg = models.ForeignKey(
-        Leg, null=True, blank=True, on_delete=models.SET_NULL, related_name="stops"
+        Leg, null=True, blank=True, on_delete=models.DB_SET_NULL, related_name="stops"
     )
-    place = models.ForeignKey(Place, on_delete=models.PROTECT, related_name="stops")
+    place = models.ForeignKey(Place, on_delete=models.DO_NOTHING, related_name="stops")
     kind = models.CharField(max_length=16, choices=Kind.choices)
     arrive_utc = models.DateTimeField(null=True, blank=True)
     depart_utc = models.DateTimeField(null=True, blank=True)
     tz = models.CharField(max_length=64, blank=True)
-    author = models.ForeignKey(User, on_delete=models.PROTECT, related_name="+")
+    author = models.ForeignKey(User, on_delete=models.DO_NOTHING, related_name="+")
     source_segment = models.ForeignKey(
         "history.TimelineSegment",
         null=True,
         blank=True,
-        on_delete=models.SET_NULL,
+        on_delete=models.DB_SET_NULL,
         related_name="+",
     )
     created_at = models.DateTimeField(auto_now_add=True)
@@ -334,7 +342,7 @@ class Stop(models.Model):
 
 
 class Tag(models.Model):
-    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="tags")
+    owner = models.ForeignKey(User, on_delete=models.DB_CASCADE, related_name="tags")
     name = models.CharField(max_length=64)
     color = models.CharField(max_length=7, blank=True)
 
@@ -348,9 +356,9 @@ class Tag(models.Model):
 class TripTag(models.Model):
     """A tag applied to a trip by its author (the owner's tags are the trip's main tags)."""
 
-    trip = models.ForeignKey(Trip, on_delete=models.CASCADE, related_name="trip_tags")
-    tag = models.ForeignKey(Tag, on_delete=models.CASCADE, related_name="trip_tags")
-    author = models.ForeignKey(User, on_delete=models.CASCADE, related_name="+")
+    trip = models.ForeignKey(Trip, on_delete=models.DB_CASCADE, related_name="trip_tags")
+    tag = models.ForeignKey(Tag, on_delete=models.DB_CASCADE, related_name="trip_tags")
+    author = models.ForeignKey(User, on_delete=models.DB_CASCADE, related_name="+")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -361,8 +369,8 @@ class TripTag(models.Model):
 
 
 class TripNote(models.Model):
-    trip = models.ForeignKey(Trip, on_delete=models.CASCADE, related_name="trip_notes")
-    author = models.ForeignKey(User, on_delete=models.PROTECT, related_name="+")
+    trip = models.ForeignKey(Trip, on_delete=models.DB_CASCADE, related_name="trip_notes")
+    author = models.ForeignKey(User, on_delete=models.DO_NOTHING, related_name="+")
     body = models.TextField()
     public_consent = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -375,11 +383,11 @@ class TripNote(models.Model):
 class TrackContribution(models.Model):
     """A participant attaching their own GPS track (a time range of their raw points)."""
 
-    trip = models.ForeignKey(Trip, on_delete=models.CASCADE, related_name="track_contributions")
-    author = models.ForeignKey(User, on_delete=models.PROTECT, related_name="+")
+    trip = models.ForeignKey(Trip, on_delete=models.DB_CASCADE, related_name="track_contributions")
+    author = models.ForeignKey(User, on_delete=models.DO_NOTHING, related_name="+")
     time_range = DateTimeRangeField()
     route = models.ForeignKey(
-        Route, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+        Route, null=True, blank=True, on_delete=models.DB_SET_NULL, related_name="+"
     )
     public_consent = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -395,13 +403,13 @@ class ReviewFlag(models.Model):
         FLIGHT_UNMATCHED = "flight_unmatched", "Flight not matched"
         OTHER = "other", "Other"
 
-    trip = models.ForeignKey(Trip, on_delete=models.CASCADE, related_name="review_flags")
+    trip = models.ForeignKey(Trip, on_delete=models.DB_CASCADE, related_name="review_flags")
     reason = models.CharField(max_length=32, choices=Reason.choices)
     details = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     resolved_at = models.DateTimeField(null=True, blank=True)
     resolved_by = models.ForeignKey(
-        User, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+        User, null=True, blank=True, on_delete=models.DB_SET_NULL, related_name="+"
     )
 
     def __str__(self) -> str:
@@ -411,7 +419,7 @@ class ReviewFlag(models.Model):
 class RejectedCandidate(models.Model):
     """Rejected detections never resurface (matched by fingerprint)."""
 
-    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="+")
+    owner = models.ForeignKey(User, on_delete=models.DB_CASCADE, related_name="+")
     fingerprint = models.CharField(max_length=64)
     time_range = DateTimeRangeField()
     rejected_at = models.DateTimeField(auto_now_add=True)
@@ -436,8 +444,8 @@ class TransferOffer(models.Model):
         ACCEPTED = "accepted", "Accepted"
         DECLINED = "declined", "Declined"
 
-    from_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="+")
-    to_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="+")
+    from_user = models.ForeignKey(User, on_delete=models.DB_CASCADE, related_name="+")
+    to_user = models.ForeignKey(User, on_delete=models.DB_CASCADE, related_name="+")
     kind = models.CharField(max_length=16, choices=Kind.choices)
     object_id = models.BigIntegerField()
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.PENDING)

@@ -19,13 +19,13 @@ class Vehicle(models.Model):
     trim = models.CharField(max_length=64, blank=True)
     color = models.CharField(max_length=32, blank=True)
     photo = models.ForeignKey(
-        "media.Media", null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+        "media.Media", null=True, blank=True, on_delete=models.DB_SET_NULL, related_name="+"
     )
-    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="+")
+    created_by = models.ForeignKey(User, on_delete=models.DO_NOTHING, related_name="+")
     hidden = models.BooleanField(default=False)
     is_rental = models.BooleanField(default=False)
     merged_into = models.ForeignKey(
-        "self", null=True, blank=True, on_delete=models.SET_NULL, related_name="merged_from"
+        "self", null=True, blank=True, on_delete=models.DB_SET_NULL, related_name="merged_from"
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -39,7 +39,7 @@ class VehiclePrivate(models.Model):
     """Plate and VIN, readable only by the vehicle's managing user (separate table for RLS)."""
 
     vehicle = models.OneToOneField(
-        Vehicle, primary_key=True, on_delete=models.CASCADE, related_name="private"
+        Vehicle, primary_key=True, on_delete=models.DB_CASCADE, related_name="private"
     )
     plate = models.CharField(max_length=16, blank=True)
     plate_last4 = models.CharField(max_length=4, blank=True)
@@ -57,9 +57,9 @@ class VehicleOwnership(models.Model):
         DEALER = "dealer", "Dealer"
         OTHER = "other", "Other"
 
-    vehicle = models.ForeignKey(Vehicle, on_delete=models.CASCADE, related_name="ownerships")
+    vehicle = models.ForeignKey(Vehicle, on_delete=models.DB_CASCADE, related_name="ownerships")
     owner_person = models.ForeignKey(
-        "accounts.Person", null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+        "accounts.Person", null=True, blank=True, on_delete=models.DO_NOTHING, related_name="+"
     )
     outside_owner_name = models.CharField(max_length=150, blank=True)
     outside_owner_kind = models.CharField(
@@ -67,7 +67,7 @@ class VehicleOwnership(models.Model):
     )
     valid_from = models.DateField(null=True, blank=True)  # null = since before records
     valid_to = models.DateField(null=True, blank=True)  # null = still owned (exclusive bound)
-    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="+")
+    created_by = models.ForeignKey(User, on_delete=models.DO_NOTHING, related_name="+")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

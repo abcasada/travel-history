@@ -29,7 +29,7 @@ class User(AbstractBaseUser):
     oidc_issuer = models.CharField(max_length=255, blank=True)
     oidc_sub = models.CharField(max_length=255, blank=True)
     person = models.OneToOneField(
-        "accounts.Person", null=True, blank=True, on_delete=models.SET_NULL, related_name="user"
+        "accounts.Person", null=True, blank=True, on_delete=models.DB_SET_NULL, related_name="user"
     )
     is_active = models.BooleanField(default=True)
     privacy_notice_ack_at = models.DateTimeField(null=True, blank=True)
@@ -69,7 +69,9 @@ class Person(models.Model):
 
     display_name = models.CharField(max_length=150)
     birth_year = models.PositiveSmallIntegerField(null=True, blank=True)
-    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="persons_created")
+    created_by = models.ForeignKey(
+        User, on_delete=models.DO_NOTHING, related_name="persons_created"
+    )
     visibility = models.CharField(
         max_length=16, choices=Visibility.choices, default=Visibility.FAMILY
     )
@@ -84,7 +86,7 @@ class Person(models.Model):
 class UserPreference(models.Model):
     """Per-user settings, optionally per device class (e.g. split-pane width on desktop)."""
 
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="preferences")
+    user = models.ForeignKey(User, on_delete=models.DB_CASCADE, related_name="preferences")
     key = models.CharField(max_length=64)
     device_class = models.CharField(
         max_length=16, choices=DeviceClass.choices, default=DeviceClass.ANY
@@ -113,7 +115,7 @@ class DeviceToken(models.Model):
         COLOTA = "colota", "Colota"
         GENERIC = "generic", "Generic"
 
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="device_tokens")
+    user = models.ForeignKey(User, on_delete=models.DB_CASCADE, related_name="device_tokens")
     name = models.CharField(max_length=100)
     kind = models.CharField(max_length=16, choices=Kind.choices)
     token_prefix = models.CharField(max_length=12)
@@ -141,10 +143,10 @@ class AccessRequest(models.Model):
     ip_hash = models.CharField(max_length=64, blank=True)
     turnstile_ok = models.BooleanField(default=False)
     invite = models.ForeignKey(
-        "accounts.Invite", null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+        "accounts.Invite", null=True, blank=True, on_delete=models.DB_SET_NULL, related_name="+"
     )
     decided_by = models.ForeignKey(
-        User, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+        User, null=True, blank=True, on_delete=models.DB_SET_NULL, related_name="+"
     )
     decided_at = models.DateTimeField(null=True, blank=True)
     idp_user_id = models.CharField(max_length=255, blank=True)
@@ -157,7 +159,7 @@ class AccessRequest(models.Model):
 class AllowlistEntry(models.Model):
     email = models.EmailField()
     role = models.CharField(max_length=16, choices=Role.choices, default=Role.MEMBER)
-    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="+")
+    created_by = models.ForeignKey(User, on_delete=models.DO_NOTHING, related_name="+")
     note = models.CharField(max_length=255, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -176,11 +178,11 @@ class Invite(models.Model):
     email = models.EmailField(blank=True)
     relationship = models.CharField(max_length=150, blank=True)
     role = models.CharField(max_length=16, choices=Role.choices, default=Role.MEMBER)
-    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="+")
+    created_by = models.ForeignKey(User, on_delete=models.DO_NOTHING, related_name="+")
     expires_at = models.DateTimeField()
     used_at = models.DateTimeField(null=True, blank=True)
     used_by = models.ForeignKey(
-        User, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+        User, null=True, blank=True, on_delete=models.DB_SET_NULL, related_name="+"
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -189,7 +191,7 @@ class Invite(models.Model):
 
 
 class PushSubscription(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="push_subscriptions")
+    user = models.ForeignKey(User, on_delete=models.DB_CASCADE, related_name="push_subscriptions")
     endpoint = models.TextField(unique=True)
     p256dh = models.CharField(max_length=255)
     auth = models.CharField(max_length=255)
@@ -205,13 +207,13 @@ class PushSubscription(models.Model):
 class PublicProfile(models.Model):
     """A user's public profile page. Off until its owner enables it."""
 
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="public_profile")
+    user = models.OneToOneField(User, on_delete=models.DB_CASCADE, related_name="public_profile")
     slug = models.SlugField(max_length=64, unique=True)
     enabled = models.BooleanField(default=False)
     display_name = models.CharField(max_length=150, blank=True)
     bio = models.TextField(blank=True)
     avatar = models.ForeignKey(
-        "media.Media", null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+        "media.Media", null=True, blank=True, on_delete=models.DB_SET_NULL, related_name="+"
     )
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -226,7 +228,7 @@ class IntegrationSetting(models.Model):
     class Provider(models.TextChoices):
         IMMICH = "immich", "Immich"
 
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="integrations")
+    user = models.ForeignKey(User, on_delete=models.DB_CASCADE, related_name="integrations")
     provider = models.CharField(max_length=16, choices=Provider.choices)
     base_url = models.URLField()
     credential_encrypted = models.TextField(blank=True)
@@ -245,7 +247,7 @@ class IntegrationSetting(models.Model):
 
 class AuditLog(models.Model):
     actor = models.ForeignKey(
-        User, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+        User, null=True, blank=True, on_delete=models.DB_SET_NULL, related_name="+"
     )
     action = models.CharField(max_length=64)
     object_type = models.CharField(max_length=64, blank=True)

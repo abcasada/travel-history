@@ -22,7 +22,7 @@ class RawFile(models.Model):
         COMPANION = "companion", "Android companion"
         API = "api", "API"
 
-    owner = models.ForeignKey(User, on_delete=models.PROTECT, related_name="raw_files")
+    owner = models.ForeignKey(User, on_delete=models.DO_NOTHING, related_name="raw_files")
     original_name = models.CharField(max_length=255)
     content_type = models.CharField(max_length=100, blank=True)
     size_bytes = models.BigIntegerField()
@@ -62,10 +62,10 @@ class ImportBatch(models.Model):
         DONE = "done", "Done"
         FAILED = "failed", "Failed"
 
-    owner = models.ForeignKey(User, on_delete=models.PROTECT, related_name="import_batches")
+    owner = models.ForeignKey(User, on_delete=models.DO_NOTHING, related_name="import_batches")
     kind = models.CharField(max_length=32, choices=Kind.choices)
     raw_file = models.ForeignKey(
-        RawFile, null=True, blank=True, on_delete=models.PROTECT, related_name="batches"
+        RawFile, null=True, blank=True, on_delete=models.DO_NOTHING, related_name="batches"
     )
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.QUEUED)
     summary = models.JSONField(default=dict, blank=True)
@@ -93,7 +93,7 @@ class LocationPoint(models.Model):
     """Append-only raw point (no UPDATE: trigger + revoked privilege)."""
 
     id = models.BigAutoField(primary_key=True)
-    owner = models.ForeignKey(User, on_delete=models.PROTECT, related_name="+", db_index=False)
+    owner = models.ForeignKey(User, on_delete=models.DO_NOTHING, related_name="+", db_index=False)
     ts = models.DateTimeField()
     geom = gis.PointField(srid=4326)
     accuracy_m = models.FloatField(null=True, blank=True)
@@ -102,13 +102,13 @@ class LocationPoint(models.Model):
     course_deg = models.FloatField(null=True, blank=True)
     battery_pct = models.SmallIntegerField(null=True, blank=True)
     source = models.CharField(max_length=16, choices=PointSource.choices)
-    # PROTECT, not SET_NULL: Django implements SET_NULL with an UPDATE, which the append-only
-    # trigger rejects. Device tokens are revoked, not deleted, while points reference them.
+    # DO_NOTHING (a plain FK that refuses the delete), never SET_NULL: nulling the column would be
+    # an UPDATE, which the append-only trigger rejects. Device tokens are revoked, not deleted.
     device = models.ForeignKey(
-        "accounts.DeviceToken", null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+        "accounts.DeviceToken", null=True, blank=True, on_delete=models.DO_NOTHING, related_name="+"
     )
     import_batch = models.ForeignKey(
-        ImportBatch, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+        ImportBatch, null=True, blank=True, on_delete=models.DO_NOTHING, related_name="+"
     )
     received_at = models.DateTimeField(auto_now_add=True)
     extra = models.JSONField(null=True, blank=True)
@@ -140,12 +140,12 @@ class TimelineSegment(models.Model):
         PATH = "path", "Path"
         MEMORY = "memory", "Memory"
 
-    owner = models.ForeignKey(User, on_delete=models.PROTECT, related_name="+", db_index=False)
+    owner = models.ForeignKey(User, on_delete=models.DO_NOTHING, related_name="+", db_index=False)
     lineage_id = models.UUIDField()
     version = models.PositiveIntegerField(default=1)
     is_current = models.BooleanField(default=True)
     superseded_by = models.ForeignKey(
-        "self", null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+        "self", null=True, blank=True, on_delete=models.DB_SET_NULL, related_name="+"
     )
     kind = models.CharField(max_length=16, choices=Kind.choices)
     start_utc = models.DateTimeField()
@@ -165,7 +165,7 @@ class TimelineSegment(models.Model):
     data = models.JSONField()
     fingerprint = models.CharField(max_length=64)
     import_batch = models.ForeignKey(
-        ImportBatch, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+        ImportBatch, null=True, blank=True, on_delete=models.DO_NOTHING, related_name="+"
     )
     edited_in_app = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -190,7 +190,7 @@ class TimelineSegment(models.Model):
 
 
 class CoverageReport(models.Model):
-    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="+")
+    owner = models.ForeignKey(User, on_delete=models.DB_CASCADE, related_name="+")
     day = models.DateField()
     source = models.CharField(max_length=16, choices=PointSource.choices)
     points = models.PositiveIntegerField(default=0)
@@ -208,7 +208,7 @@ class CoverageReport(models.Model):
 
 
 class DetectionRun(models.Model):
-    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="+")
+    owner = models.ForeignKey(User, on_delete=models.DB_CASCADE, related_name="+")
     params = models.JSONField(default=dict)
     summary = models.JSONField(default=dict, blank=True)
     started_at = models.DateTimeField(auto_now_add=True)
@@ -234,9 +234,9 @@ class HomePeriod(models.Model):
         GOOGLE_HINT = "google_hint", "Google hint"
 
     person = models.ForeignKey(
-        "accounts.Person", on_delete=models.CASCADE, related_name="home_periods"
+        "accounts.Person", on_delete=models.DB_CASCADE, related_name="home_periods"
     )
-    managed_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="+")
+    managed_by = models.ForeignKey(User, on_delete=models.DO_NOTHING, related_name="+")
     point = gis.PointField(srid=4326, null=True, blank=True)
     address = models.CharField(max_length=300, blank=True)
     label = models.CharField(max_length=100, blank=True)

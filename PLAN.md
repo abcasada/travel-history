@@ -5,7 +5,7 @@
 > This file is the single source of truth for design and progress. Keep it current
 > (CLAUDE.md requires it).
 
-**Status:** Phase 1 (Skeleton) in progress — milestones 1.0–1.2 done. Last updated 2026-10-20.
+**Status:** Phase 1 (Skeleton) in progress — milestones 1.0–1.3 done. Last updated 2026-10-20.
 
 Contents
 
@@ -495,6 +495,14 @@ schema and fails if any user-owned table lacks RLS or a policy for each command.
 | `person` | `visibility = family` or creator or linked user or on a trip I can view | any member | managing user or Admin | managing user |
 | `access_request`, `allowlist_entry`, `invite`, `audit_log` | Admin | via public endpoint function / Admin | Admin | Admin |
 | reference datasets | everyone (no RLS) | owner role only | owner role only | owner role only |
+
+**Implementation notes (milestone 1.3).** Policies are in `backend/travel/core/migrations/0002_row_level_security.py`;
+helpers live in schema `app` and are executable only by `travel_app`. Guard triggers enforce
+column rules RLS cannot: only the Admin changes roles or (de)activates accounts; identity fields
+change only at login; trip owners change only through a transfer; leg author/trip/contribution
+status are fixed; only a participant (or their managing user) sets their public consent;
+contributions keep their author. Every request runs in one transaction with
+`app.user_id` set by `RlsContextMiddleware`; workers use `rls_context(user_id)`.
 
 ### 6.5 Public pages: separate read-only path
 
@@ -1424,7 +1432,7 @@ Status markers: ✅ done · 🔄 in progress · ⏳ not started · ⛔ blocked o
 | 1.0 Prior-art evaluation, PLAN.md, CLAUDE.md, repo hygiene | Evaluation recorded (§1); plan and CLAUDE.md pushed; pre-commit secret scan + personal-data guard active | ✅ 2026-10-20 |
 | 1.1 Compose stack | `./dev up` starts db, web, worker, mock OIDC, Mailpit, Vite; all healthy; DB has no published ports; all containers non-root; `./dev test` runs backend + frontend tests in containers | ✅ 2026-10-20 |
 | 1.2 Full schema | Every table in §5 migrated (with constraints: vehicle-ownership exclusion + no-gap trigger, immutable route/raw_file, append-only points, segment version rules) | ✅ 2026-10-20 |
-| 1.3 RLS + permission tests | RLS on every user-owned table (meta-test enumerates tables); permission matrix §6.3 tested at the API level **and** at the SQL level as `travel_app`; visibility rules §6.2 tested | ⏳ |
+| 1.3 RLS + permission tests | RLS on every user-owned table (meta-test enumerates tables); permission matrix §6.3 tested at the SQL level as `travel_app` **and** against the app policy layer (`travel.core.policy`) that every endpoint must use; visibility rules §6.2 tested. Each API endpoint added later ships with its own API-level permission tests (CLAUDE.md rule 3) | ✅ 2026-10-20 (45 actions × 7 actors) |
 | 1.4 OIDC + login wall | Login/callback/logout/re-auth against the mock provider; public-route allowlist test (§7.6); CSRF on; secure-cookie settings in production config | ⏳ |
 | 1.5 Frontend shell + basemap | React + TS + MapLibre app with desktop/mobile shells and manual switch, OpenFreeMap basemap, auth state, PWA manifest; platform adapters stubbed; Vitest + type-check + build pass | ⏳ |
 | 1.6 Backups | Nightly backup job (pg_dump → zstd → age; raw/media incremental); `./dev restore-test` restores into a scratch DB and verifies; NAS pull instructions written | ⏳ |
@@ -1557,10 +1565,14 @@ and can be revisited. Newest at the bottom.
 | D-43 | 2026-10-19 | No open-source license chosen for this repo yet (all rights reserved) | Private project; MIT-attributed code is compatible with any later choice. Q-13. |
 | D-44 | 2026-10-20 | PostgreSQL container runs as uid 999 from the start (`user: "999:999"`), all other containers as the host user; Mailpit too | Satisfies "containers run as non-root" without weakening the image's entrypoint. |
 | D-45 | 2026-10-20 | Table grants are applied by one module after every `migrate` (`travel/core/db_privileges.py`): DML for `travel_app` except read-only reference tables and no-UPDATE on immutable tables; `travel_public` reads only snapshot tables | One auditable place for privileges; re-applied idempotently. (Django sends `post_migrate` only to apps with a models module — `core` has one for this reason.) |
+| D-46 | 2026-10-20 | Dev stack = `compose.yaml` + `compose.dev.yaml` with Django `runserver`, Vite dev server (proxying `/api` and `/auth` so the browser sees one origin), mock OIDC and Mailpit bound to the LAN address; tests run in a `tools` container as the owner role, each test switching to `travel_app` | Same images and roles as production; fast reload; LAN/VPN-only. |
 | D-47 | 2026-10-20 | Route geometry is a MultiLineString | Great-circle arcs are stored split at ±180°, and map-matched tracks can have unmatched gaps; one geometry type keeps stats and tiles uniform. |
 | D-48 | 2026-10-20 | `location_point.device` and `.import_batch` use PROTECT (not SET NULL) | Django implements SET NULL as an UPDATE, which the append-only trigger rejects; device tokens are revoked, not deleted, while points reference them. |
 | D-49 | 2026-10-20 | Integrity triggers: route UPDATE rejected; raw_file and location_point UPDATE rejected; segment versions may only change `is_current`/`superseded_by`; vehicle ownership checked at commit (deferred constraint triggers: no gaps, no owner-less vehicle); photo limit per contributor (advisory-locked) | Guarantees from §5 hold even for code paths that bypass the ORM. Trigger helpers that must see all rows are `SECURITY DEFINER` and not executable by other roles. |
-| D-46 | 2026-10-20 | Dev stack = `compose.yaml` + `compose.dev.yaml` with Django `runserver`, Vite dev server (proxying `/api` and `/auth` so the browser sees one origin), mock OIDC and Mailpit bound to the LAN address; tests run in a `tools` container as the owner role, each test switching to `travel_app` | Same images and roles as production; fast reload; LAN/VPN-only. |
+| D-50 | 2026-10-20 | All foreign keys use database-level `on_delete` (`DB_CASCADE`, `DB_SET_NULL`; `DO_NOTHING` = a plain FK that refuses the delete) | Django's Python-level cascades issue per-table statements that RLS correctly blocks for other people's rows, so an owner could not delete a trip with contributions. PostgreSQL's referential actions run as the table owner and bypass RLS by design; Django forbids mixing the two styles. Media files of cascaded rows are removed by a periodic orphan-file sweep. |
+| D-51 | 2026-10-20 | Narrow system contexts (`app.ctx`): `auth` (login: find/create/update the user row), `ingest` (look up a device token by hash), `public_form` (create an access request, read allowlist/invites), `transfer` (ownership change) | Pre-authentication steps need a few specific accesses; each context opens only those, nothing else (tested: the login context sees no trips). |
+| D-52 | 2026-10-20 | `INSERT … RETURNING` needs a SELECT policy, so the anonymous request form and the audit log may read back rows created by the current transaction only (`xmin = pg_current_xact_id()`) | Lets the ORM insert without granting general read access. |
+| D-53 | 2026-10-20 | Deactivated users have no access at all, not even to their own data; the Admin cannot change their own role (app level) | Fail closed for stale sessions and tokens; avoid Admin lock-out. |
 
 ---
 

@@ -43,7 +43,9 @@ MIDDLEWARE = [
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
-    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    # Sets request.user and the row-level-security context in one transaction per request
+    # (replaces django.contrib.auth.middleware.AuthenticationMiddleware).
+    "travel.core.middleware.RlsContextMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 

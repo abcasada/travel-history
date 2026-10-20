@@ -14,18 +14,18 @@ class Media(models.Model):
         IMMICH = "immich", "Immich"
 
     trip = models.ForeignKey(
-        "trips.Trip", null=True, blank=True, on_delete=models.CASCADE, related_name="media"
+        "trips.Trip", null=True, blank=True, on_delete=models.DB_CASCADE, related_name="media"
     )
     leg = models.ForeignKey(
-        "trips.Leg", null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+        "trips.Leg", null=True, blank=True, on_delete=models.DB_SET_NULL, related_name="+"
     )
     stop = models.ForeignKey(
-        "trips.Stop", null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+        "trips.Stop", null=True, blank=True, on_delete=models.DB_SET_NULL, related_name="+"
     )
     vehicle = models.ForeignKey(
-        "vehicles.Vehicle", null=True, blank=True, on_delete=models.CASCADE, related_name="+"
+        "vehicles.Vehicle", null=True, blank=True, on_delete=models.DB_CASCADE, related_name="+"
     )
-    author = models.ForeignKey(User, on_delete=models.PROTECT, related_name="media")
+    author = models.ForeignKey(User, on_delete=models.DO_NOTHING, related_name="media")
     source = models.CharField(max_length=16, choices=Source.choices, default=Source.LOCAL)
     external_id = models.CharField(max_length=64, blank=True)
     display_path = models.CharField(max_length=500, blank=True)

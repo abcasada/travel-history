@@ -58,7 +58,9 @@ class PublicTripSnapshot(models.Model):
 
 class PublicMediaFile(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    snapshot = models.ForeignKey(PublicTripSnapshot, on_delete=models.CASCADE, related_name="files")
+    snapshot = models.ForeignKey(
+        PublicTripSnapshot, on_delete=models.DB_CASCADE, related_name="files"
+    )
     variant = models.CharField(max_length=16)  # display | thumb
     path = models.CharField(max_length=500)
     width = models.PositiveIntegerField()

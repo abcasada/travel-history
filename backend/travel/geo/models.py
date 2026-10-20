@@ -39,7 +39,7 @@ class AirportCodeHistory(models.Model):
         MANUAL = "manual", "Manual override"
 
     code = models.CharField(max_length=4, db_index=True)
-    airport = models.ForeignKey(Airport, on_delete=models.CASCADE, related_name="code_history")
+    airport = models.ForeignKey(Airport, on_delete=models.DB_CASCADE, related_name="code_history")
     valid_from = models.DateField(null=True, blank=True)
     valid_to = models.DateField(null=True, blank=True)
     source = models.CharField(max_length=16, choices=Source.choices)
