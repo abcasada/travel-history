@@ -1,0 +1,102 @@
+# Development overrides (used by ./dev). Adds the mock OIDC provider, Mailpit, the Vite dev
+# server and a `tools` container, and binds dev ports to TRAVEL_LAN_BIND (the server's LAN
+# address) so the stack is reachable over LAN/WireGuard only — never from the internet.
+
+x-dev-backend: &dev-backend
+  image: travel-history-backend-dev:latest
+  build:
+    context: .
+    dockerfile: backend/Dockerfile
+    target: dev
+  volumes:
+    - ./backend:/app
+    - ${TRAVEL_BULK_DIR:?set in .env}:/bulk
+
+services:
+  migrate:
+    <<: *dev-backend
+
+  web:
+    <<: *dev-backend
+    command: ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+    ports:
+      - "127.0.0.1:8780:8000"
+      - "${TRAVEL_LAN_BIND:-127.0.0.1}:8780:8000"
+    environment:
+      DJANGO_DEBUG: "true"
+      DJANGO_SECURE_COOKIES: "false"   # plain HTTP on the LAN; production is HTTPS-only
+      SMTP_HOST: mail
+      SMTP_PORT: "1025"
+      SMTP_USE_TLS: "false"
+
+  worker:
+    <<: *dev-backend
+    environment:
+      SMTP_HOST: mail
+      SMTP_PORT: "1025"
+      SMTP_USE_TLS: "false"
+
+  # One-off commands and tests. Connects as the OWNER role (migrations, dataset loads, test
+  # database creation); tests switch every query to travel_app themselves.
+  tools:
+    <<: *dev-backend
+    profiles: ["tools"]
+    user: "${APP_UID:-1000}:${APP_GID:-1000}"
+    environment:
+      DB_HOST: db
+      DB_NAME: travel
+      DB_USER: travel_owner
+      DB_PASSWORD: ${TRAVEL_OWNER_PASSWORD:?set in .env}
+      DB_PUBLIC_USER: travel_public
+      DB_PUBLIC_PASSWORD: ${TRAVEL_PUBLIC_PASSWORD:?set in .env}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?set in .env}
+      DJANGO_DEBUG: "false"
+    networks: [internal, egress, valhalla]
+    depends_on:
+      db: { condition: service_healthy }
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+
+  oidc:
+    image: ghcr.io/navikt/mock-oauth2-server:6.1.2
+    environment:
+      SERVER_PORT: "8080"
+      JSON_CONFIG_PATH: /config/config.json
+      LOG_LEVEL: WARN
+    volumes:
+      - ./devstack/oidc/config.json:/config/config.json:ro
+    ports:
+      - "${TRAVEL_LAN_BIND:-127.0.0.1}:8781:8080"
+    networks: [egress]
+    user: "${APP_UID:-1000}:${APP_GID:-1000}"
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 512m
+
+  mail:
+    image: axllent/mailpit:v1.29
+    user: "${APP_UID:-1000}:${APP_GID:-1000}"
+    ports:
+      - "${TRAVEL_LAN_BIND:-127.0.0.1}:8782:8025"
+    networks: [internal, egress]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 128m
+
+  frontend:
+    image: node:24-trixie-slim
+    working_dir: /src
+    command: ["npm", "run", "dev"]
+    user: "${APP_UID:-1000}:${APP_GID:-1000}"
+    environment:
+      HOME: /tmp
+      npm_config_update_notifier: "false"
+      VITE_BACKEND_URL: http://web:8000
+    volumes:
+      - ./frontend:/src
+    ports:
+      - "${TRAVEL_LAN_BIND:-127.0.0.1}:5173:5173"
+    networks: [internal, egress]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 768m

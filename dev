@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+# Development wrapper: every tool runs in a container (nothing is installed on the host).
+set -euo pipefail
+cd "$(dirname "$0")"
+
+compose() { docker compose -f compose.yaml -f compose.dev.yaml "$@"; }
+node_run() {
+  docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -e npm_config_update_notifier=false \
+    -v "$PWD/frontend:/src" -w /src node:24-trixie-slim "$@"
+}
+random_secret() { head -c 48 /dev/urandom | base64 | tr -d '/+=\n' | head -c 48; }
+env_value() { grep -E "^$1=" .env | head -1 | cut -d= -f2-; }
+
+cmd="${1:-help}"; shift || true
+case "$cmd" in
+  setup)
+    git config core.hooksPath .githooks
+    if [ ! -f .env ]; then
+      umask 077
+      while IFS= read -r line; do
+        if [[ "$line" =~ ^([A-Z0-9_]+)=generate$ ]]; then
+          echo "${BASH_REMATCH[1]}=$(random_secret)"
+        else
+          echo "$line"
+        fi
+      done < .env.example > .env
+      chmod 600 .env
+      echo "created .env with generated secrets (edit TRAVEL_LAN_BIND / TRAVEL_DEV_HOST for LAN access)"
+    fi
+    bulk="$(env_value TRAVEL_BULK_DIR)"
+    mkdir -p "$bulk"/{raw,media,backup-outbox,uploads}
+    docker network inspect valhalla >/dev/null 2>&1 || docker network create valhalla >/dev/null
+    [ -d frontend/node_modules ] || node_run npm ci --no-audit --no-fund
+    echo "setup done"
+    ;;
+  up)       compose up -d --build "$@" ;;
+  down)     compose down "$@" ;;
+  ps)       compose ps "$@" ;;
+  logs)     compose logs -f --tail=100 "$@" ;;
+  build)    compose build "$@" ;;
+  manage)   compose run --rm tools python manage.py "$@" ;;
+  shell)    compose run --rm tools python manage.py shell "$@" ;;
+  psql)     compose exec db psql -U travel_owner -d travel "$@" ;;
+  test)
+    "$0" test-backend
+    "$0" test-frontend
+    ;;
+  test-backend)
+    compose up -d db
+    compose run --rm tools pytest "$@"
+    ;;
+  test-frontend)
+    node_run bash -c 'npx tsc -b --noEmit && npx vitest run'
+    ;;
+  lint)
+    compose run --rm --no-deps tools ruff check .
+    compose run --rm --no-deps tools ruff format --check .
+    node_run npx biome check src
+    ;;
+  fmt)
+    compose run --rm --no-deps tools ruff format .
+    compose run --rm --no-deps tools ruff check --fix .
+    node_run npx biome check --write src
+    ;;
+  npm)      node_run npm "$@" ;;
+  help|*)
+    cat <<'HELP'
+./dev setup               first-time setup: git hooks, .env with generated secrets, bulk dirs, networks
+./dev up | down | ps | logs [svc]   dev stack (db, migrate, web, worker, oidc, mail, frontend)
+./dev test                backend + frontend tests
+./dev test-backend [args] pytest in the tools container (owner role creates the test DB)
+./dev test-frontend       type-check + Vitest
+./dev lint | fmt          ruff + Biome
+./dev manage <cmd>        Django management command (runs as the OWNER role)
+./dev shell | psql        Django shell / psql (owner role)
+./dev npm <args>          npm inside the Node container (frontend/)
+HELP
+    ;;
+esac

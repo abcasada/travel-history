@@ -1,0 +1,23 @@
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings"
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+filterwarnings = ["ignore:No directory at:UserWarning"]
+markers = [
+  "as_owner: run this DB test as the owner role instead of travel_app (schema/meta tests only)",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+extend-exclude = ["**/migrations/*"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "DJ", "S", "BLE", "ARG", "RUF"]
+ignore = ["S101", "RUF012"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S105", "S106", "ARG001"]
+# Django/Ninja views receive `request` whether or not they use it.
+"**/views.py" = ["ARG001"]
+"**/api.py" = ["ARG001"]

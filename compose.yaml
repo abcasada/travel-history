@@ -1,0 +1,129 @@
+# Travel History — production-like stack. Dev additions live in compose.dev.yaml.
+# Use ./dev (it passes both files in development). Secrets come from .env (never committed).
+name: travel-history
+
+x-logging: &logging
+  driver: json-file
+  options: { max-size: "10m", max-file: "3" }
+
+x-hardening: &hardening
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  logging: *logging
+
+x-backend-env: &backend-env
+  DB_HOST: db
+  DB_NAME: travel
+  DB_USER: travel_app
+  DB_PASSWORD: ${TRAVEL_APP_PASSWORD:?set in .env}
+  DB_PUBLIC_USER: travel_public
+  DB_PUBLIC_PASSWORD: ${TRAVEL_PUBLIC_PASSWORD:?set in .env}
+  DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?set in .env}
+  DJANGO_DEBUG: ${DJANGO_DEBUG:-false}
+  DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
+  DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-}
+  DJANGO_SECURE_COOKIES: ${DJANGO_SECURE_COOKIES:-true}
+  DJANGO_BEHIND_TLS_PROXY: ${DJANGO_BEHIND_TLS_PROXY:-false}
+  OIDC_ISSUER: ${OIDC_ISSUER:-}
+  OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
+  OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+  OIDC_EXTRA_AUDIENCES: ${OIDC_EXTRA_AUDIENCES:-}
+  SMTP_HOST: ${SMTP_HOST:-}
+  SMTP_PORT: ${SMTP_PORT:-587}
+  SMTP_USER: ${SMTP_USER:-}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+  SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
+  SMTP_FROM: ${SMTP_FROM:-noreply@adamcasada.com}
+  TRAVEL_PUBLIC_BASE_URL: ${TRAVEL_PUBLIC_BASE_URL:-http://localhost:8780}
+
+x-backend: &backend
+  image: travel-history-backend:${TRAVEL_IMAGE_TAG:-latest}
+  build:
+    context: .
+    dockerfile: backend/Dockerfile
+    target: runtime
+  user: "${APP_UID:-1000}:${APP_GID:-1000}"
+  environment: *backend-env
+  volumes:
+    - ${TRAVEL_BULK_DIR:?set in .env}:/bulk
+  networks: [internal, egress, valhalla]
+  <<: *hardening
+
+services:
+  db:
+    image: postgis/postgis:18-3.6
+    # The image's default entrypoint starts as root and drops privileges; running as the
+    # postgres uid from the start keeps the container non-root (the volume is owned by 999).
+    user: "999:999"
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?set in .env}
+      POSTGRES_DB: postgres
+      TRAVEL_OWNER_PASSWORD: ${TRAVEL_OWNER_PASSWORD:?set in .env}
+      TRAVEL_APP_PASSWORD: ${TRAVEL_APP_PASSWORD:?set in .env}
+      TRAVEL_PUBLIC_PASSWORD: ${TRAVEL_PUBLIC_PASSWORD:?set in .env}
+    command: >-
+      postgres -c shared_buffers=512MB -c work_mem=16MB -c maintenance_work_mem=256MB
+      -c max_connections=60 -c log_min_duration_statement=2000
+    volumes:
+      - db-data:/var/lib/postgresql
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    # No published ports, ever: only reachable on the internal network.
+    networks: [internal]
+    shm_size: 256m
+    mem_limit: 1536m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d travel"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    <<: *hardening
+
+  migrate:
+    <<: *backend
+    environment:
+      <<: *backend-env
+      DB_USER: travel_owner
+      DB_PASSWORD: ${TRAVEL_OWNER_PASSWORD:?set in .env}
+    command: ["python", "manage.py", "migrate", "--noinput"]
+    networks: [internal]
+    depends_on:
+      db: { condition: service_healthy }
+    restart: "no"
+
+  web:
+    <<: *backend
+    ports:
+      # Localhost only: the Cloudflare Tunnel will point here after go-live (PLAN.md §2).
+      - "127.0.0.1:8780:8000"
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=4)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    mem_limit: 768m
+    pids_limit: 200
+    restart: unless-stopped
+
+  worker:
+    <<: *backend
+    command: ["python", "manage.py", "procrastinate", "worker"]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    mem_limit: 1536m
+    pids_limit: 200
+    restart: unless-stopped
+
+networks:
+  internal:
+    internal: true
+  egress: {}
+  # Shared with the separate `valhalla` compose project (PLAN.md §13.5); created by ./dev setup.
+  valhalla:
+    external: true
+    name: valhalla
+
+volumes:
+  db-data:

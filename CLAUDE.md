@@ -25,6 +25,7 @@ frontend/               React + TS + Vite PWA
   src/shells/           desktop and mobile shells
   src/platform/         adapters: files, shortcuts, notifications (wrapper-ready)
 db/init/                role creation (runs once on first DB init)
+devstack/               dev-only service config (mock OIDC users/claims)
 backup/                 backup image + scripts (pg_dump → zstd → age), restore test
 valhalla/               separate compose project `valhalla` (shared routing engine)
 docs/                   guides (tracking setup, Timeline export, Authentik, email DNS, backups)

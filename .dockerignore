@@ -1,0 +1,14 @@
+.git
+data/
+var/
+**/node_modules
+frontend/dist
+frontend/dev-dist
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache
+backend/staticfiles
+valhalla/data
+docs/
+*.md
+!frontend/**/*.md

@@ -1,0 +1,48 @@
+{
+  "interactiveLogin": true,
+  "httpServer": "NettyWrapper",
+  "tokenCallbacks": [
+    {
+      "issuerId": "default",
+      "tokenExpiry": 3600,
+      "requestMappings": [
+        {
+          "requestParam": "subject",
+          "match": "dev-admin",
+          "claims": {
+            "sub": "dev-admin",
+            "email": "dev-admin@example.test",
+            "email_verified": true,
+            "name": "Dev Admin",
+            "preferred_username": "dev-admin",
+            "groups": ["travel-users", "travel-admins"]
+          }
+        },
+        {
+          "requestParam": "subject",
+          "match": "dev-member",
+          "claims": {
+            "sub": "dev-member",
+            "email": "dev-member@example.test",
+            "email_verified": true,
+            "name": "Dev Member",
+            "preferred_username": "dev-member",
+            "groups": ["travel-users"]
+          }
+        },
+        {
+          "requestParam": "subject",
+          "match": "dev-outsider",
+          "claims": {
+            "sub": "dev-outsider",
+            "email": "dev-outsider@example.test",
+            "email_verified": true,
+            "name": "Dev Outsider",
+            "preferred_username": "dev-outsider",
+            "groups": ["other-app-users"]
+          }
+        }
+      ]
+    }
+  ]
+}

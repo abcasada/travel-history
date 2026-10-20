@@ -5,7 +5,7 @@
 > This file is the single source of truth for design and progress. Keep it current
 > (CLAUDE.md requires it).
 
-**Status:** Phase 1 (Skeleton) in progress. Last updated 2026-10-19.
+**Status:** Phase 1 (Skeleton) in progress — milestones 1.0–1.1 done. Last updated 2026-10-20.
 
 Contents
 
@@ -1421,8 +1421,8 @@ Status markers: ✅ done · 🔄 in progress · ⏳ not started · ⛔ blocked o
 
 | Milestone | Acceptance criteria | Status |
 |---|---|---|
-| 1.0 Prior-art evaluation, PLAN.md, CLAUDE.md, repo hygiene | Evaluation recorded (§1); plan and CLAUDE.md pushed; pre-commit secret scan + personal-data guard active | 🔄 |
-| 1.1 Compose stack | `./dev up` starts db, web, worker, mock OIDC, Mailpit, Vite; all healthy; DB has no published ports; all containers non-root; `./dev test` runs backend + frontend tests in containers | ⏳ |
+| 1.0 Prior-art evaluation, PLAN.md, CLAUDE.md, repo hygiene | Evaluation recorded (§1); plan and CLAUDE.md pushed; pre-commit secret scan + personal-data guard active | ✅ 2026-10-20 |
+| 1.1 Compose stack | `./dev up` starts db, web, worker, mock OIDC, Mailpit, Vite; all healthy; DB has no published ports; all containers non-root; `./dev test` runs backend + frontend tests in containers | ✅ 2026-10-20 |
 | 1.2 Full schema | Every table in §5 migrated (with constraints: vehicle-ownership exclusion + no-gap trigger, immutable route/raw_file, append-only points, segment version rules) | ⏳ |
 | 1.3 RLS + permission tests | RLS on every user-owned table (meta-test enumerates tables); permission matrix §6.3 tested at the API level **and** at the SQL level as `travel_app`; visibility rules §6.2 tested | ⏳ |
 | 1.4 OIDC + login wall | Login/callback/logout/re-auth against the mock provider; public-route allowlist test (§7.6); CSRF on; secure-cookie settings in production config | ⏳ |
@@ -1555,6 +1555,9 @@ and can be revisited. Newest at the bottom.
 | D-41 | 2026-10-19 | Mode detection reimplemented from ideas (windowed speed classes + smoothing + flight thresholds), user-correctable | Ideas from Reitti/GeoPulse are not copyrightable; no AGPL/BSL code used. |
 | D-42 | 2026-10-19 | Android companion: AppAuth-Android for OIDC; UIDT jobs (API 34+) / WorkManager below for uploads | Standard OIDC library for Android; uploads survive app closure within Android 15's foreground-service limits. |
 | D-43 | 2026-10-19 | No open-source license chosen for this repo yet (all rights reserved) | Private project; MIT-attributed code is compatible with any later choice. Q-13. |
+| D-44 | 2026-10-20 | PostgreSQL container runs as uid 999 from the start (`user: "999:999"`), all other containers as the host user; Mailpit too | Satisfies "containers run as non-root" without weakening the image's entrypoint. |
+| D-45 | 2026-10-20 | Table grants are applied by one module after every `migrate` (`travel/core/db_privileges.py`): DML for `travel_app` except read-only reference tables and no-UPDATE on immutable tables; `travel_public` reads only snapshot tables | One auditable place for privileges; re-applied idempotently. (Django sends `post_migrate` only to apps with a models module — `core` has one for this reason.) |
+| D-46 | 2026-10-20 | Dev stack = `compose.yaml` + `compose.dev.yaml` with Django `runserver`, Vite dev server (proxying `/api` and `/auth` so the browser sees one origin), mock OIDC and Mailpit bound to the LAN address; tests run in a `tools` container as the owner role, each test switching to `travel_app` | Same images and roles as production; fast reload; LAN/VPN-only. |
 
 ---
 
@@ -1576,6 +1579,7 @@ and can be revisited. Newest at the bottom.
 | Q-12 | Switch the secret scanner from gitleaks (now security-patches-only) to its successor Betterleaks? | Keep gitleaks for now. |
 | Q-13 | Any intention to publish the source? (Would decide a license, e.g. MIT or AGPL.) | No license (private). |
 | Q-14 | Should family members be able to see each other's **vehicles' ownership history** (who owned it when), or only the vehicle and current owner? | Full history visible to family unless hidden. |
+| Q-15 | The server's LAN address is DHCP-assigned. A DHCP reservation on the EdgeRouter would keep the dev binding stable (router change → yours). | Binding uses the current address from `.env`. |
 
 ---
 
