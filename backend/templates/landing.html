@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Travel History</h1>
+<p>A private family site for cataloging the places we've been.</p>
+{% if user.is_authenticated %}
+  <p>Signed in as {{ user.display_name|default:user.email }}.</p>
+  <form method="post" action="/auth/logout">{% csrf_token %}<button type="submit">Sign out</button></form>
+{% else %}
+  <p><a class="button" href="/auth/login">Sign in</a></p>
+{% endif %}
+<p class="muted">Privacy here is enforced by the app. The server's operator has technical access
+to the database and backups.</p>
+{% endblock %}

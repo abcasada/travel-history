@@ -217,8 +217,11 @@ CREATE POLICY user_update ON accounts_user FOR UPDATE TO travel_app
 -- No DELETE policy: accounts are deactivated, never deleted by the app.
 
 ALTER TABLE accounts_person ENABLE ROW LEVEL SECURITY;
+-- SELECT policies check the row's own columns first: a by-id lookup cannot see a row inserted
+-- by the same statement, which INSERT ... RETURNING needs.
 CREATE POLICY person_select ON accounts_person FOR SELECT TO travel_app
-  USING (app.can_view_person(id));
+  USING ((app.is_family() AND (visibility = 'family' OR created_by_id = app.user_id()))
+         OR app.can_view_person(id));
 CREATE POLICY person_insert ON accounts_person FOR INSERT TO travel_app
   WITH CHECK (app.can_create() AND created_by_id = app.user_id());
 CREATE POLICY person_update ON accounts_person FOR UPDATE TO travel_app
@@ -291,7 +294,7 @@ CREATE POLICY audit_returning ON accounts_auditlog FOR SELECT TO travel_app
 -- ===== trips =============================================================================
 ALTER TABLE trips_purpose ENABLE ROW LEVEL SECURITY;
 CREATE POLICY purpose_select ON trips_purpose FOR SELECT TO travel_app
-  USING (app.can_view_purpose(id));
+  USING ((owner_id = app.user_id() AND app.is_family()) OR app.can_view_purpose(id));
 CREATE POLICY purpose_write ON trips_purpose FOR INSERT TO travel_app
   WITH CHECK (owner_id = app.user_id() AND app.can_create());
 CREATE POLICY purpose_update ON trips_purpose FOR UPDATE TO travel_app
@@ -373,7 +376,7 @@ CREATE POLICY legoverride_write ON trips_legparticipantoverride FOR ALL TO trave
 
 ALTER TABLE trips_place ENABLE ROW LEVEL SECURITY;
 CREATE POLICY place_select ON trips_place FOR SELECT TO travel_app
-  USING (app.can_view_place(id));
+  USING ((owner_id = app.user_id() AND app.is_family()) OR app.can_view_place(id));
 CREATE POLICY place_write ON trips_place FOR INSERT TO travel_app
   WITH CHECK (owner_id = app.user_id() AND app.can_create());
 CREATE POLICY place_update ON trips_place FOR UPDATE TO travel_app
@@ -392,7 +395,7 @@ CREATE POLICY stop_write ON trips_stop FOR ALL TO travel_app
 
 ALTER TABLE trips_tag ENABLE ROW LEVEL SECURITY;
 CREATE POLICY tag_select ON trips_tag FOR SELECT TO travel_app
-  USING (app.can_view_tag(id));
+  USING ((owner_id = app.user_id() AND app.is_family()) OR app.can_view_tag(id));
 CREATE POLICY tag_insert ON trips_tag FOR INSERT TO travel_app
   WITH CHECK (owner_id = app.user_id() AND app.can_create());
 CREATE POLICY tag_update ON trips_tag FOR UPDATE TO travel_app

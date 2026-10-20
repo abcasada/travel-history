@@ -5,7 +5,7 @@
 > This file is the single source of truth for design and progress. Keep it current
 > (CLAUDE.md requires it).
 
-**Status:** Phase 1 (Skeleton) in progress — milestones 1.0–1.3 done. Last updated 2026-10-20.
+**Status:** Phase 1 (Skeleton) in progress — milestones 1.0–1.4 done. Last updated 2026-10-20.
 
 Contents
 
@@ -562,7 +562,8 @@ database and backups and could read anything stored here, including your raw loc
 - **Android companion / API clients:** `Authorization: Bearer <access token>` validated locally
   (JWKS cached, `iss`, `aud`, `exp`, `alg=RS256`), mapped to the user by `(iss, sub)`.
 - **Development:** `navikt/mock-oauth2-server` 6.1.2 in `compose.dev.yaml` (interactive login,
-  any username; claims configured in `dev/oidc/config.json`). Browser and Django reach it under
+  any username; users `dev-admin`, `dev-member`, `dev-outsider` and their claims configured in
+  `devstack/oidc/config.json`). Browser and Django reach it under
   the same host name (`TRAVEL_DEV_HOST`), because it derives the issuer from the Host header.
 
 ### 7.2 What this app needs from Authentik (for Adam to configure; not done from this repo)
@@ -1433,7 +1434,7 @@ Status markers: ✅ done · 🔄 in progress · ⏳ not started · ⛔ blocked o
 | 1.1 Compose stack | `./dev up` starts db, web, worker, mock OIDC, Mailpit, Vite; all healthy; DB has no published ports; all containers non-root; `./dev test` runs backend + frontend tests in containers | ✅ 2026-10-20 |
 | 1.2 Full schema | Every table in §5 migrated (with constraints: vehicle-ownership exclusion + no-gap trigger, immutable route/raw_file, append-only points, segment version rules) | ✅ 2026-10-20 |
 | 1.3 RLS + permission tests | RLS on every user-owned table (meta-test enumerates tables); permission matrix §6.3 tested at the SQL level as `travel_app` **and** against the app policy layer (`travel.core.policy`) that every endpoint must use; visibility rules §6.2 tested. Each API endpoint added later ships with its own API-level permission tests (CLAUDE.md rule 3) | ✅ 2026-10-20 (45 actions × 7 actors) |
-| 1.4 OIDC + login wall | Login/callback/logout/re-auth against the mock provider; public-route allowlist test (§7.6); CSRF on; secure-cookie settings in production config | ⏳ |
+| 1.4 OIDC + login wall | Login/callback/logout/re-auth against the mock provider; public-route allowlist test (§7.6); CSRF on; secure-cookie settings in production config | ✅ 2026-10-20 (also verified live against the running mock provider) |
 | 1.5 Frontend shell + basemap | React + TS + MapLibre app with desktop/mobile shells and manual switch, OpenFreeMap basemap, auth state, PWA manifest; platform adapters stubbed; Vitest + type-check + build pass | ⏳ |
 | 1.6 Backups | Nightly backup job (pg_dump → zstd → age; raw/media incremental); `./dev restore-test` restores into a scratch DB and verifies; NAS pull instructions written | ⏳ |
 
@@ -1573,6 +1574,11 @@ and can be revisited. Newest at the bottom.
 | D-51 | 2026-10-20 | Narrow system contexts (`app.ctx`): `auth` (login: find/create/update the user row), `ingest` (look up a device token by hash), `public_form` (create an access request, read allowlist/invites), `transfer` (ownership change) | Pre-authentication steps need a few specific accesses; each context opens only those, nothing else (tested: the login context sees no trips). |
 | D-52 | 2026-10-20 | `INSERT … RETURNING` needs a SELECT policy, so the anonymous request form and the audit log may read back rows created by the current transaction only (`xmin = pg_current_xact_id()`) | Lets the ORM insert without granting general read access. |
 | D-53 | 2026-10-20 | Deactivated users have no access at all, not even to their own data; the Admin cannot change their own role (app level) | Fail closed for stale sessions and tokens; avoid Admin lock-out. |
+| D-54 | 2026-10-20 | New accounts are always Members; the first Admin is set from the server with `./dev manage set_role <email> admin` (owner role) after their first sign-in; afterwards only the Admin changes roles | A database guard stops any login path from creating an Admin; no secret bootstrap URL needed. |
+| D-55 | 2026-10-20 | Bearer access tokens (Android companion) are accepted only for accounts that already exist (created at a first web sign-in) | Keeps account creation in one place (the browser flow with group check and onboarding). |
+| D-56 | 2026-10-20 | Login wall = path-allowlist middleware, deny by default; anonymous API calls get 401 JSON, pages redirect to sign-in; a test walks every URL route | Independent of per-view decorators, so a forgotten decorator cannot expose a page. |
+| D-57 | 2026-10-20 | Development only: server-to-server OIDC calls go to the mock provider's internal address (`OIDC_BACKCHANNEL_URL`) with the public Host header | On this host the firewall drops traffic from containers to the host's own addresses (verified: even sshd times out). Not changed (host firewall = your call); unnecessary in production, where Authentik is reached via its public hostname. |
+| D-58 | 2026-10-20 | Re-authentication freshness uses the ID token's `auth_time` when the provider sends it (Authentik does), else the callback time; every provider call has a 10 s timeout and an unreachable provider shows a 503 page | Approvals need proof of a fresh login; no request may hang on the provider. |
 
 ---
 

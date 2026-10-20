@@ -19,4 +19,5 @@ def visible_trips(request):
     )
 
 
-urlpatterns = [path("probe", visible_trips)]
+# Under a public prefix so anonymous requests reach the view (the login wall would redirect).
+urlpatterns = [path("t/probe", visible_trips)]

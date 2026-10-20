@@ -25,6 +25,9 @@ services:
     environment:
       DJANGO_DEBUG: "true"
       DJANGO_SECURE_COOKIES: "false"   # plain HTTP on the LAN; production is HTTPS-only
+      # Containers can't reach the host's LAN address (host firewall), so server-to-server
+      # OIDC calls go to the mock provider directly (travel/accounts/oidc.py).
+      OIDC_BACKCHANNEL_URL: http://oidc:8080
       SMTP_HOST: mail
       SMTP_PORT: "1025"
       SMTP_USE_TLS: "false"

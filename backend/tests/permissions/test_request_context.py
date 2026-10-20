@@ -16,13 +16,13 @@ def login(client, user):
 
 
 def test_anonymous_request_has_no_context_and_sees_nothing(client, family):
-    data = client.get("/probe").json()
+    data = client.get("/t/probe").json()
     assert data == {"user": None, "rls_user": None, "ctx": "", "trips": []}
 
 
 def test_logged_in_request_sees_exactly_what_rls_allows(client, family):
     login(client, family.bob)
-    data = client.get("/probe").json()
+    data = client.get("/t/probe").json()
     assert data["user"] == data["rls_user"] == family.bob.pk
     expected = {t.pk for k, t in family.trips.items() if k != "private"}
     assert set(data["trips"]) == expected
@@ -30,7 +30,7 @@ def test_logged_in_request_sees_exactly_what_rls_allows(client, family):
 
 def test_deactivated_user_session_is_treated_as_anonymous(client, family):
     login(client, family.ivan)
-    data = client.get("/probe").json()
+    data = client.get("/t/probe").json()
     assert data["user"] is None
     assert data["rls_user"] is None
     assert data["trips"] == []

@@ -48,6 +48,8 @@ All commands run in containers through `./dev` (see `./dev help`):
 - `./dev lint` — ruff + Biome
 - `./dev manage <cmd>` — Django management commands (`migrate` runs as the owner role)
 - `./dev psql` — psql as the owner role (never expose the DB port)
+- `./dev manage set_role <email> admin` — make a user Admin (after their first sign-in)
+- Dev sign-in: open the app, choose Sign in, and type `dev-admin`, `dev-member` or `dev-outsider` (no group → refused) at the mock provider
 - `./dev restore-test` — backup → restore into a scratch DB → verify
 - Dev URLs (LAN/VPN only): app `http://<lan-host>:8780`, mock OIDC `:8781`, Mailpit `:8782`, Vite `:5173`
 

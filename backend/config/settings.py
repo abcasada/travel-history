@@ -46,6 +46,7 @@ MIDDLEWARE = [
     # Sets request.user and the row-level-security context in one transaction per request
     # (replaces django.contrib.auth.middleware.AuthenticationMiddleware).
     "travel.core.middleware.RlsContextMiddleware",
+    "travel.core.loginwall.LoginWallMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
@@ -94,6 +95,22 @@ DATABASE_ROUTERS: list[str] = []
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 AUTH_USER_MODEL = "accounts.User"
+AUTHENTICATION_BACKENDS = ["django.contrib.auth.backends.ModelBackend"]
+LOGIN_URL = "/auth/login"
+
+# --- OIDC (PLAN.md §7.1, §7.2) -------------------------------------------------------------
+OIDC_ISSUER = env.str("OIDC_ISSUER", "")
+OIDC_CLIENT_ID = env.str("OIDC_CLIENT_ID", "")
+OIDC_CLIENT_SECRET = env.str("OIDC_CLIENT_SECRET", "")
+# Development only: internal base URL for server-to-server calls to the provider (see oidc.py).
+OIDC_BACKCHANNEL_URL = env.str("OIDC_BACKCHANNEL_URL", "")
+# Only members of this provider group may use the app ("" disables the check).
+OIDC_REQUIRED_GROUP = env.str("OIDC_REQUIRED_GROUP", "travel-users")
+# Bearer tokens: Authentik issues one issuer per provider (web + Android).
+OIDC_ACCEPTED_ISSUERS = [i for i in [OIDC_ISSUER, *env.list("OIDC_EXTRA_ISSUERS", [])] if i]
+OIDC_ACCEPTED_AUDIENCES = [a for a in [OIDC_CLIENT_ID, *env.list("OIDC_EXTRA_AUDIENCES", [])] if a]
+# Approvals and destructive admin actions need a login at most this many seconds old.
+REAUTH_MAX_AGE = env.int("REAUTH_MAX_AGE", 300)
 
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"
