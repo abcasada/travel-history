@@ -82,6 +82,15 @@ def apply(using: str = "default") -> None:
                     statements.append(f"REVOKE UPDATE ON {quoted} FROM {APP_ROLE}")
             if table in PUBLIC_READABLE_TABLES:
                 statements.append(f"GRANT SELECT ON {quoted} TO {PUBLIC_ROLE}")
+        # Our SECURITY DEFINER functions in `public` (trigger helpers) run with the owner's
+        # rights; nobody needs to call them directly. Triggers still fire without EXECUTE.
+        cursor.execute(
+            "SELECT p.oid::regprocedure::text FROM pg_proc p "
+            "JOIN pg_namespace n ON n.oid = p.pronamespace "
+            "WHERE n.nspname = 'public' AND p.prosecdef AND p.proowner = current_user::regrole"
+        )
+        for (signature,) in cursor.fetchall():
+            statements.append(f"REVOKE EXECUTE ON FUNCTION {signature} FROM PUBLIC")
         # Policy helper functions (schema `app`, PLAN.md §6.1) are callable by the app role only.
         cursor.execute("SELECT 1 FROM pg_namespace WHERE nspname = 'app'")
         if cursor.fetchone():

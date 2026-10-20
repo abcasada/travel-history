@@ -24,9 +24,16 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.staticfiles",
     "django.contrib.gis",
+    "django.contrib.postgres",
     "procrastinate.contrib.django",
     "travel.core",
     "travel.accounts",
+    "travel.geo",
+    "travel.trips",
+    "travel.vehicles",
+    "travel.history",
+    "travel.media",
+    "travel.public",
 ]
 
 MIDDLEWARE = [
