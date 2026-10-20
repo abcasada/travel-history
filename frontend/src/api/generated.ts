@@ -33,6 +33,35 @@ export const DeviceClass = {
   mobile: 'mobile',
 } as const;
 
+export type ImportBatchOutSummary = { [key: string]: unknown };
+
+export interface ImportBatchOut {
+  created_at: string;
+  error: string;
+  finished_at: string | null;
+  id: number;
+  kind: string;
+  original_name: string | null;
+  size_bytes: number | null;
+  status: string;
+  summary: ImportBatchOutSummary;
+}
+
+export type Kind = typeof Kind[keyof typeof Kind];
+
+
+export const Kind = {
+  google_timeline: 'google_timeline',
+  flights_template: 'flights_template',
+  myflightradar24: 'myflightradar24',
+  flighty: 'flighty',
+  appintheair: 'appintheair',
+  tripit: 'tripit',
+  jetlog: 'jetlog',
+  byair: 'byair',
+  gpx: 'gpx',
+} as const;
+
 export interface MeOut {
   display_name: string;
   email: string;
@@ -46,6 +75,25 @@ export interface MeOut {
 export interface PreferenceIn {
   device_class?: DeviceClass;
   value: unknown;
+}
+
+export interface UploadIn {
+  content_type?: string;
+  filename: string;
+  kind: Kind;
+  size: number;
+}
+
+export interface UploadOut {
+  chunk_size: number;
+  filename: string;
+  id: string;
+  import_batch_id: number | null;
+  kind: string;
+  next_index: number;
+  received_bytes: number;
+  status: string;
+  total_size: number;
 }
 
 export type ListPreferencesParams = {
@@ -74,6 +122,208 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getListImportsUrl = () => {
+
+
+
+
+  return `/api/v1/imports`
+}
+
+/**
+ * @summary List Imports
+ */
+export const listImports = async ( options?: Parameters<typeof apiFetch>[1]): Promise<ImportBatchOut[]> => {
+
+  return apiFetch<ImportBatchOut[]>(getListImportsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListImportsQueryKey = () => {
+    return [
+    `/api/v1/imports`
+    ] as const;
+    }
+
+
+export const getListImportsQueryOptions = <TData = Awaited<ReturnType<typeof listImports>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listImports>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListImportsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listImports>>> = ({ signal }) => listImports({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listImports>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListImportsQueryResult = NonNullable<Awaited<ReturnType<typeof listImports>>>
+export type ListImportsQueryError = unknown
+
+
+export function useListImports<TData = Awaited<ReturnType<typeof listImports>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listImports>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listImports>>,
+          TError,
+          Awaited<ReturnType<typeof listImports>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListImports<TData = Awaited<ReturnType<typeof listImports>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listImports>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listImports>>,
+          TError,
+          Awaited<ReturnType<typeof listImports>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListImports<TData = Awaited<ReturnType<typeof listImports>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listImports>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List Imports
+ */
+
+export function useListImports<TData = Awaited<ReturnType<typeof listImports>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listImports>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListImportsQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetImportUrl = (batchId: number,) => {
+
+
+
+
+  return `/api/v1/imports/${batchId}`
+}
+
+/**
+ * @summary Get Import
+ */
+export const getImport = async (batchId: number, options?: Parameters<typeof apiFetch>[1]): Promise<ImportBatchOut> => {
+
+  return apiFetch<ImportBatchOut>(getGetImportUrl(batchId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetImportQueryKey = (batchId: number,) => {
+    return [
+    `/api/v1/imports/${batchId}`
+    ] as const;
+    }
+
+
+export const getGetImportQueryOptions = <TData = Awaited<ReturnType<typeof getImport>>, TError = unknown>(batchId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getImport>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetImportQueryKey(batchId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getImport>>> = ({ signal }) => getImport(batchId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: batchId !== null && batchId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getImport>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetImportQueryResult = NonNullable<Awaited<ReturnType<typeof getImport>>>
+export type GetImportQueryError = unknown
+
+
+export function useGetImport<TData = Awaited<ReturnType<typeof getImport>>, TError = unknown>(
+ batchId: number, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getImport>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getImport>>,
+          TError,
+          Awaited<ReturnType<typeof getImport>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetImport<TData = Awaited<ReturnType<typeof getImport>>, TError = unknown>(
+ batchId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getImport>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getImport>>,
+          TError,
+          Awaited<ReturnType<typeof getImport>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetImport<TData = Awaited<ReturnType<typeof getImport>>, TError = unknown>(
+ batchId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getImport>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get Import
+ */
+
+export function useGetImport<TData = Awaited<ReturnType<typeof getImport>>, TError = unknown>(
+ batchId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getImport>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetImportQueryOptions(batchId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getGetMeUrl = () => {
 
@@ -447,4 +697,418 @@ export const useSetPreference = <TError = unknown,
         TContext
       > => {
       return useMutation(getSetPreferenceMutationOptions(options), queryClient);
+    }
+
+export const getCreateUploadUrl = () => {
+
+
+
+
+  return `/api/v1/uploads`
+}
+
+/**
+ * @summary Create Upload
+ */
+export const createUpload = async (uploadIn: UploadIn, options?: Parameters<typeof apiFetch>[1]): Promise<UploadOut> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return apiFetch<UploadOut>(getCreateUploadUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(uploadIn)
+  }
+);}
+
+
+
+
+
+export const getCreateUploadMutationKey = () => ['createUpload'] as const;
+
+export const getCreateUploadMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createUpload>>, TError,CreateUploadMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createUpload>>, TError,CreateUploadMutationVariables, TContext> => {
+
+const mutationKey = getCreateUploadMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createUpload>>, CreateUploadMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createUpload(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateUploadMutationResult = NonNullable<Awaited<ReturnType<typeof createUpload>>>
+    export type CreateUploadMutationBody = UploadIn
+    export type CreateUploadMutationError = unknown
+    export type CreateUploadMutationVariables = {data: UploadIn}
+
+    /**
+ * @summary Create Upload
+ */
+export const useCreateUpload = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createUpload>>, TError,CreateUploadMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof createUpload>>,
+        TError,
+        CreateUploadMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateUploadMutationOptions(options), queryClient);
+    }
+
+export const getAbortUploadUrl = (uploadId: string,) => {
+
+
+
+
+  return `/api/v1/uploads/${uploadId}`
+}
+
+/**
+ * @summary Abort Upload
+ */
+export const abortUpload = async (uploadId: string, options?: Parameters<typeof apiFetch>[1]): Promise<void> => {
+
+  return apiFetch<void>(getAbortUploadUrl(uploadId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getAbortUploadMutationKey = () => ['abortUpload'] as const;
+
+export const getAbortUploadMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof abortUpload>>, TError,AbortUploadMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof abortUpload>>, TError,AbortUploadMutationVariables, TContext> => {
+
+const mutationKey = getAbortUploadMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof abortUpload>>, AbortUploadMutationVariables> = (props) => {
+          const {uploadId} = props ?? {};
+
+          return  abortUpload(uploadId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AbortUploadMutationResult = NonNullable<Awaited<ReturnType<typeof abortUpload>>>
+
+    export type AbortUploadMutationError = unknown
+    export type AbortUploadMutationVariables = {uploadId: string}
+
+    /**
+ * @summary Abort Upload
+ */
+export const useAbortUpload = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof abortUpload>>, TError,AbortUploadMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof abortUpload>>,
+        TError,
+        AbortUploadMutationVariables,
+        TContext
+      > => {
+      return useMutation(getAbortUploadMutationOptions(options), queryClient);
+    }
+
+export const getGetUploadUrl = (uploadId: string,) => {
+
+
+
+
+  return `/api/v1/uploads/${uploadId}`
+}
+
+/**
+ * @summary Get Upload
+ */
+export const getUpload = async (uploadId: string, options?: Parameters<typeof apiFetch>[1]): Promise<UploadOut> => {
+
+  return apiFetch<UploadOut>(getGetUploadUrl(uploadId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetUploadQueryKey = (uploadId: string,) => {
+    return [
+    `/api/v1/uploads/${uploadId}`
+    ] as const;
+    }
+
+
+export const getGetUploadQueryOptions = <TData = Awaited<ReturnType<typeof getUpload>>, TError = unknown>(uploadId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUpload>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetUploadQueryKey(uploadId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUpload>>> = ({ signal }) => getUpload(uploadId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: uploadId !== null && uploadId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUpload>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetUploadQueryResult = NonNullable<Awaited<ReturnType<typeof getUpload>>>
+export type GetUploadQueryError = unknown
+
+
+export function useGetUpload<TData = Awaited<ReturnType<typeof getUpload>>, TError = unknown>(
+ uploadId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUpload>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getUpload>>,
+          TError,
+          Awaited<ReturnType<typeof getUpload>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetUpload<TData = Awaited<ReturnType<typeof getUpload>>, TError = unknown>(
+ uploadId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUpload>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getUpload>>,
+          TError,
+          Awaited<ReturnType<typeof getUpload>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetUpload<TData = Awaited<ReturnType<typeof getUpload>>, TError = unknown>(
+ uploadId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUpload>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get Upload
+ */
+
+export function useGetUpload<TData = Awaited<ReturnType<typeof getUpload>>, TError = unknown>(
+ uploadId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUpload>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetUploadQueryOptions(uploadId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getPutChunkUrl = (uploadId: string,
+    index: number,) => {
+
+
+
+
+  return `/api/v1/uploads/${uploadId}/chunks/${index}`
+}
+
+/**
+ * Body: the raw chunk bytes (application/octet-stream); header X-Chunk-SHA256.
+ * @summary Put Chunk
+ */
+export const putChunk = async (uploadId: string,
+    index: number, options?: Parameters<typeof apiFetch>[1]): Promise<UploadOut> => {
+
+  return apiFetch<UploadOut>(getPutChunkUrl(uploadId,index),
+  {
+    ...options,
+    method: 'PUT'
+
+
+  }
+);}
+
+
+
+
+
+export const getPutChunkMutationKey = () => ['putChunk'] as const;
+
+export const getPutChunkMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putChunk>>, TError,PutChunkMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof putChunk>>, TError,PutChunkMutationVariables, TContext> => {
+
+const mutationKey = getPutChunkMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof putChunk>>, PutChunkMutationVariables> = (props) => {
+          const {uploadId,index} = props ?? {};
+
+          return  putChunk(uploadId,index,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PutChunkMutationResult = NonNullable<Awaited<ReturnType<typeof putChunk>>>
+
+    export type PutChunkMutationError = unknown
+    export type PutChunkMutationVariables = {uploadId: string;index: number}
+
+    /**
+ * @summary Put Chunk
+ */
+export const usePutChunk = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putChunk>>, TError,PutChunkMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof putChunk>>,
+        TError,
+        PutChunkMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPutChunkMutationOptions(options), queryClient);
+    }
+
+export const getCompleteUploadUrl = (uploadId: string,) => {
+
+
+
+
+  return `/api/v1/uploads/${uploadId}/complete`
+}
+
+/**
+ * @summary Complete Upload
+ */
+export const completeUpload = async (uploadId: string, options?: Parameters<typeof apiFetch>[1]): Promise<ImportBatchOut> => {
+
+  return apiFetch<ImportBatchOut>(getCompleteUploadUrl(uploadId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getCompleteUploadMutationKey = () => ['completeUpload'] as const;
+
+export const getCompleteUploadMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completeUpload>>, TError,CompleteUploadMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof completeUpload>>, TError,CompleteUploadMutationVariables, TContext> => {
+
+const mutationKey = getCompleteUploadMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof completeUpload>>, CompleteUploadMutationVariables> = (props) => {
+          const {uploadId} = props ?? {};
+
+          return  completeUpload(uploadId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CompleteUploadMutationResult = NonNullable<Awaited<ReturnType<typeof completeUpload>>>
+
+    export type CompleteUploadMutationError = unknown
+    export type CompleteUploadMutationVariables = {uploadId: string}
+
+    /**
+ * @summary Complete Upload
+ */
+export const useCompleteUpload = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completeUpload>>, TError,CompleteUploadMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof completeUpload>>,
+        TError,
+        CompleteUploadMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCompleteUploadMutationOptions(options), queryClient);
     }

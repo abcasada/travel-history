@@ -2,8 +2,104 @@
   "components": {
     "schemas": {
       "DeviceClass": {
-        "enum": ["any", "desktop", "mobile"],
+        "enum": [
+          "any",
+          "desktop",
+          "mobile"
+        ],
         "title": "DeviceClass",
+        "type": "string"
+      },
+      "ImportBatchOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "error": {
+            "title": "Error",
+            "type": "string"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "original_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Name"
+          },
+          "size_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size Bytes"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "summary": {
+            "additionalProperties": true,
+            "title": "Summary",
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "original_name",
+          "size_bytes",
+          "summary",
+          "error",
+          "created_at",
+          "finished_at"
+        ],
+        "title": "ImportBatchOut",
+        "type": "object"
+      },
+      "Kind": {
+        "enum": [
+          "google_timeline",
+          "flights_template",
+          "myflightradar24",
+          "flighty",
+          "appintheair",
+          "tripit",
+          "jetlog",
+          "byair",
+          "gpx"
+        ],
+        "title": "Kind",
         "type": "string"
       },
       "MeOut": {
@@ -86,8 +182,98 @@
             "title": "Value"
           }
         },
-        "required": ["value"],
+        "required": [
+          "value"
+        ],
         "title": "PreferenceIn",
+        "type": "object"
+      },
+      "UploadIn": {
+        "properties": {
+          "content_type": {
+            "default": "",
+            "title": "Content Type",
+            "type": "string"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/Kind"
+          },
+          "size": {
+            "title": "Size",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "filename",
+          "size",
+          "kind"
+        ],
+        "title": "UploadIn",
+        "type": "object"
+      },
+      "UploadOut": {
+        "properties": {
+          "chunk_size": {
+            "title": "Chunk Size",
+            "type": "integer"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "import_batch_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Import Batch Id"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "next_index": {
+            "title": "Next Index",
+            "type": "integer"
+          },
+          "received_bytes": {
+            "title": "Received Bytes",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "total_size": {
+            "title": "Total Size",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "filename",
+          "kind",
+          "total_size",
+          "chunk_size",
+          "received_bytes",
+          "next_index",
+          "status",
+          "import_batch_id"
+        ],
+        "title": "UploadOut",
         "type": "object"
       }
     },
@@ -110,6 +296,80 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/imports": {
+      "get": {
+        "operationId": "listImports",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ImportBatchOut"
+                  },
+                  "title": "Response",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "List Imports",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/v1/imports/{batch_id}": {
+      "get": {
+        "operationId": "getImport",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "title": "Batch Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportBatchOut"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Get Import",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
     "/api/v1/me": {
       "get": {
         "operationId": "getMe",
@@ -135,7 +395,9 @@
           }
         ],
         "summary": "Me",
-        "tags": ["me"]
+        "tags": [
+          "me"
+        ]
       }
     },
     "/api/v1/me/privacy-ack": {
@@ -164,7 +426,9 @@
           }
         ],
         "summary": "Acknowledge Privacy Notice",
-        "tags": ["me"]
+        "tags": [
+          "me"
+        ]
       }
     },
     "/api/v1/preferences": {
@@ -179,7 +443,11 @@
             "schema": {
               "allOf": [
                 {
-                  "enum": ["any", "desktop", "mobile"],
+                  "enum": [
+                    "any",
+                    "desktop",
+                    "mobile"
+                  ],
                   "title": "DeviceClass",
                   "type": "string"
                 }
@@ -211,7 +479,9 @@
           }
         ],
         "summary": "List Preferences",
-        "tags": ["me"]
+        "tags": [
+          "me"
+        ]
       }
     },
     "/api/v1/preferences/{key}": {
@@ -261,7 +531,214 @@
           }
         ],
         "summary": "Set Preference",
-        "tags": ["me"]
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/api/v1/uploads": {
+      "post": {
+        "operationId": "createUpload",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadOut"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Create Upload",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/v1/uploads/{upload_id}": {
+      "delete": {
+        "operationId": "abortUpload",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "upload_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Upload Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Abort Upload",
+        "tags": [
+          "imports"
+        ]
+      },
+      "get": {
+        "operationId": "getUpload",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "upload_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Upload Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadOut"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Get Upload",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/v1/uploads/{upload_id}/chunks/{index}": {
+      "put": {
+        "description": "Body: the raw chunk bytes (application/octet-stream); header X-Chunk-SHA256.",
+        "operationId": "putChunk",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "upload_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Upload Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "index",
+            "required": true,
+            "schema": {
+              "title": "Index",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadOut"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Put Chunk",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/v1/uploads/{upload_id}/complete": {
+      "post": {
+        "operationId": "completeUpload",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "upload_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Upload Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportBatchOut"
+                }
+              }
+            },
+            "description": "Accepted"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Complete Upload",
+        "tags": [
+          "imports"
+        ]
       }
     }
   },

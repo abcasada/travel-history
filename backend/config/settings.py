@@ -127,6 +127,10 @@ WHITENOISE_MIMETYPES = {".webmanifest": "application/manifest+json"}
 
 # Bulk storage on the HDD: raw import files, photo derivatives, backup outbox.
 BULK_DIR = Path(env.str("TRAVEL_BULK_DIR_IN_CONTAINER", "/bulk"))
+# Uploads (PLAN.md D-33): 32 MiB chunks stay well under Cloudflare's 100 MB request limit.
+TRAVEL_UPLOAD_CHUNK_BYTES = env.int("TRAVEL_UPLOAD_CHUNK_BYTES", 32 * 1024 * 1024)
+TRAVEL_UPLOAD_MAX_BYTES = env.int("TRAVEL_UPLOAD_MAX_BYTES", 2 * 1024**3)
+TRAVEL_USER_QUOTA_BYTES = env.int("TRAVEL_USER_QUOTA_BYTES", 20 * 1024**3)
 
 # --- Security -------------------------------------------------------------------------------
 SESSION_COOKIE_SECURE = env.bool("DJANGO_SECURE_COOKIES", True)

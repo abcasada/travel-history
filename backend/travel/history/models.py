@@ -2,6 +2,8 @@
 segments, coverage, and home periods (PLAN.md §5.5-5.6). Trips reference time ranges of this
 data; they never copy points."""
 
+import uuid
+
 from django.conf import settings
 from django.contrib.gis.db import models as gis
 from django.contrib.postgres.fields import ArrayField, DateTimeRangeField
@@ -60,6 +62,8 @@ class ImportBatch(models.Model):
         QUEUED = "queued", "Queued"
         PROCESSING = "processing", "Processing"
         DONE = "done", "Done"
+        DUPLICATE = "duplicate", "Identical file already imported"
+        UNSUPPORTED = "unsupported", "No importer for this format yet"
         FAILED = "failed", "Failed"
 
     owner = models.ForeignKey(User, on_delete=models.DO_NOTHING, related_name="import_batches")
@@ -76,6 +80,40 @@ class ImportBatch(models.Model):
 
     def __str__(self) -> str:
         return f"{self.kind} import {self.pk} ({self.status})"
+
+
+class UploadSession(models.Model):
+    """A resumable chunked upload (PLAN.md §17, D-33): chunks of at most `chunk_size` bytes are
+    appended in order to a part file on the HDD; on completion the worker stores the raw file
+    and starts the import. Shared by the web app and the Android companion."""
+
+    class Status(models.TextChoices):
+        OPEN = "open", "Receiving chunks"
+        COMPLETE = "complete", "Complete"
+        ABORTED = "aborted", "Aborted"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    owner = models.ForeignKey(User, on_delete=models.DO_NOTHING, related_name="+")
+    filename = models.CharField(max_length=255)
+    content_type = models.CharField(max_length=100, blank=True)
+    kind = models.CharField(max_length=32, choices=ImportBatch.Kind.choices)
+    total_size = models.BigIntegerField()
+    chunk_size = models.PositiveIntegerField()
+    received_bytes = models.BigIntegerField(default=0)
+    next_index = models.PositiveIntegerField(default=0)
+    last_chunk_sha256 = models.CharField(max_length=64, blank=True)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.OPEN)
+    uploaded_via = models.CharField(
+        max_length=16, choices=RawFile.UploadedVia.choices, default=RawFile.UploadedVia.WEB
+    )
+    import_batch = models.ForeignKey(
+        ImportBatch, null=True, blank=True, on_delete=models.DB_SET_NULL, related_name="+"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self) -> str:
+        return f"upload {self.filename} ({self.received_bytes}/{self.total_size})"
 
 
 class PointSource(models.TextChoices):

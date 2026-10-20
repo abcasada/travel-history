@@ -28,6 +28,7 @@ class OidcBearer(HttpBearer):
             return None
         set_context(user.pk)
         request.user = user
+        request.via_bearer = True  # the Android companion (e.g. raw files record their origin)
         return user
 
 

@@ -4,7 +4,9 @@ import re
 from typing import Any
 
 from django.utils import timezone
+from django.views.decorators.csrf import ensure_csrf_cookie
 from ninja import Router, Schema
+from ninja.decorators import decorate_view
 from ninja.errors import HttpError
 
 from travel.core.choices import DeviceClass
@@ -25,6 +27,7 @@ class MeOut(Schema):
 
 
 @router.get("/me", response=MeOut, operation_id="getMe")
+@decorate_view(ensure_csrf_cookie)  # the SPA reads the CSRF token from this cookie
 def me(request):
     return request.user
 
