@@ -5,7 +5,7 @@
 > This file is the single source of truth for design and progress. Keep it current
 > (CLAUDE.md requires it).
 
-**Status:** Phase 1 complete; phase 2 (Timeline and tracking) in progress — milestone 2.1 done. Last updated 2026-10-20.
+**Status:** Phase 1 complete; phase 2 (Timeline and tracking) in progress — milestones 2.1–2.2 done. Last updated 2026-10-20.
 
 Contents
 
@@ -757,7 +757,15 @@ else                                                       → NEW: new lineage,
 Current segments with no staged counterpart                → untouched (ABSENT ≠ DELETED)
 ```
 
-- Matching is by time overlap, never exact timestamps (Google shifts boundaries by seconds).
+- Matching is by time overlap within the same `kind` **and nesting level** (`hierarchy_level`:
+  Google nests visits, e.g. a shop inside a mall), never exact timestamps (Google shifts
+  boundaries by seconds). Segments created by the same import are never superseded by it.
+- The fingerprint covers the segment's content (times to the second, place id, semantic and
+  activity type, coordinates to 1e-6°, distance, path points) but **not** Google's probability,
+  which changes without any user edit.
+- Implementation: the diff runs in Python per chunk of 2,000 segments against the owner's current
+  segments in that chunk's time span (GiST range index), with set-based writes; each chunk is
+  its own transaction, so an interrupted import is completed by a re-run (`rerun_import`).
 - A split (one old visit → two new) is handled because each new piece overlaps the old one
   ≥ 0.5 of the shorter: the first becomes the new version, the second a new lineage that
   supersedes nothing else.
@@ -1450,7 +1458,7 @@ Status markers: ✅ done · 🔄 in progress · ⏳ not started · ⛔ blocked o
 | Milestone | Acceptance criteria |
 |---|---|
 | 2.1 Uploads + raw store ✅ 2026-10-20 | Resumable chunked upload API; raw file stored zstd, 0440, checksum-verified; identical re-upload detected by hash; per-user quota; `./dev restore-test` verifies raw-file checksums end to end (verified live: upload → worker → archive → backup → restore → checksum) |
-| 2.2 Timeline import + diff | Streaming parse (memory bounded: a 1 GB synthetic file stays under the worker limit); staging + diff per §8.3; versions kept; absent ≠ deleted; in-app edits win; review flags; import summary page. iOS marked unverified until a real sample is checked |
+| 2.2 Timeline import + diff ✅ 2026-10-21 | Streaming parse (memory bounded: peak memory stays flat as files grow — tested 20k vs 80k points); diff per §8.3; versions kept; absent ≠ deleted; in-app edits win; review flags; import summary page. iOS marked unverified until a real sample is checked (verified in the browser: upload → worker → summary) |
 | 2.3 Raw-history map | MVT endpoint (own points only, RLS), date filter, segment overlay, coverage strip |
 | 2.4 Tracker ingestion | OwnTracks + Overland endpoints with device tokens (create/revoke/rate-limit); setup pages with QR/deep links; Colota evaluated; battery notes |
 | 2.5 Home periods | Suggestions per §10.1 (synthetic multi-year fixture with two moves and a long stay detects all three), manual entry, gap/overlap validation |
@@ -1595,6 +1603,10 @@ and can be revisited. Newest at the bottom.
 | D-65 | 2026-10-20 | Upload protocol: `POST /uploads` → `PUT /uploads/{id}/chunks/{n}` (in order, `X-Chunk-SHA256`, re-sending the last chunk is a no-op, writes go to the recorded offset) → `POST /uploads/{id}/complete` (202 + import batch); archiving and importing happen in the worker, serialized per user by a Procrastinate lock; per-file limit 2 GiB, per-user quota 20 GiB (compressed archive + open uploads), stale uploads dropped after 7 days | Survives flaky mobile connections and Cloudflare's 100 MB / 125 s limits; long work never blocks a request; per-user serialization keeps re-import diffs consistent. |
 | D-66 | 2026-10-20 | Formats without an importer yet are still archived (status `unsupported`) and can be imported later from the raw file | Nothing a family member uploads is lost while importers are being written. |
 | D-67 | 2026-10-20 | The dev database currently holds synthetic dev data (mock-provider users, a synthetic raw file); wipe the dev volume and bulk directory before the first real import | Keeps real history free of test rows; deleting dev-only data, not real data. |
+| D-68 | 2026-10-21 | Re-import matching key: (kind, nesting level) + time overlap; fingerprint excludes Google's probability; diff in Python per 2,000-segment chunk with set-based writes instead of an SQL staging table | Nested visits must not supersede their parents; probability noise must not create fake "changes"; per-chunk transactions keep memory bounded and make interrupted imports resumable. |
+| D-69 | 2026-10-21 | iOS path points (minute precision) that share a timestamp are spread by one second each | Otherwise the (owner, source, time) de-duplication would drop real points. |
+| D-70 | 2026-10-21 | HOME/WORK labels from the export (frequent places and HOME/WORK/INFERRED_* visits) are stored as `PlaceHint` rows | Inputs for home detection (§10.1) without treating Google's guesses as facts. |
+| D-71 | 2026-10-21 | Dev worker runs under `watchfiles` (restarts on code changes); `./dev manage rerun_import <batch>` re-runs an importer from the archived file | The worker otherwise keeps running old code; archived "unsupported" uploads can be imported once their importer exists (D-66). |
 
 ---
 

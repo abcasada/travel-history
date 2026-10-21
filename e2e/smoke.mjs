@@ -33,6 +33,21 @@ await page.waitForTimeout(4000);
 await page.screenshot({ path: "out/desktop.png" });
 await page.keyboard.press("?");
 await page.getByRole("dialog", { name: "Keyboard shortcuts" }).waitFor();
+await page.keyboard.press("Escape");
+// Import a synthetic Timeline through the real UI: picker -> chunked upload -> worker -> summary.
+await page.getByRole("link", { name: "History" }).click();
+const chooser = page.waitForEvent("filechooser");
+await page.getByRole("button", { name: /Import Google Timeline/ }).click();
+await (await chooser).setFiles("fixtures/timeline-synthetic.json");
+// Wait for this upload to finish, then for the newest import (first in the list) to have a result.
+// A re-run of the smoke test uploads the same file again, which is reported as a duplicate.
+await page.getByRole("status").waitFor({ state: "detached", timeout: 60000 });
+await page
+  .locator("li")
+  .first()
+  .getByText(/(new|unchanged) segments|already imported/)
+  .waitFor({ timeout: 60000 });
+await page.screenshot({ path: "out/history.png" });
 const mobile = await browser.newContext({ viewport: { width: 400, height: 800 }, hasTouch: true, isMobile: true, storageState: await context.storageState() });
 const m = await mobile.newPage();
 await m.addInitScript(() => localStorage.setItem("shell_override", "mobile"));
@@ -46,5 +61,9 @@ await m.screenshot({ path: "out/mobile.png" });
   await browser.close();
   process.exit(1);
 }
-console.log(JSON.stringify({ ok: true, consoleErrors: log }));
+// Known and harmless: the signed-out /me probe (401), COOP ignored on plain-HTTP dev origins,
+// and MapLibre's minified AbortError names logged when tile requests are cancelled.
+const benign = [/status of 401/, /Cross-Origin-Opener-Policy/, /^[A-Za-z]{1,3}$/];
+const unexpected = log.filter((line) => !benign.some((pattern) => pattern.test(line)));
+console.log(JSON.stringify({ ok: true, unexpectedConsoleErrors: unexpected }));
 await browser.close();

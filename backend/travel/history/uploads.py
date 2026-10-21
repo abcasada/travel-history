@@ -147,33 +147,34 @@ def process_upload(upload_id: str, owner_id: int) -> ImportBatch:
         batch = session.import_batch
         batch.status, batch.started_at = ImportBatch.Status.PROCESSING, timezone.now()
         batch.save(update_fields=["status", "started_at"])
-    part = part_path(session)
-    digest = rawstore.sha256_file(part)
-    with rls_context(owner_id):
-        existing = rawstore.find_existing(owner_id, digest)
-        if existing is not None:
-            first = (
-                ImportBatch.objects.filter(raw_file=existing)
-                .exclude(pk=batch.pk)
-                .order_by("created_at")
-                .first()
+    if batch.raw_file_id is None:  # not yet archived (a retried job skips straight to import)
+        part = part_path(session)
+        digest = rawstore.sha256_file(part)
+        with rls_context(owner_id):
+            existing = rawstore.find_existing(owner_id, digest)
+            if existing is not None:
+                first = (
+                    ImportBatch.objects.filter(raw_file=existing)
+                    .exclude(pk=batch.pk)
+                    .order_by("created_at")
+                    .first()
+                )
+                batch.raw_file = existing
+                batch.status = ImportBatch.Status.DUPLICATE
+                batch.summary = {"duplicate_of_batch": first.pk if first else None}
+                batch.finished_at = timezone.now()
+                batch.save(update_fields=["raw_file", "status", "summary", "finished_at"])
+                part.unlink(missing_ok=True)
+                return batch
+            raw = rawstore.store_file(
+                owner_id,
+                part,
+                original_name=session.filename,
+                content_type=session.content_type,
+                uploaded_via=session.uploaded_via,
+                sha256=digest,
             )
-            batch.raw_file = existing
-            batch.status = ImportBatch.Status.DUPLICATE
-            batch.summary = {"duplicate_of_batch": first.pk if first else None}
-            batch.finished_at = timezone.now()
-            batch.save(update_fields=["raw_file", "status", "summary", "finished_at"])
-            part.unlink(missing_ok=True)
-            return batch
-        raw = rawstore.store_file(
-            owner_id,
-            part,
-            original_name=session.filename,
-            content_type=session.content_type,
-            uploaded_via=session.uploaded_via,
-            sha256=digest,
-        )
-        batch.raw_file = raw
-        batch.save(update_fields=["raw_file"])
-    part.unlink(missing_ok=True)
+            batch.raw_file = raw
+            batch.save(update_fields=["raw_file"])
+        part.unlink(missing_ok=True)
     return importers.run(batch.pk, owner_id)

@@ -115,7 +115,7 @@ case "$cmd" in
     mkdir -p e2e/out
     [ -d e2e/node_modules ] || docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp \
       -v "$PWD/e2e:/w" -w /w node:24-trixie-slim npm ci --no-audit --no-fund
-    docker run -d --rm --name travel-e2e-chrome --network host zenika/alpine-chrome:124 \
+    docker run -d --rm --name travel-e2e-chrome --network host --shm-size=1g zenika/alpine-chrome:124 \
       --no-sandbox --remote-debugging-address=127.0.0.1 --remote-debugging-port=9222 \
       --use-gl=swiftshader --enable-unsafe-swiftshader about:blank >/dev/null
     trap 'docker stop travel-e2e-chrome >/dev/null' EXIT

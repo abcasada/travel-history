@@ -34,6 +34,8 @@ services:
 
   worker:
     <<: *dev-backend
+    # Restart the worker when backend code changes (runserver reloads itself; the worker doesn't).
+    command: ["watchfiles", "--filter", "python", "python manage.py procrastinate worker", "/app"]
     environment:
       SMTP_HOST: mail
       SMTP_PORT: "1025"

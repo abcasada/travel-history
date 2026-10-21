@@ -194,6 +194,8 @@ class TimelineSegment(models.Model):
         db_persist=True,
     )
     utc_offset_min = models.SmallIntegerField(null=True, blank=True)
+    # Google nests visits (a shop inside a mall); versions only match at the same level.
+    hierarchy_level = models.PositiveSmallIntegerField(default=0)
     place_id = models.CharField(max_length=255, blank=True)
     semantic_type = models.CharField(max_length=32, blank=True)
     activity_type = models.CharField(max_length=32, blank=True)
@@ -225,6 +227,32 @@ class TimelineSegment(models.Model):
 
     def __str__(self) -> str:
         return f"{self.kind} {self.start_utc:%Y-%m-%d} v{self.version}"
+
+
+class PlaceHint(models.Model):
+    """Home/work labels from a Timeline export (`userLocationProfile.frequentPlaces`, and visits
+    whose semantic type is HOME/WORK/INFERRED_*). Hints for home detection, never decisive."""
+
+    class Label(models.TextChoices):
+        HOME = "HOME", "Home"
+        WORK = "WORK", "Work"
+
+    owner = models.ForeignKey(User, on_delete=models.DB_CASCADE, related_name="+")
+    label = models.CharField(max_length=8, choices=Label.choices)
+    place_id = models.CharField(max_length=255, blank=True)
+    point = gis.PointField(srid=4326)
+    import_batch = models.ForeignKey(
+        ImportBatch, null=True, blank=True, on_delete=models.DB_SET_NULL, related_name="+"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["owner", "label", "place_id"], name="placehint_unique")
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.label} hint {self.place_id}"
 
 
 class CoverageReport(models.Model):
