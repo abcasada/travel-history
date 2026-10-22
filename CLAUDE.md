@@ -1,10 +1,31 @@
 # CLAUDE.md
 
+If my message is 'Continue orchestration', you are the orchestrator. Read docs/ORCHESTRATION.md, docs/ROADMAP.md, and NEXT.md, run git status, and resume.
+
 Private, self-hosted website for cataloging a lifetime of travel for Adam and a few family
 members. Django + GeoDjango + PostgreSQL/PostGIS backend, React + TypeScript + MapLibre PWA,
 everything in Docker on Adam's home server. **`PLAN.md` is the source of truth** for design,
 phases, decisions (§24) and open questions (§25). Read the relevant PLAN.md sections before
 changing anything, and keep PLAN.md current.
+
+## Orchestrated workflow
+
+- **Who does what:**
+  - Opus subagents do the work (builder-medium, builder-high, builder-xhigh, reviewer-xhigh, planner-xhigh), dispatched one at a time by an orchestrator session at Opus high.
+  - The orchestrator follows docs/ORCHESTRATION.md and docs/ROADMAP.md.
+  - Only the orchestrator and the planner edit ROADMAP.md.
+- **Session start:** state which model you are running as. If it isn't Opus, stop.
+- **Checkpoints:** commit at working sub-steps. Update NEXT.md before long steps and at the end of each item.
+- **Escalation:**
+  - Escalate on a repeated failure, an unsettled design decision, or an out-of-scope permission or privacy change.
+  - The chain is medium → high → xhigh → planner → me.
+- **Committed migrations are frozen;** changes go in new migrations.
+- **Tests:** targeted tests while working; the quick suite at each item's end; the full suite at milestones and at the end of the work order.
+- **Context hygiene:**
+  - Never read generated, minified, or lockfiles.
+  - Read `docs/research/` only when needed.
+  - No parallel agents.
+- **Reports** are 15 lines or fewer (20 for the planner), with no code or logs.
 
 ## Project structure
 
