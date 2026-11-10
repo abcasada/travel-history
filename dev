@@ -121,7 +121,10 @@ case "$cmd" in
     trap 'docker stop travel-e2e-chrome >/dev/null' EXIT
     sleep 3
     docker run --rm --network host --user "$(id -u):$(id -g)" -e HOME=/tmp \
-      -v "$PWD/e2e:/w" -w /w node:24-trixie-slim node smoke.mjs "$base"
+      -v "$PWD/e2e:/w" -w /w node:24-trixie-slim node smoke.mjs "$base" && status=0 || status=$?
+    # Each run re-uploads the same synthetic fixture; drop the duplicate batches it leaves.
+    "$0" manage e2e_cleanup "$(sha256sum e2e/fixtures/timeline-synthetic.json | cut -d' ' -f1)"
+    exit "$status"
     ;;
   help|*)
     cat <<'HELP'

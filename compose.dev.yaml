@@ -104,4 +104,4 @@ services:
     networks: [internal, egress]
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
-    mem_limit: 768m
+    mem_limit: 1280m   # Vite dev server sat at ~630 MiB (82% of the old 768m) in the 2026-10-21 audit

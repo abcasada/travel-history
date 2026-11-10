@@ -7,6 +7,7 @@ import stat
 
 import pytest
 import zstandard
+from django.core.management import CommandError, call_command
 from django.db import connection
 
 from tests.factories import UserFactory
@@ -249,3 +250,23 @@ def test_receive_chunk_rewrites_from_the_recorded_offset(member):
             session, 0, io.BytesIO(data[:CHUNK]), CHUNK, hashlib.sha256(data[:CHUNK]).hexdigest()
         )
     assert uploads.part_path(session).read_bytes() == data[:CHUNK]
+
+
+def test_e2e_cleanup_removes_only_duplicates_of_the_given_file(member, fake_importer):
+    data = payload()
+    other = payload(seed=b"SYNTHETIC other ")
+    ids = []
+    for content in (data, data, data, other, other):
+        info = upload_all(member, content)
+        member.post(f"/api/v1/uploads/{info['id']}/complete")
+        ids.append(uploads.process_upload(info["id"], member.user.pk).pk)
+    with as_owner():
+        call_command("e2e_cleanup", hashlib.sha256(data).hexdigest(), stdout=io.StringIO())
+        left = set(ImportBatch.objects.filter(pk__in=ids).values_list("pk", flat=True))
+    # The first (real) import of the file and everything from other files survive.
+    assert left == {ids[0], ids[3], ids[4]}
+
+
+def test_e2e_cleanup_rejects_a_malformed_checksum():
+    with pytest.raises(CommandError):
+        call_command("e2e_cleanup", "not-a-hash")

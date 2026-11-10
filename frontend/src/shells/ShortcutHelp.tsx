@@ -1,6 +1,5 @@
 const ROWS: [string, string][] = [
   ["?", "Show or hide this help"],
-  ["/", "Search"],
   ["g then m / t / r / s / v / h", "Go to Map, Trips, Review, Stats, Vehicles, History"],
   ["[ and ]", "Narrow or widen the list"],
   ["\\", "Hide or show the list"],

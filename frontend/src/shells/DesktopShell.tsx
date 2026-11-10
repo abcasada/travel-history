@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Group,
   type Layout,
@@ -33,7 +33,6 @@ export default function DesktopShell() {
   const [layout, setLayout] = usePreference<Layout>("split_layout", "desktop", DEFAULT_LAYOUT);
   const groupRef = useGroupRef();
   const listRef = usePanelRef();
-  const search = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const [helpOpen, setHelpOpen] = useState(false);
 
@@ -53,7 +52,6 @@ export default function DesktopShell() {
 
   useShortcuts({
     "?": () => setHelpOpen((open) => !open),
-    "/": () => search.current?.focus(),
     Escape: () => setHelpOpen(false),
     "[": () => resizeList(-STEP),
     "]": () => resizeList(STEP),
@@ -84,13 +82,8 @@ export default function DesktopShell() {
             </NavLink>
           ))}
         </nav>
-        <input
-          ref={search}
-          type="search"
-          placeholder="Search  /"
-          aria-label="Search"
-          className="ml-auto w-64 rounded border px-2 py-1 text-sm"
-        />
+        {/* The search box and its "/" shortcut come back once search is wired up (catalog UI, T19). */}
+        <div className="flex-1" />
         <ShellMenu />
       </header>
       <Group
