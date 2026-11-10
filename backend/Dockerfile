@@ -3,7 +3,7 @@
 # Build context: repository root.
 
 # --- Frontend build (production SPA, served by Django/WhiteNoise from the same origin) ------
-FROM node:24-trixie-slim AS frontend
+FROM node:24.22.0-trixie-slim@sha256:7f486cabe892bff8fef04c0f7da8dba84a560be3e4e2740b7a86afc57ebec315 AS frontend
 WORKDIR /src
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
@@ -11,7 +11,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # --- Python base -----------------------------------------------------------------------------
-FROM python:3.13-slim-trixie AS base
+FROM python:3.13.16-slim-trixie@sha256:70729b46c69b4f1e97c4822c1af3df53a1476cf5ddc6c087c0c10bc3a5678c2f AS base
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \

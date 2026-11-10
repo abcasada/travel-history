@@ -41,7 +41,7 @@ Versions are the latest stable on 2026-10-19 (sources: `docs/research/stack-libr
 | Shortcuts | own ~70-line adapter (`src/platform/shortcuts.ts`: single keys and `g`-sequences, ignored while typing, no Ctrl/Alt/Meta) |
 | Tests | Vitest 5 + Testing Library; Playwright 1.64 (Chromium, in a container) for e2e |
 | Lint / format | Biome 2.5 |
-| Runtime | Node 24 LTS image now (`node:24-trixie-slim`); move to Node 26 after it becomes LTS (2026-10-28) |
+| Runtime | Node 24 LTS image now (`node:24.22.0-trixie-slim`, pinned by digest like the Python and PostGIS bases since 2026-11-10); move to Node 26 after it becomes LTS (2026-10-28) |
 
 ### 4.3 Tooling and infrastructure
 

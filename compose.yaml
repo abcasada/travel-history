@@ -51,7 +51,7 @@ x-backend: &backend
 
 services:
   db:
-    image: postgis/postgis:18-3.6
+    image: postgis/postgis:18-3.6@sha256:b4466ea2ba7e3af54fcbba996d45325720f4b3ecb4f43f99b2f41367dc196f23
     # The image's default entrypoint starts as root and drops privileges; running as the
     # postgres uid from the start keeps the container non-root (the volume is owned by 999).
     user: "999:999"

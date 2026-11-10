@@ -89,7 +89,7 @@ services:
     mem_limit: 128m
 
   frontend:
-    image: node:24-trixie-slim
+    image: node:24.22.0-trixie-slim@sha256:7f486cabe892bff8fef04c0f7da8dba84a560be3e4e2740b7a86afc57ebec315
     working_dir: /src
     command: ["npm", "run", "dev"]
     user: "${APP_UID:-1000}:${APP_GID:-1000}"

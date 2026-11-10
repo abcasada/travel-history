@@ -6,7 +6,7 @@ cd "$(dirname "$0")"
 compose() { docker compose -f compose.yaml -f compose.dev.yaml "$@"; }
 node_run() {
   docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -e npm_config_update_notifier=false \
-    -v "$PWD/frontend:/src" -w /src node:24-trixie-slim "$@"
+    -v "$PWD/frontend:/src" -w /src node:24.22.0-trixie-slim@sha256:7f486cabe892bff8fef04c0f7da8dba84a560be3e4e2740b7a86afc57ebec315 "$@"
 }
 random_secret() { head -c 48 /dev/urandom | base64 | tr -d '/+=\n' | head -c 48; }
 env_value() { grep -E "^$1=" .env | head -1 | cut -d= -f2-; }
@@ -84,7 +84,7 @@ case "$cmd" in
     trap 'docker rm -f "$db" >/dev/null 2>&1; docker network rm "$net" >/dev/null 2>&1; rm -rf "$rt"' EXIT
     docker run -d --name "$db" --network "$net" --user 999:999 -e POSTGRES_PASSWORD="$pw" \
       -e TRAVEL_OWNER_PASSWORD="$pw" -e TRAVEL_APP_PASSWORD="$pw" -e TRAVEL_PUBLIC_PASSWORD="$pw" \
-      -v "$PWD/db/init:/docker-entrypoint-initdb.d:ro" postgis/postgis:18-3.6 >/dev/null
+      -v "$PWD/db/init:/docker-entrypoint-initdb.d:ro" postgis/postgis:18-3.6@sha256:b4466ea2ba7e3af54fcbba996d45325720f4b3ecb4f43f99b2f41367dc196f23 >/dev/null
     for _ in $(seq 1 60); do
       docker exec "$db" psql -U postgres -d travel -c 'select 1' >/dev/null 2>&1 \
         && docker logs "$db" 2>&1 | grep -q 'PostgreSQL init process complete' && break
@@ -114,14 +114,15 @@ case "$cmd" in
     base="${1:-http://$(env_value TRAVEL_DEV_HOST):5173}"
     mkdir -p e2e/out
     [ -d e2e/node_modules ] || docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp \
-      -v "$PWD/e2e:/w" -w /w node:24-trixie-slim npm ci --no-audit --no-fund
+      -v "$PWD/e2e:/w" -w /w node:24.22.0-trixie-slim@sha256:7f486cabe892bff8fef04c0f7da8dba84a560be3e4e2740b7a86afc57ebec315 npm ci --no-audit --no-fund
+    docker rm -f travel-e2e-chrome >/dev/null 2>&1 || true  # a previous run's container may still be going away
     docker run -d --rm --name travel-e2e-chrome --network host --shm-size=1g zenika/alpine-chrome:124 \
       --no-sandbox --remote-debugging-address=127.0.0.1 --remote-debugging-port=9222 \
       --use-gl=swiftshader --enable-unsafe-swiftshader about:blank >/dev/null
-    trap 'docker stop travel-e2e-chrome >/dev/null' EXIT
+    trap 'docker rm -f travel-e2e-chrome >/dev/null' EXIT  # rm -f returns only once the name is free
     sleep 3
     docker run --rm --network host --user "$(id -u):$(id -g)" -e HOME=/tmp \
-      -v "$PWD/e2e:/w" -w /w node:24-trixie-slim node smoke.mjs "$base" && status=0 || status=$?
+      -v "$PWD/e2e:/w" -w /w node:24.22.0-trixie-slim@sha256:7f486cabe892bff8fef04c0f7da8dba84a560be3e4e2740b7a86afc57ebec315 node smoke.mjs "$base" && status=0 || status=$?
     # Each run re-uploads the same synthetic fixture; drop the duplicate batches it leaves.
     "$0" manage e2e_cleanup "$(sha256sum e2e/fixtures/timeline-synthetic.json | cut -d' ' -f1)"
     exit "$status"
