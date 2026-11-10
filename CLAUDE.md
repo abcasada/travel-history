@@ -4,9 +4,11 @@ If my message is 'Continue orchestration', you are the orchestrator. Read docs/O
 
 Private, self-hosted website for cataloging a lifetime of travel for Adam and a few family
 members. Django + GeoDjango + PostgreSQL/PostGIS backend, React + TypeScript + MapLibre PWA,
-everything in Docker on Adam's home server. **`PLAN.md` is the source of truth** for design,
-phases, decisions (§24) and open questions (§25). Read the relevant PLAN.md sections before
-changing anything, and keep PLAN.md current.
+everything in Docker on Adam's home server. **`PLAN.md` (an index) and the docs it links are the
+source of truth**: design in `docs/design/`, phases in `docs/design/phases.md` (§23), decisions in
+`docs/decisions.md` (§24), open questions in PLAN.md (§25). PLAN.md's section map says which file
+holds each old §N. Read the index and the relevant design docs before changing anything, and keep
+them current.
 
 ## Orchestrated workflow
 
@@ -30,7 +32,7 @@ changing anything, and keep PLAN.md current.
 ## Project structure
 
 ```
-PLAN.md                 design, phases + milestones, decisions log, open questions, facts register
+PLAN.md                 index: status, section map, one-line decisions, open questions (§25)
 CLAUDE.md               this file
 dev                     ./dev wrapper: every tool runs in a container (no make/node on the host)
 compose.yaml            production-like stack: db, migrate, web, worker, backup
@@ -50,14 +52,16 @@ devstack/               dev-only service config (mock OIDC users/claims)
 backup/                 backup image + scripts (pg_dump → zstd → age), restore test
 valhalla/               separate compose project `valhalla` (shared routing engine)
 docs/                   guides (tracking setup, Timeline export, Authentik, email DNS, backups)
-docs/research/          dated research notes behind PLAN.md's facts register
+docs/design/            design by area (old PLAN.md §2–§23, §27), phases.md = milestones
+docs/decisions.md       full decisions log (§24)
+docs/research/          dated research notes, prior-art.md (§1), facts-register.md (§26)
 data/fixtures/          synthetic test data only (must contain the SYNTHETIC marker)
 data/private/           Adam's real files — git-ignored, never committed
 scripts/                repo tooling (personal-data guard, …)
 .githooks/pre-commit    gitleaks (Docker) + personal-data guard
 ```
 
-Directories appear as phases land; PLAN.md §23 tracks what exists.
+Directories appear as phases land; docs/design/phases.md (§23) tracks what exists.
 
 ## Commands
 
@@ -130,8 +134,8 @@ All commands run in containers through `./dev` (see `./dev help`):
    with attribution**: keep the original copyright + permission notice in the file header and in
    `THIRD_PARTY_NOTICES.md`.
 3. **Permission changes require tests** — at the API level and at the SQL/RLS level as
-   `travel_app` — and an update to the matrix in PLAN.md §6.3.
-4. **Public pages render only allowlisted fields** (PLAN.md §6.5): only the snapshot builder
+   `travel_app` — and an update to the matrix in docs/design/permissions.md §6.3.
+4. **Public pages render only allowlisted fields** (docs/design/permissions.md §6.5): only the snapshot builder
    copies data into the public snapshot tables; public views read only those tables through the
    `travel_public` role. Any change needs the sentinel leak tests to pass.
 5. **Never recompute a saved route.** Saved routes are frozen versions; edits create a new
@@ -144,8 +148,9 @@ All commands run in containers through `./dev` (see `./dev help`):
 9. **Everything runs in containers, with nothing installed on the host.** Use `./dev` or
    `docker compose run`. Host changes (packages, swap, LVM, firewall) need Adam's approval.
 10. **Commit, push, and summarize at every milestone** (all tests passing first).
-11. **Keep PLAN.md updated when decisions change**: decisions log (§24), open questions (§25),
-    phase status (§23), facts register (§26) with source, date checked and confidence.
+11. **Keep PLAN.md and its docs updated when decisions change**: decisions log (docs/decisions.md),
+    open questions (PLAN.md §25), phase status (docs/design/phases.md), facts register
+    (docs/research/facts-register.md) with source, date checked and confidence.
 12. Raw import files are read-only and never deleted or overwritten without Adam's approval.
 13. Outbound requests to third-party services never carry personal data (no emails or names in
     User-Agent headers, no raw location history to hosted routing APIs).
@@ -156,7 +161,7 @@ All commands run in containers through `./dev` (see `./dev help`):
 
 - Host today: Xeon W3565 (x86-64-v2, **no AVX**), 11 GiB RAM, small SSD (~28 GB free), 931 GB HDD
   at `/storage/hdd1`. Every native binary must run without AVX. Migration to a Ryzen 5 3600 /
-  32 GB host is expected (PLAN.md §2, §21).
+  32 GB host is expected (docs/design/host.md, docs/design/resource-budget.md).
 - Public ingress for the server's sites is a dashboard-managed Cloudflare Tunnel
   (`~/apps/cloudflared`, host networking); apps bind `127.0.0.1:<port>`. This app uses `8780`.
   Adding its hostname is a shared-infrastructure change (ask first).
