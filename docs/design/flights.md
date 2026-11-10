@@ -37,6 +37,8 @@ ICAO first, then IATA among airlines plausible at that date, else flagged.
   it in `data/private/`), and writes a converted CSV plus a report of rows it could not match
   (unknown airport, ambiguous code, unknown airline, bad date). Until the real file exists, it
   runs against `data/fixtures/flights_synthetic.csv`.
+- `docs/flights/template.csv` and `data/fixtures/flights_synthetic.csv` don't exist yet; they
+  land with the flight template and conversion work (T13).
 - **Other formats** (phase 3.5 or 10): MyFlightRadar24, Flighty, App in the Air, TripIt (ICS),
   JetLog, byAir — reimplemented from the specs in `docs/research/reference-projects.md`.
 

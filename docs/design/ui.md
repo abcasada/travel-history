@@ -58,6 +58,10 @@ stats pages are lazy-loaded chunks imported only by the desktop shell.
 Browse/filter trips, view them on the map, edit tags, participants, notes and own
 contributions, add basic photos. No route editing, review queue or stats editing.
 
+**Interim tabs (2026-11-10):** the mobile shell currently shows Map / Trips / History, not the
+Map / Trips / Add / Me above. That is a deliberate interim state while History is the only
+working feature; the final mobile tabs are decided in T29 (mobile features).
+
 ### 18.4 Keyboard shortcuts (desktop)
 
 No Ctrl/Cmd combinations are used (they collide with browser and OS shortcuts such as Ctrl+T/W/N/L/R/S/P/F, Ctrl+Tab, Alt+←).

@@ -28,6 +28,8 @@ at least as reliable (bake-off below).
 
 ### 9.2 Trackers and setup guides (`docs/tracking/`)
 
+`docs/tracking/` doesn't exist yet; it lands with the tracker ingestion work (T7).
+
 | Tracker | Platform | Status 2026-10 | Format / setup |
 |---|---|---|---|
 | OwnTracks | Android 2.5.9, iOS 27.1.2 | active | HTTP mode. Setup: `owntracks:///config?inline=<base64 .otrc>` link + QR (`{"_type":"configuration","mode":3,"url":…,"auth":true,"username":"travel","password":"<token>","deviceId":…,"tid":…,"monitoring":1}`). QR import is documented for iOS; Android uses the link or the `.otrc` file. |
