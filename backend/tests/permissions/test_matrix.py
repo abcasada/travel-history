@@ -8,12 +8,16 @@ Both layers must give the expected answer. Every row of the matrix in PLAN.md §
 or more actions below; when the matrix changes, this table changes with it.
 """
 
+import copy
 import datetime as dt
+import sys
 
 import pytest
 from django.contrib.auth.models import AnonymousUser
-from django.db import DatabaseError, transaction
+from django.db import DatabaseError, connection, transaction
 
+from tests.helpers import as_owner
+from tests.permissions.conftest import build_family
 from travel.accounts.models import AccessRequest, DeviceToken, Person, User
 from travel.core import policy
 from travel.core.rls import set_context
@@ -352,10 +356,7 @@ def test_every_action_has_a_matrix_row():
     assert set(ACTIONS) == set(MATRIX)
 
 
-@pytest.fixture
-def scenario(family):
-    from tests.helpers import as_owner
-
+def _add_scenario_details(family):
     with as_owner():
         family.kid_participation_pk = TripParticipant.objects.get(
             trip=family.trips["family"], person=family.kid
@@ -375,6 +376,53 @@ def scenario(family):
             trip=family.trips["family"], person=family.bob.person
         ).pk
     return family
+
+
+@pytest.fixture(scope="module")
+def shared_scenario(django_db_setup, django_db_blocker):
+    """Build the family once for all cases instead of once per case (T46).
+
+    The rows live in an outer transaction that is rolled back after this module. Each case still
+    runs in its own savepoint (pytest-django's `db` fixture), which is rolled back after the case,
+    so nothing one case writes is visible to the next: the same isolation as a fresh fixture.
+    """
+    with django_db_blocker.unblock():
+        outer = transaction.atomic()
+        outer.__enter__()
+        try:
+            family = _add_scenario_details(build_family())
+            family.row_counts = _row_counts()
+        except BaseException:
+            outer.__exit__(*sys.exc_info())
+            raise
+    yield family
+    with django_db_blocker.unblock():
+        transaction.set_rollback(True)
+        outer.__exit__(None, None, None)
+
+
+def _row_counts():
+    tables = (
+        Trip, TripParticipant, TripNote, Leg, LegParticipantOverride, Route, LocationPoint,
+        TimelineSegment, RawFile, HomePeriod, Vehicle, VehiclePrivate, Person, User,
+        DeviceToken, AccessRequest,
+    )  # fmt: skip
+    # One round trip per case: SELECT (SELECT count(*) FROM a), (SELECT count(*) FROM b), ...
+    # Table names come from model metadata, never from input.
+    names = [connection.ops.quote_name(m._meta.db_table) for m in tables]
+    sql = "SELECT " + ", ".join(f"(SELECT count(*) FROM {name})" for name in names)  # noqa: S608
+    with as_owner(), connection.cursor() as cursor:
+        cursor.execute(sql)
+        return dict(zip((m.__name__ for m in tables), cursor.fetchone(), strict=True))
+
+
+@pytest.fixture
+def scenario(shared_scenario, db):
+    # Every case must start from exactly the rows the family was built with.
+    assert _row_counts() == shared_scenario.row_counts, "a previous case leaked rows"
+    # A private copy, so a case can't leak Python-side state (cached relations, refreshed
+    # fields) into later cases either.
+    return copy.deepcopy(shared_scenario)
 
 
 @pytest.mark.parametrize(("action", "actor_name", "expected"), CASES)

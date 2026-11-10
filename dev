@@ -49,6 +49,11 @@ case "$cmd" in
     compose up -d db
     compose run --rm tools pytest "$@"
     ;;
+  test-quick)
+    # Everything except tests marked slow; the full suite (./dev test) still runs them.
+    "$0" test-backend -m "not slow" "$@"
+    "$0" test-frontend
+    ;;
   test-frontend)
     node_run bash -c 'npx tsc -b --noEmit && npx vitest run'
     ;;
@@ -134,6 +139,7 @@ case "$cmd" in
 ./dev test                backend + frontend tests
 ./dev test-backend [args] pytest in the tools container (owner role creates the test DB)
 ./dev test-frontend       type-check + Vitest
+./dev test-quick [args]   like ./dev test, minus tests marked slow (for item ends; full suite at milestones)
 ./dev lint | fmt          ruff + Biome
 ./dev manage <cmd>        Django management command (runs as the OWNER role)
 ./dev shell | psql        Django shell / psql (owner role)

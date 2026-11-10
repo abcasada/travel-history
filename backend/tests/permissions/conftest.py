@@ -35,6 +35,11 @@ from travel.vehicles.models import Vehicle, VehicleOwnership, VehiclePrivate
 
 @pytest.fixture
 def family(db):
+    return build_family()
+
+
+def build_family() -> SimpleNamespace:
+    """Create the synthetic family as the owner role. Callers provide the transaction."""
     with as_owner():
         f = SimpleNamespace()
         f.admin = user_with_person(role=Role.ADMIN, display_name="Admin")

@@ -313,6 +313,7 @@ def _peak_import(user, tmp_path, n_points: int, offset: int) -> tuple[int, int, 
     return peak, len(document), batch
 
 
+@pytest.mark.slow  # ~40 s: parses multi-MB documents to compare peak memory
 def test_parsing_streams_with_bounded_memory(user, tmp_path):
     """Peak memory stays flat as files grow: nothing loads the whole export."""
     small_peak, small_size, _ = _peak_import(user, tmp_path, 20_000, offset=0)
