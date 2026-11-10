@@ -1614,20 +1614,20 @@ and can be revisited. Newest at the bottom.
 
 | ID | Question | Current assumption |
 |---|---|---|
-| Q-1 | The GitHub repo `abcasada/travel-history` already exists and is **public**. Make it private? (`gh repo edit abcasada/travel-history --visibility private --accept-visibility-change-consequences`) | Left public; contents kept public-safe. |
+| Q-1 | The GitHub repo `abcasada/travel-history` already exists and is **public**. Make it private? (`gh repo edit abcasada/travel-history --visibility private --accept-visibility-change-consequences`) | **Answered 2026-11-10:** leave public; keep contents public-safe. |
 | Q-2 | When will the Ryzen 5 3600 / 32 GB migration happen? | Develop on the current host with small data. |
 | Q-3 | The SSD's volume group seems to have ~55 GB unallocated. Extend the root LV (`sudo lvextend -r -l +100%FREE ubuntu-vg/ubuntu-lv`)? It's a host change, so I won't do it. | Not extended. |
 | Q-4 | North America Valhalla build: rented cloud VM (first build, a few dollars) or local on the Ryzen host? | Kansas extract only until you choose. |
 | Q-5 | Backup NAS: what OS/filesystem (ZFS, btrfs, Synology…)? Needed to make `docs/backup-nas.md` concrete. | Generic rsync-over-SSH pull + snapshots. |
-| Q-6 | Should Viewers be able to contribute (notes/photos) to trips they're on, or stay read-only? | Read-only. |
-| Q-7 | For participants without accounts (e.g. kids), who decides whether their name/legs appear on public pages? | The person's managing user. |
-| Q-8 | PWA install/service-worker testing needs HTTPS. Over plain LAN HTTP it won't install. Options: (a) SSH port-forward to `localhost`, (b) a dev hostname through the tunnel behind Cloudflare Access (that's exposure → your call), (c) a local CA. | (a) for now. |
-| Q-9 | OpenRouteService's terms prohibit transmitting personal data. OK to send only user-drawn waypoints (outside NA / Valhalla down), or skip ORS and use only the FOSSGIS fallback there? | Send only user-drawn waypoints, no user identity. |
+| Q-6 | Should Viewers be able to contribute (notes/photos) to trips they're on, or stay read-only? | **Answered 2026-11-10:** read-only. |
+| Q-7 | For participants without accounts (e.g. kids), who decides whether their name/legs appear on public pages? | **Answered 2026-11-10:** the managing user decides. |
+| Q-8 | PWA install/service-worker testing needs HTTPS. Over plain LAN HTTP it won't install. Options: (a) SSH port-forward to `localhost`, (b) a dev hostname through the tunnel behind Cloudflare Access (that's exposure → your call), (c) a local CA. | **Answered 2026-11-10:** (a) SSH port-forward to localhost. |
+| Q-9 | OpenRouteService's terms prohibit transmitting personal data. OK to send only user-drawn waypoints (outside NA / Valhalla down), or skip ORS and use only the FOSSGIS fallback there? | **Answered 2026-11-10:** user-drawn waypoints only, no identity. No ORS key yet; Valhalla only with the ORS fallback stubbed until a key is added. |
 | Q-10 | Email: Resend (recommended) or SMTP2GO? Is Cloudflare Email Routing active on adamcasada.com (so I can double-check the SPF/DMARC records)? | Resend; existing apex SPF untouched. |
-| Q-11 | Defaults OK? Privacy-zone radius 1 km; public pages show dates only; home addresses private by default. | Yes. |
+| Q-11 | Defaults OK? Privacy-zone radius 1 km; public pages show dates only; home addresses private by default. | **Still open (2026-11-10):** 1 km is the default for now, but Adam may revisit the radius soon; keep it a single setting that is easy to change. Dates-only and private home addresses assumed yes. |
 | Q-12 | Switch the secret scanner from gitleaks (now security-patches-only) to its successor Betterleaks? | Keep gitleaks for now. |
 | Q-13 | Any intention to publish the source? (Would decide a license, e.g. MIT or AGPL.) | No license (private). |
-| Q-14 | Should family members be able to see each other's **vehicles' ownership history** (who owned it when), or only the vehicle and current owner? | Full history visible to family unless hidden. |
+| Q-14 | Should family members be able to see each other's **vehicles' ownership history** (who owned it when), or only the vehicle and current owner? | **Answered 2026-11-10:** full history visible to family unless hidden. |
 | Q-15 | The server's LAN address is DHCP-assigned. A DHCP reservation on the EdgeRouter would keep the dev binding stable (router change → yours). | Binding uses the current address from `.env`. |
 
 ---
