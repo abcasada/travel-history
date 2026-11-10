@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(/frontend/src/api/generated.ts)",
+      "Read(/frontend/dist/**)",
+      "Read(/frontend/dev-dist/**)",
+      "Read(**/*.min.js)",
+      "Read(**/*.min.css)",
+      "Read(**/*.min.mjs)",
+      "Read(**/package-lock.json)",
+      "Read(**/pnpm-lock.yaml)",
+      "Read(**/yarn.lock)",
+      "Read(**/uv.lock)",
+      "Read(**/poetry.lock)"
+    ]
+  }
+}
