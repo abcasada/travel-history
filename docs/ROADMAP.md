@@ -6,7 +6,7 @@ Only the orchestrator and the planner edit this file. Status values: todo · in 
 Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhigh. Task IDs are from the 2026-10-21 audit (STATUS.md, or ROADMAP.md if Stage 0 already ran). Each item is one dispatch unless noted.
 
 1. **[M] Stage 0 housekeeping** (details below). Skip it if already done.
-   - Status: todo
+   - Status: in progress (dispatched 2026-11-10)
 
    **Item 1 details: Stage 0 housekeeping**
    1. **Restructure PLAN.md** (it's ~35k tokens):
