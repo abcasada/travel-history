@@ -8,16 +8,13 @@ Both layers must give the expected answer. Every row of the matrix in PLAN.md §
 or more actions below; when the matrix changes, this table changes with it.
 """
 
-import copy
 import datetime as dt
-import sys
 
 import pytest
 from django.contrib.auth.models import AnonymousUser
-from django.db import DatabaseError, connection, transaction
+from django.db import DatabaseError, transaction
 
 from tests.helpers import as_owner
-from tests.permissions.conftest import build_family
 from travel.accounts.models import AccessRequest, DeviceToken, Person, User, UserDirectory
 from travel.core import policy
 from travel.core.rls import set_context
@@ -96,6 +93,98 @@ def _trip_actions():
             lambda f, u, v=vis: policy.can_edit_trip_core(u, f.trips[v]),
         )
     return actions
+
+
+def _trips_api_actions():
+    """What the trips API (work-order item 6) adds: legs and participants as rows of their
+    own, people and vehicles referenced from a trip, and the trip's own purpose and cover."""
+    fam = "family"
+    return {
+        "view_core_leg": (
+            lambda f, a: sees(Leg, f.core_leg.pk),
+            lambda f, u: policy.can_view_trip(u, f.trips[fam]),
+        ),
+        "view_bob_participation:participants": (
+            lambda f, a: sees(TripParticipant, f.bob_participations["participants"]),
+            lambda f, u: policy.can_view_trip(u, f.trips["participants"]),
+        ),
+        "delete_core_leg": (
+            lambda f, a: deletes(Leg, f.core_leg.pk),
+            lambda f, u: policy.can_delete_leg(u, f.core_leg),
+        ),
+        "add_carol:family": (
+            lambda f, a: inserts(
+                lambda: TripParticipant.objects.create(
+                    trip=f.trips[fam], person=f.carol.person, added_by_id=uid(f, a)
+                )
+            ),
+            lambda f, u: policy.can_add_participant(u, f.trips[fam], f.carol.person),
+        ),
+        # A private person someone else created: a guessed id must not put their name on a trip.
+        "add_alices_private_person:family": (
+            lambda f, a: inserts(
+                lambda: TripParticipant.objects.create(
+                    trip=f.trips[fam], person=f.alices_private_person, added_by_id=uid(f, a)
+                )
+            ),
+            lambda f, u: policy.can_add_participant(u, f.trips[fam], f.alices_private_person),
+        ),
+        "remove_bob:family": (
+            lambda f, a: deletes(TripParticipant, f.bob_participation_pk),
+            lambda f, u: policy.can_remove_participant(u, f.trips[fam]),
+        ),
+        # Viewers are read-only, but their own public consent is a privacy choice (§6.3).
+        "set_victor_consent": (
+            lambda f, a: updates(TripParticipant, f.victor_participation_pk, public_consent=True),
+            lambda f, u: policy.can_set_participant_consent(u, f.trips[fam], f.victor.person),
+        ),
+        "include_private_person_on_leg": (
+            lambda f, a: inserts(
+                lambda: LegParticipantOverride.objects.create(
+                    leg=f.core_leg,
+                    person=f.alices_private_person,
+                    include=True,
+                    set_by_id=uid(f, a),
+                )
+            ),
+            lambda f, u: policy.can_set_leg_participation(u, f.core_leg, f.alices_private_person),
+        ),
+        "use_vehicle_on_core_leg": (
+            lambda f, a: updates(Leg, f.core_leg.pk, vehicle=f.vehicle),
+            lambda f, u: (
+                policy.can_edit_leg(u, f.core_leg) and policy.can_use_vehicle(u, f.vehicle)
+            ),
+        ),
+        "use_hidden_vehicle_on_core_leg": (
+            lambda f, a: updates(Leg, f.core_leg.pk, vehicle=f.hidden_vehicle),
+            lambda f, u: (
+                policy.can_edit_leg(u, f.core_leg) and policy.can_use_vehicle(u, f.hidden_vehicle)
+            ),
+        ),
+        "use_hidden_vehicle_on_bobs_leg": (
+            lambda f, a: updates(Leg, f.bob_leg.pk, vehicle=f.hidden_vehicle),
+            lambda f, u: (
+                policy.can_edit_leg(u, f.bob_leg) and policy.can_use_vehicle(u, f.hidden_vehicle)
+            ),
+        ),
+        "set_own_purpose:family": (
+            lambda f, a: updates(Trip, f.trips[fam].pk, purpose=f.alice_purpose),
+            lambda f, u: policy.can_set_trip_purpose(u, f.trips[fam], f.alice_purpose),
+        ),
+        "set_foreign_purpose:family": (
+            lambda f, a: updates(Trip, f.trips[fam].pk, purpose=f.bob_purpose),
+            lambda f, u: policy.can_set_trip_purpose(u, f.trips[fam], f.bob_purpose),
+        ),
+        # Covers are set by the photo work (T31); the database rule exists already.
+        "set_cover_own_photo:family": (
+            lambda f, a: updates(Trip, f.trips[fam].pk, cover_media=f.bob_photo),
+            None,
+        ),
+        "set_cover_other_trips_photo:family": (
+            lambda f, a: updates(Trip, f.trips[fam].pk, cover_media=f.alice_private_photo),
+            None,
+        ),
+    }
 
 
 ACTIONS = {
@@ -311,6 +400,7 @@ ACTIONS = {
     ),
     "view_kid": (lambda f, a: sees(Person, f.kid.pk), None),
     "view_alices_private_person": (lambda f, a: sees(Person, f.alices_private_person.pk), None),
+    **_trips_api_actions(),
 }
 
 T, F = True, False
@@ -365,6 +455,22 @@ MATRIX = {
     "view_ivan_name":              (T, T, T, T, T, F, F),
     "view_kid":                    (T, T, T, T, T, F, F),
     "view_alices_private_person":  (F, T, F, F, F, F, F),
+    # Trips API (work-order item 6)
+    "view_core_leg":                        (T, T, T, T, T, F, F),
+    "view_bob_participation:participants":  (F, T, T, F, F, F, F),
+    "delete_core_leg":                      (T, T, F, F, F, F, F),
+    "add_carol:family":                     (T, T, F, F, F, F, F),
+    "add_alices_private_person:family":     (F, T, F, F, F, F, F),
+    "remove_bob:family":                    (T, T, F, F, F, F, F),
+    "set_victor_consent":                   (F, F, F, F, T, F, F),
+    "include_private_person_on_leg":        (F, T, F, F, F, F, F),
+    "use_vehicle_on_core_leg":              (T, T, F, F, F, F, F),
+    "use_hidden_vehicle_on_core_leg":       (F, T, F, F, F, F, F),
+    "use_hidden_vehicle_on_bobs_leg":       (F, F, F, F, F, F, F),
+    "set_own_purpose:family":               (T, T, F, F, F, F, F),
+    "set_foreign_purpose:family":           (F, F, F, F, F, F, F),
+    "set_cover_own_photo:family":           (T, T, F, F, F, F, F),
+    "set_cover_other_trips_photo:family":   (F, F, F, F, F, F, F),
 }  # fmt: skip
 
 CASES = [
@@ -376,75 +482,6 @@ CASES = [
 
 def test_every_action_has_a_matrix_row():
     assert set(ACTIONS) == set(MATRIX)
-
-
-def _add_scenario_details(family):
-    with as_owner():
-        family.kid_participation_pk = TripParticipant.objects.get(
-            trip=family.trips["family"], person=family.kid
-        ).pk
-        family.person_by_user = {
-            u.pk: u.person
-            for u in (
-                family.admin,
-                family.alice,
-                family.bob,
-                family.carol,
-                family.victor,
-                family.ivan,
-            )
-        }
-        family.bob_participation_pk = TripParticipant.objects.get(
-            trip=family.trips["family"], person=family.bob.person
-        ).pk
-    return family
-
-
-@pytest.fixture(scope="module")
-def shared_scenario(django_db_setup, django_db_blocker):
-    """Build the family once for all cases instead of once per case (T46).
-
-    The rows live in an outer transaction that is rolled back after this module. Each case still
-    runs in its own savepoint (pytest-django's `db` fixture), which is rolled back after the case,
-    so nothing one case writes is visible to the next: the same isolation as a fresh fixture.
-    """
-    with django_db_blocker.unblock():
-        outer = transaction.atomic()
-        outer.__enter__()
-        try:
-            family = _add_scenario_details(build_family())
-            family.row_counts = _row_counts()
-        except BaseException:
-            outer.__exit__(*sys.exc_info())
-            raise
-    yield family
-    with django_db_blocker.unblock():
-        transaction.set_rollback(True)
-        outer.__exit__(None, None, None)
-
-
-def _row_counts():
-    tables = (
-        Trip, TripParticipant, TripNote, Leg, LegParticipantOverride, Route, LocationPoint,
-        TimelineSegment, RawFile, HomePeriod, Vehicle, VehiclePrivate, Person, User,
-        DeviceToken, AccessRequest,
-    )  # fmt: skip
-    # One round trip per case: SELECT (SELECT count(*) FROM a), (SELECT count(*) FROM b), ...
-    # Table names come from model metadata, never from input.
-    names = [connection.ops.quote_name(m._meta.db_table) for m in tables]
-    sql = "SELECT " + ", ".join(f"(SELECT count(*) FROM {name})" for name in names)  # noqa: S608
-    with as_owner(), connection.cursor() as cursor:
-        cursor.execute(sql)
-        return dict(zip((m.__name__ for m in tables), cursor.fetchone(), strict=True))
-
-
-@pytest.fixture
-def scenario(shared_scenario, db):
-    # Every case must start from exactly the rows the family was built with.
-    assert _row_counts() == shared_scenario.row_counts, "a previous case leaked rows"
-    # A private copy, so a case can't leak Python-side state (cached relations, refreshed
-    # fields) into later cases either.
-    return copy.deepcopy(shared_scenario)
 
 
 @pytest.mark.parametrize(("action", "actor_name", "expected"), CASES)

@@ -8,10 +8,13 @@ victor  Viewer; participant on alice's family trip (viewers still cannot contrib
 ivan    Member, deactivated
 """
 
+import copy
 import datetime as dt
+import sys
 from types import SimpleNamespace
 
 import pytest
+from django.db import connection, transaction
 from django.utils import timezone
 
 from tests.factories import (
@@ -26,10 +29,20 @@ from tests.factories import (
     user_with_person,
 )
 from tests.helpers import as_owner
-from travel.accounts.models import AccessRequest, DeviceToken, Person, Role
-from travel.history.models import HomePeriod
+from travel.accounts.models import AccessRequest, DeviceToken, Person, Role, User
+from travel.history.models import HomePeriod, LocationPoint, RawFile, TimelineSegment
 from travel.media.models import Media
-from travel.trips.models import Leg, LegParticipantOverride, Tag, TripNote, TripTag
+from travel.trips.models import (
+    Leg,
+    LegParticipantOverride,
+    Purpose,
+    Route,
+    Tag,
+    Trip,
+    TripNote,
+    TripParticipant,
+    TripTag,
+)
 from travel.vehicles.models import Vehicle, VehicleOwnership, VehiclePrivate
 
 
@@ -81,6 +94,11 @@ def build_family() -> SimpleNamespace:
         f.bob_note = TripNote.objects.create(trip=fam, author=f.bob, body="Bob's note")
         f.alice_note = TripNote.objects.create(trip=fam, author=f.alice, body="Alice's note")
         f.bob_photo = Media.objects.create(trip=fam, author=f.bob, display_path="x/bob.webp")
+        f.alice_private_photo = Media.objects.create(
+            trip=f.trips["private"], author=f.alice, display_path="x/alice.webp"
+        )
+        f.alice_purpose = Purpose.objects.create(owner=f.alice, name="Vacation")
+        f.bob_purpose = Purpose.objects.create(owner=f.bob, name="Bob's own purpose")
         f.bob_tag = Tag.objects.create(owner=f.bob, name="bob-tag")
         f.alice_tag = Tag.objects.create(owner=f.alice, name="alice-tag")
         f.bob_triptag = TripTag.objects.create(trip=fam, tag=f.bob_tag, author=f.bob)
@@ -139,3 +157,81 @@ def build_family() -> SimpleNamespace:
         )
         f.now = timezone.now()
     return f
+
+
+# --- One family per test module (T46) ------------------------------------------------------
+
+
+def _add_scenario_details(family):
+    with as_owner():
+        fam = family.trips["family"]
+        family.kid_participation_pk = TripParticipant.objects.get(trip=fam, person=family.kid).pk
+        family.person_by_user = {
+            u.pk: u.person
+            for u in (
+                family.admin,
+                family.alice,
+                family.bob,
+                family.carol,
+                family.victor,
+                family.ivan,
+            )
+        }
+        family.bob_participation_pk = TripParticipant.objects.get(
+            trip=fam, person=family.bob.person
+        ).pk
+        family.victor_participation_pk = TripParticipant.objects.get(
+            trip=fam, person=family.victor.person
+        ).pk
+        family.bob_participations = {
+            vis: TripParticipant.objects.get(trip=trip, person=family.bob.person).pk
+            for vis, trip in family.trips.items()
+        }
+    return family
+
+
+def _row_counts():
+    tables = (
+        Trip, TripParticipant, TripNote, Leg, LegParticipantOverride, Route, LocationPoint,
+        TimelineSegment, RawFile, HomePeriod, Vehicle, VehiclePrivate, Person, User,
+        DeviceToken, AccessRequest, Purpose, Media, TripTag,
+    )  # fmt: skip
+    # One round trip per case: SELECT (SELECT count(*) FROM a), (SELECT count(*) FROM b), ...
+    # Table names come from model metadata, never from input.
+    names = [connection.ops.quote_name(m._meta.db_table) for m in tables]
+    sql = "SELECT " + ", ".join(f"(SELECT count(*) FROM {name})" for name in names)  # noqa: S608
+    with as_owner(), connection.cursor() as cursor:
+        cursor.execute(sql)
+        return dict(zip((m.__name__ for m in tables), cursor.fetchone(), strict=True))
+
+
+@pytest.fixture(scope="module")
+def shared_scenario(django_db_setup, django_db_blocker):
+    """Build the family once per module instead of once per case (T46).
+
+    The rows live in an outer transaction that is rolled back after the module. Each case still
+    runs in its own savepoint (pytest-django's `db` fixture), which is rolled back after the case,
+    so nothing one case writes is visible to the next: the same isolation as a fresh fixture.
+    """
+    with django_db_blocker.unblock():
+        outer = transaction.atomic()
+        outer.__enter__()
+        try:
+            family = _add_scenario_details(build_family())
+            family.row_counts = _row_counts()
+        except BaseException:
+            outer.__exit__(*sys.exc_info())
+            raise
+    yield family
+    with django_db_blocker.unblock():
+        transaction.set_rollback(True)
+        outer.__exit__(None, None, None)
+
+
+@pytest.fixture
+def scenario(shared_scenario, db):
+    # Every case must start from exactly the rows the family was built with.
+    assert _row_counts() == shared_scenario.row_counts, "a previous case leaked rows"
+    # A private copy, so a case can't leak Python-side state (cached relations, refreshed
+    # fields) into later cases either.
+    return copy.deepcopy(shared_scenario)

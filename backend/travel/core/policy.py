@@ -19,7 +19,7 @@ from travel.core.choices import Visibility
 if TYPE_CHECKING:
     from travel.accounts.models import User
     from travel.history.models import HomePeriod
-    from travel.trips.models import Leg, Trip
+    from travel.trips.models import Leg, Purpose, Trip
     from travel.vehicles.models import Vehicle
 
 
@@ -91,8 +91,35 @@ def can_edit_trip_core(user, trip: Trip) -> bool:
     return trip.owner_id == user.pk or (is_admin(user) and can_view_trip(user, trip))
 
 
+def can_view_trip_sharing(user, trip: Trip) -> bool:
+    """Public mode, unlisted-link slug, privacy zone: the people who may change them. The slug
+    is a capability URL, so nobody else needs it (trips API, D-81)."""
+    return can_edit_trip_core(user, trip)
+
+
+def can_set_trip_purpose(user, trip: Trip, purpose: Purpose) -> bool:
+    """Purposes are per user: a trip takes only its owner's (so another user's purpose names
+    never surface on a trip). For a new trip, pass an unsaved Trip owned by the creator."""
+    return can_edit_trip_core(user, trip) and purpose.owner_id == trip.owner_id
+
+
 def can_delete_trip(user, trip: Trip) -> bool:
     return is_family(user) and trip.owner_id == user.pk  # PLAN.md D-17
+
+
+def can_add_participant(user, trip: Trip, person: Person) -> bool:
+    """Core editors add people they can see; adding someone can share the trip with them."""
+    return can_edit_trip_core(user, trip) and can_view_person(user, person)
+
+
+def can_remove_participant(user, trip: Trip) -> bool:
+    return can_edit_trip_core(user, trip)
+
+
+def can_set_participant_consent(user, trip: Trip, person: Person) -> bool:
+    """A participant's public consent: their managing user decides (D-21, Q-7), Viewers
+    included - it is a privacy choice about themselves, not a contribution."""
+    return can_view_trip(user, trip) and can_set_public_consent(user, person)
 
 
 def can_contribute(user, trip: Trip) -> bool:
@@ -108,14 +135,33 @@ def can_edit_contribution(user, obj) -> bool:
     return is_family(user) and obj.author_id == user.pk and can_view_trip(user, obj.trip)
 
 
+def new_leg_kind(user, trip: Trip) -> str | None:
+    """What a new leg by this user becomes: core editors add core legs; other contributors add
+    their own legs (`is_contribution`, participant_scope author, D-22); anyone else: None."""
+    if can_edit_trip_core(user, trip):
+        return "core"
+    if can_contribute(user, trip):
+        return "contribution"
+    return None
+
+
 def can_edit_leg(user, leg: Leg) -> bool:
     if leg.is_contribution:
         return leg.author_id == user.pk and can_contribute(user, leg.trip)
     return can_edit_trip_core(user, leg.trip)
 
 
+def can_delete_leg(user, leg: Leg) -> bool:
+    """Same as editing: a contributor's leg only by its author while they may still
+    contribute; core legs by core editors."""
+    return can_edit_leg(user, leg)
+
+
 def can_set_leg_participation(user, leg: Leg, person: Person) -> bool:
-    """Core editors manage everyone's legs; participants set which legs they themselves were on."""
+    """Core editors manage everyone's legs; participants set which legs they themselves were on.
+    Either way only for people the user can see (a leg must not reveal a hidden person)."""
+    if not can_view_person(user, person):
+        return False
     if can_edit_trip_core(user, leg.trip):
         return True
     return manages_person(user, person) and can_contribute(user, leg.trip)
@@ -137,6 +183,29 @@ def can_view_account(user, target: User) -> bool:
 def can_view_directory(user) -> bool:
     """Display names (and person link, active flag) of every account: the whole family (D-76)."""
     return is_family(user)
+
+
+def can_view_person(user, person: Person) -> bool:
+    """Mirror of app.can_view_person: family-visible people, people I created, my own person,
+    anyone on a trip I can see (trip-level or a leg override), owners of vehicles I can see."""
+    from travel.trips.models import LegParticipantOverride, TripParticipant
+    from travel.vehicles.models import VehicleOwnership
+
+    if not is_family(user):
+        return False
+    if (
+        person.visibility == Person.Visibility.FAMILY
+        or person.created_by_id == user.pk
+        or person.pk == user.person_id
+    ):
+        return True
+    trips = visible_trips(user)
+    if TripParticipant.objects.filter(person_id=person.pk, trip__in=trips).exists():
+        return True
+    if LegParticipantOverride.objects.filter(person_id=person.pk, leg__trip__in=trips).exists():
+        return True
+    owned = VehicleOwnership.objects.filter(owner_person_id=person.pk).select_related("vehicle")
+    return any(can_view_vehicle(user, o.vehicle) for o in owned)
 
 
 def manages_person(user, person: Person) -> bool:
@@ -189,6 +258,11 @@ def can_manage_vehicle(user, vehicle: Vehicle) -> bool:
     return vehicle_manager_id(vehicle) == user.pk or (
         is_admin(user) and can_view_vehicle(user, vehicle)
     )
+
+
+def can_use_vehicle(user, vehicle: Vehicle) -> bool:
+    """Put a vehicle on a leg: any vehicle the user can see (a hidden one only by its manager)."""
+    return can_create(user) and can_view_vehicle(user, vehicle)
 
 
 def can_view_vehicle_private(user, vehicle: Vehicle) -> bool:
