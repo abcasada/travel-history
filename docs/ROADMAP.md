@@ -31,7 +31,7 @@ Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhi
       - Report before and after timings.
    8. **Finish:** full suite, lint, and type checks green; commit and push.
 2. **[X] T4 + T2:** account privacy, and the database-backed rate limiter. Tests must cover concurrent requests.
-   - Status: todo
+   - Status: in progress (dispatched 2026-11-10)
 3. **[M] T5:** a 500 MB–1 GB synthetic import test. Record time, peak memory, and database growth. If it's over budget or fails: ESCALATE.
    - Status: todo
 4. **[M] T11 + real import:**
