@@ -75,6 +75,13 @@ def test_date_filter_selects_points(member):
     assert point_count(get_tile(member, 6, query).content) == 2
 
 
+def test_cache_buster_is_ignored(member):
+    """The map appends `rev=` (latest import) so new data isn't hidden by the browser cache."""
+    add_points(member.user, DAY1, 2)
+    assert point_count(get_tile(member, 6, "?rev=3.17").content) == 2
+    assert get_tile(member, 12, "?rev=3.17", kind="segments").status_code == 200
+
+
 def test_source_filter(member):
     add_points(member.user, DAY1, 3, source=PointSource.OWNTRACKS)
     add_points(member.user, DAY1, 2, source=PointSource.GOOGLE_PATH)

@@ -8,6 +8,16 @@ vi.mock("react-map-gl/maplibre", () => ({
   default: ({ children }: { children?: ReactNode }) =>
     createElement("div", { "data-testid": "basemap" }, children),
   NavigationControl: () => null,
+  // Sources expose their tile URLs so tests can check what the map would request.
+  Source: ({ id, tiles, children }: { id: string; tiles?: string[]; children?: ReactNode }) =>
+    createElement(
+      "div",
+      { "data-testid": `source-${id}`, "data-tiles": tiles?.join(" ") },
+      children,
+    ),
+  Layer: ({ id }: { id: string }) => createElement("div", { "data-testid": `layer-${id}` }),
+  Popup: () => null,
+  useMap: () => ({ current: undefined }),
 }));
 
 vi.mock("../map/maplibreWorker", () => ({}));

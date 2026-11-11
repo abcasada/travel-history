@@ -1,6 +1,9 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { useSearchParams } from "react-router";
 import { getListImportsQueryKey, type ImportBatchOut, useListImports } from "../api/generated";
+import { CoverageStrip } from "../history/CoverageStrip";
+import { type HistoryFilter, readFilter, writeFilter } from "../history/filter";
 import { pickFiles } from "../platform/files";
 import { type Progress, uploadFile } from "../upload/chunkedUpload";
 
@@ -65,6 +68,65 @@ export function ImportSummary({ batch }: { batch: ImportBatchOut }) {
   );
 }
 
+/** Date range, segments overlay and coverage strip for the history map (both shells). */
+export function HistoryMapControls() {
+  const [params, setParams] = useSearchParams();
+  const filter = readFilter(params);
+  const update = (change: Partial<HistoryFilter>) =>
+    setParams(writeFilter(params, { ...filter, ...change }), { replace: true });
+
+  function pick(day: string, extend: boolean) {
+    if (extend && filter.from) {
+      const ends = [filter.from, filter.to ?? filter.from, day].sort();
+      update({ from: ends[0], to: ends[2] });
+    } else {
+      update({ from: day, to: day });
+    }
+  }
+
+  return (
+    <section aria-label="Map filter" className="mb-6">
+      <div className="mb-3 flex flex-wrap items-end gap-3 text-sm">
+        <label className="flex flex-col">
+          From
+          <input
+            type="date"
+            className="rounded border px-2 py-1"
+            value={filter.from ?? ""}
+            onChange={(e) => update({ from: e.target.value || null })}
+          />
+        </label>
+        <label className="flex flex-col">
+          To
+          <input
+            type="date"
+            className="rounded border px-2 py-1"
+            value={filter.to ?? ""}
+            onChange={(e) => update({ to: e.target.value || null })}
+          />
+        </label>
+        <button
+          type="button"
+          className="rounded border px-2 py-1 hover:bg-slate-100 disabled:opacity-40"
+          onClick={() => update({ from: null, to: null })}
+          disabled={!filter.from && !filter.to}
+        >
+          All dates
+        </button>
+        <label className="flex items-center gap-1">
+          <input
+            type="checkbox"
+            checked={filter.segments}
+            onChange={(e) => update({ segments: e.target.checked })}
+          />
+          Timeline segments
+        </label>
+      </div>
+      <CoverageStrip from={filter.from} to={filter.to} onPick={pick} />
+    </section>
+  );
+}
+
 export function HistoryPage() {
   const queryClient = useQueryClient();
   const [progress, setProgress] = useState<Progress | null>(null);
@@ -94,6 +156,12 @@ export function HistoryPage() {
   return (
     <div className="p-4">
       <h2 className="mb-1 text-lg font-semibold">Raw history</h2>
+      <p className="mb-3 text-sm text-slate-600">
+        Your own location history on the map: only you can see it. Zoomed out, points are grouped
+        into cells; zoom in for single points, and click one to see when it was recorded.
+      </p>
+      <HistoryMapControls />
+      <h3 className="mb-1 font-medium">Import</h3>
       <p className="mb-3 text-sm text-slate-600">
         Import your Google Timeline export. Re-importing a newer export only adds what changed; the
         original file is always kept unchanged.

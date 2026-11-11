@@ -24,6 +24,25 @@ import type {
 } from '@tanstack/react-query';
 
 import { apiFetch } from './client';
+export interface CoverageDayOut {
+  day: string;
+  points: number;
+  segments: number;
+}
+
+export interface CoverageIn {
+  from: string;
+  to: string;
+  /** IANA zone that defines the local days */
+  tz?: string;
+}
+
+export interface CoverageOut {
+  days: CoverageDayOut[];
+  first_day: string | null;
+  last_day: string | null;
+}
+
 export type DeviceClass = typeof DeviceClass[keyof typeof DeviceClass];
 
 
@@ -72,9 +91,25 @@ export interface MeOut {
   role: string;
 }
 
+export interface PointsTileIn {
+  /** inclusive, with offset */
+  from?: string | null;
+  /** comma-separated point sources */
+  source?: string | null;
+  /** exclusive, with offset */
+  to?: string | null;
+}
+
 export interface PreferenceIn {
   device_class?: DeviceClass;
   value: unknown;
+}
+
+export interface TimeRangeIn {
+  /** inclusive, with offset */
+  from?: string | null;
+  /** exclusive, with offset */
+  to?: string | null;
 }
 
 export interface UploadIn {
@@ -95,6 +130,41 @@ export interface UploadOut {
   status: string;
   total_size: number;
 }
+
+export type GetHistoryCoverageParams = {
+from: string;
+to: string;
+/**
+ * IANA zone that defines the local days
+ */
+tz?: string;
+};
+
+export type GetHistorySegmentsTileParams = {
+/**
+ * inclusive, with offset
+ */
+from?: string | null;
+/**
+ * exclusive, with offset
+ */
+to?: string | null;
+};
+
+export type GetHistoryPointsTileParams = {
+/**
+ * inclusive, with offset
+ */
+from?: string | null;
+/**
+ * exclusive, with offset
+ */
+to?: string | null;
+/**
+ * comma-separated point sources
+ */
+source?: string | null;
+};
 
 export type ListPreferencesParams = {
 device_class?: 'any' | 'desktop' | 'mobile';
@@ -122,6 +192,386 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getGetHistoryCoverageUrl = (params: GetHistoryCoverageParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/history/coverage?${stringifiedParams}` : `/api/v1/history/coverage`
+}
+
+/**
+ * Which local days (in IANA zone `tz`) have points or Timeline segments, for the coverage
+ * strip; at most 400 days per request. Days without data are omitted.
+ * @summary History Coverage
+ */
+export const getHistoryCoverage = async (params: GetHistoryCoverageParams, options?: Parameters<typeof apiFetch>[1]): Promise<CoverageOut> => {
+
+  return apiFetch<CoverageOut>(getGetHistoryCoverageUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetHistoryCoverageQueryKey = (params?: GetHistoryCoverageParams,) => {
+    return [
+    `/api/v1/history/coverage`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetHistoryCoverageQueryOptions = <TData = Awaited<ReturnType<typeof getHistoryCoverage>>, TError = unknown>(params: GetHistoryCoverageParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getHistoryCoverage>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetHistoryCoverageQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getHistoryCoverage>>> = ({ signal }) => getHistoryCoverage(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getHistoryCoverage>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetHistoryCoverageQueryResult = NonNullable<Awaited<ReturnType<typeof getHistoryCoverage>>>
+export type GetHistoryCoverageQueryError = unknown
+
+
+export function useGetHistoryCoverage<TData = Awaited<ReturnType<typeof getHistoryCoverage>>, TError = unknown>(
+ params: GetHistoryCoverageParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getHistoryCoverage>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getHistoryCoverage>>,
+          TError,
+          Awaited<ReturnType<typeof getHistoryCoverage>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetHistoryCoverage<TData = Awaited<ReturnType<typeof getHistoryCoverage>>, TError = unknown>(
+ params: GetHistoryCoverageParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getHistoryCoverage>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getHistoryCoverage>>,
+          TError,
+          Awaited<ReturnType<typeof getHistoryCoverage>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetHistoryCoverage<TData = Awaited<ReturnType<typeof getHistoryCoverage>>, TError = unknown>(
+ params: GetHistoryCoverageParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getHistoryCoverage>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary History Coverage
+ */
+
+export function useGetHistoryCoverage<TData = Awaited<ReturnType<typeof getHistoryCoverage>>, TError = unknown>(
+ params: GetHistoryCoverageParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getHistoryCoverage>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetHistoryCoverageQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetHistorySegmentsTileUrl = (z: number,
+    x: number,
+    y: number,
+    params?: GetHistorySegmentsTileParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/history/segments/tiles/${z}/${x}/${y}.mvt?${stringifiedParams}` : `/api/v1/history/segments/tiles/${z}/${x}/${y}.mvt`
+}
+
+/**
+ * The caller's current Timeline segments as a vector tile (layer `segments`; zoom 5 and
+ * up): visits as points, activities and paths as lines, with `kind`, `activity`, `semantic`,
+ * `t0`/`t1` (epoch seconds).
+ * @summary History Segments Tile
+ */
+export const getHistorySegmentsTile = async (z: number,
+    x: number,
+    y: number,
+    params?: GetHistorySegmentsTileParams, options?: Parameters<typeof apiFetch>[1]): Promise<unknown> => {
+
+  return apiFetch<unknown>(getGetHistorySegmentsTileUrl(z,x,y,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetHistorySegmentsTileQueryKey = (z: number,
+    x: number,
+    y: number,
+    params?: GetHistorySegmentsTileParams,) => {
+    return [
+    `/api/v1/history/segments/tiles/${z}/${x}/${y}.mvt`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetHistorySegmentsTileQueryOptions = <TData = Awaited<ReturnType<typeof getHistorySegmentsTile>>, TError = void>(z: number,
+    x: number,
+    y: number,
+    params?: GetHistorySegmentsTileParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getHistorySegmentsTile>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetHistorySegmentsTileQueryKey(z,x,y,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getHistorySegmentsTile>>> = ({ signal }) => getHistorySegmentsTile(z,x,y,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: z !== null && z !== undefined && x !== null && x !== undefined && y !== null && y !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getHistorySegmentsTile>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetHistorySegmentsTileQueryResult = NonNullable<Awaited<ReturnType<typeof getHistorySegmentsTile>>>
+export type GetHistorySegmentsTileQueryError = void
+
+
+export function useGetHistorySegmentsTile<TData = Awaited<ReturnType<typeof getHistorySegmentsTile>>, TError = void>(
+ z: number,
+    x: number,
+    y: number,
+    params: undefined |  GetHistorySegmentsTileParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getHistorySegmentsTile>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getHistorySegmentsTile>>,
+          TError,
+          Awaited<ReturnType<typeof getHistorySegmentsTile>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetHistorySegmentsTile<TData = Awaited<ReturnType<typeof getHistorySegmentsTile>>, TError = void>(
+ z: number,
+    x: number,
+    y: number,
+    params?: GetHistorySegmentsTileParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getHistorySegmentsTile>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getHistorySegmentsTile>>,
+          TError,
+          Awaited<ReturnType<typeof getHistorySegmentsTile>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetHistorySegmentsTile<TData = Awaited<ReturnType<typeof getHistorySegmentsTile>>, TError = void>(
+ z: number,
+    x: number,
+    y: number,
+    params?: GetHistorySegmentsTileParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getHistorySegmentsTile>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary History Segments Tile
+ */
+
+export function useGetHistorySegmentsTile<TData = Awaited<ReturnType<typeof getHistorySegmentsTile>>, TError = void>(
+ z: number,
+    x: number,
+    y: number,
+    params?: GetHistorySegmentsTileParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getHistorySegmentsTile>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetHistorySegmentsTileQueryOptions(z,x,y,params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetHistoryPointsTileUrl = (z: number,
+    x: number,
+    y: number,
+    params?: GetHistoryPointsTileParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/history/tiles/${z}/${x}/${y}.mvt?${stringifiedParams}` : `/api/v1/history/tiles/${z}/${x}/${y}.mvt`
+}
+
+/**
+ * The caller's raw location points as a vector tile (layer `points`). Below zoom 14, and in
+ * dense tiles above it, points are counted into a grid (`n` = points in the cell); otherwise
+ * each point is a feature with `ts` (epoch seconds) and `src`.
+ * @summary History Points Tile
+ */
+export const getHistoryPointsTile = async (z: number,
+    x: number,
+    y: number,
+    params?: GetHistoryPointsTileParams, options?: Parameters<typeof apiFetch>[1]): Promise<unknown> => {
+
+  return apiFetch<unknown>(getGetHistoryPointsTileUrl(z,x,y,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetHistoryPointsTileQueryKey = (z: number,
+    x: number,
+    y: number,
+    params?: GetHistoryPointsTileParams,) => {
+    return [
+    `/api/v1/history/tiles/${z}/${x}/${y}.mvt`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetHistoryPointsTileQueryOptions = <TData = Awaited<ReturnType<typeof getHistoryPointsTile>>, TError = void>(z: number,
+    x: number,
+    y: number,
+    params?: GetHistoryPointsTileParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getHistoryPointsTile>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetHistoryPointsTileQueryKey(z,x,y,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getHistoryPointsTile>>> = ({ signal }) => getHistoryPointsTile(z,x,y,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: z !== null && z !== undefined && x !== null && x !== undefined && y !== null && y !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getHistoryPointsTile>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetHistoryPointsTileQueryResult = NonNullable<Awaited<ReturnType<typeof getHistoryPointsTile>>>
+export type GetHistoryPointsTileQueryError = void
+
+
+export function useGetHistoryPointsTile<TData = Awaited<ReturnType<typeof getHistoryPointsTile>>, TError = void>(
+ z: number,
+    x: number,
+    y: number,
+    params: undefined |  GetHistoryPointsTileParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getHistoryPointsTile>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getHistoryPointsTile>>,
+          TError,
+          Awaited<ReturnType<typeof getHistoryPointsTile>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetHistoryPointsTile<TData = Awaited<ReturnType<typeof getHistoryPointsTile>>, TError = void>(
+ z: number,
+    x: number,
+    y: number,
+    params?: GetHistoryPointsTileParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getHistoryPointsTile>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getHistoryPointsTile>>,
+          TError,
+          Awaited<ReturnType<typeof getHistoryPointsTile>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetHistoryPointsTile<TData = Awaited<ReturnType<typeof getHistoryPointsTile>>, TError = void>(
+ z: number,
+    x: number,
+    y: number,
+    params?: GetHistoryPointsTileParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getHistoryPointsTile>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary History Points Tile
+ */
+
+export function useGetHistoryPointsTile<TData = Awaited<ReturnType<typeof getHistoryPointsTile>>, TError = void>(
+ z: number,
+    x: number,
+    y: number,
+    params?: GetHistoryPointsTileParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getHistoryPointsTile>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetHistoryPointsTileQueryOptions(z,x,y,params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getListImportsUrl = () => {
 

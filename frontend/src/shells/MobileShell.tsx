@@ -1,5 +1,6 @@
 import { NavLink } from "react-router";
 import { BaseMap } from "../map/BaseMap";
+import { HistoryLayers } from "../map/HistoryLayers";
 import { ListRoutes } from "../pages/routes";
 import { ShellMenu } from "./ShellMenu";
 
@@ -18,7 +19,9 @@ export function MobileShell() {
         <ShellMenu />
       </header>
       <div className="h-[45%] min-h-48">
-        <BaseMap />
+        <BaseMap>
+          <HistoryLayers />
+        </BaseMap>
       </div>
       <main className="min-h-0 flex-1 overflow-auto bg-white">
         <ListRoutes />

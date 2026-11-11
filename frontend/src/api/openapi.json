@@ -1,6 +1,98 @@
 {
   "components": {
     "schemas": {
+      "CoverageDayOut": {
+        "properties": {
+          "day": {
+            "format": "date",
+            "title": "Day",
+            "type": "string"
+          },
+          "points": {
+            "title": "Points",
+            "type": "integer"
+          },
+          "segments": {
+            "title": "Segments",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "day",
+          "points",
+          "segments"
+        ],
+        "title": "CoverageDayOut",
+        "type": "object"
+      },
+      "CoverageIn": {
+        "properties": {
+          "from": {
+            "format": "date",
+            "title": "From",
+            "type": "string"
+          },
+          "to": {
+            "format": "date",
+            "title": "To",
+            "type": "string"
+          },
+          "tz": {
+            "default": "UTC",
+            "description": "IANA zone that defines the local days",
+            "title": "Tz",
+            "type": "string"
+          }
+        },
+        "required": [
+          "from",
+          "to"
+        ],
+        "title": "CoverageIn",
+        "type": "object"
+      },
+      "CoverageOut": {
+        "properties": {
+          "days": {
+            "items": {
+              "$ref": "#/components/schemas/CoverageDayOut"
+            },
+            "title": "Days",
+            "type": "array"
+          },
+          "first_day": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Day"
+          },
+          "last_day": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Day"
+          }
+        },
+        "required": [
+          "first_day",
+          "last_day",
+          "days"
+        ],
+        "title": "CoverageOut",
+        "type": "object"
+      },
       "DeviceClass": {
         "enum": [
           "any",
@@ -168,6 +260,50 @@
         "title": "MeOut",
         "type": "object"
       },
+      "PointsTileIn": {
+        "properties": {
+          "from": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "inclusive, with offset",
+            "title": "From"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "comma-separated point sources",
+            "title": "Source"
+          },
+          "to": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "exclusive, with offset",
+            "title": "To"
+          }
+        },
+        "title": "PointsTileIn",
+        "type": "object"
+      },
       "PreferenceIn": {
         "properties": {
           "device_class": {
@@ -186,6 +322,38 @@
           "value"
         ],
         "title": "PreferenceIn",
+        "type": "object"
+      },
+      "TimeRangeIn": {
+        "properties": {
+          "from": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "inclusive, with offset",
+            "title": "From"
+          },
+          "to": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "exclusive, with offset",
+            "title": "To"
+          }
+        },
+        "title": "TimeRangeIn",
         "type": "object"
       },
       "UploadIn": {
@@ -296,6 +464,286 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/history/coverage": {
+      "get": {
+        "description": "Which local days (in IANA zone `tz`) have points or Timeline segments, for the coverage\nstrip; at most 400 days per request. Days without data are omitted.",
+        "operationId": "getHistoryCoverage",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "From",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "To",
+              "type": "string"
+            }
+          },
+          {
+            "description": "IANA zone that defines the local days",
+            "in": "query",
+            "name": "tz",
+            "required": false,
+            "schema": {
+              "default": "UTC",
+              "description": "IANA zone that defines the local days",
+              "title": "Tz",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CoverageOut"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "History Coverage",
+        "tags": [
+          "history"
+        ]
+      }
+    },
+    "/api/v1/history/segments/tiles/{z}/{x}/{y}.mvt": {
+      "get": {
+        "description": "The caller's current Timeline segments as a vector tile (layer `segments`; zoom 5 and\nup): visits as points, activities and paths as lines, with `kind`, `activity`, `semantic`,\n`t0`/`t1` (epoch seconds).",
+        "operationId": "getHistorySegmentsTile",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "z",
+            "required": true,
+            "schema": {
+              "title": "Z",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "x",
+            "required": true,
+            "schema": {
+              "title": "X",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "y",
+            "required": true,
+            "schema": {
+              "title": "Y",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "inclusive, with offset",
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "inclusive, with offset",
+              "title": "From"
+            }
+          },
+          {
+            "description": "exclusive, with offset",
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "exclusive, with offset",
+              "title": "To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/vnd.mapbox-vector-tile": {}
+            },
+            "description": "Mapbox Vector Tile"
+          },
+          "404": {
+            "description": "Tile outside the supported zoom range or grid"
+          },
+          "503": {
+            "description": "Tile took too long; narrow the date range or zoom in"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "History Segments Tile",
+        "tags": [
+          "history"
+        ]
+      }
+    },
+    "/api/v1/history/tiles/{z}/{x}/{y}.mvt": {
+      "get": {
+        "description": "The caller's raw location points as a vector tile (layer `points`). Below zoom 14, and in\ndense tiles above it, points are counted into a grid (`n` = points in the cell); otherwise\neach point is a feature with `ts` (epoch seconds) and `src`.",
+        "operationId": "getHistoryPointsTile",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "z",
+            "required": true,
+            "schema": {
+              "title": "Z",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "x",
+            "required": true,
+            "schema": {
+              "title": "X",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "y",
+            "required": true,
+            "schema": {
+              "title": "Y",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "inclusive, with offset",
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "inclusive, with offset",
+              "title": "From"
+            }
+          },
+          {
+            "description": "exclusive, with offset",
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "exclusive, with offset",
+              "title": "To"
+            }
+          },
+          {
+            "description": "comma-separated point sources",
+            "in": "query",
+            "name": "source",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "comma-separated point sources",
+              "title": "Source"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/vnd.mapbox-vector-tile": {}
+            },
+            "description": "Mapbox Vector Tile"
+          },
+          "404": {
+            "description": "Tile outside the supported zoom range or grid"
+          },
+          "503": {
+            "description": "Tile took too long; narrow the date range or zoom in"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "History Points Tile",
+        "tags": [
+          "history"
+        ]
+      }
+    },
     "/api/v1/imports": {
       "get": {
         "operationId": "listImports",

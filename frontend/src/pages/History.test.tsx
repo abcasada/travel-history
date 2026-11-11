@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import { stubFetch } from "../test/fetch";
 import { formatBytes, HistoryPage } from "./History";
 
@@ -37,7 +38,9 @@ test("lists imports with readable summaries", async () => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={client}>
-      <HistoryPage />
+      <MemoryRouter initialEntries={["/history"]}>
+        <HistoryPage />
+      </MemoryRouter>
     </QueryClientProvider>,
   );
   expect(await screen.findByText(/3 new, 1 changed, 40 unchanged segments/)).toBeInTheDocument();
