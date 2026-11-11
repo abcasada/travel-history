@@ -34,6 +34,35 @@ await page.screenshot({ path: "out/desktop.png" });
 await page.keyboard.press("?");
 await page.getByRole("dialog", { name: "Keyboard shortcuts" }).waitFor();
 await page.keyboard.press("Escape");
+// The raw-history map (milestone 2.3): point and segment tiles and the coverage strip load for
+// the signed-in user, with no failed history requests.
+const historyRequests = [];
+page.on("response", (r) => {
+  const path = new URL(r.url()).pathname;
+  if (path.startsWith("/api/v1/history/")) historyRequests.push([path, r.status()]);
+});
+await page.goto(`${base}/app/history?from=2025-03-01&to=2025-03-02`);
+await page.getByRole("img", { name: /Days with location history/ }).waitFor({ timeout: 20000 });
+await page.locator("canvas.maplibregl-canvas").waitFor({ timeout: 20000 });
+await page.waitForTimeout(4000);
+await page.screenshot({ path: "out/history-map.png" });
+const failed = historyRequests.filter(([, status]) => status >= 400);
+const sawTiles = historyRequests.some(([path]) => path.startsWith("/api/v1/history/tiles/"));
+const sawCoverage = historyRequests.some(([path]) => path === "/api/v1/history/coverage");
+if (failed.length || !sawTiles || !sawCoverage) {
+  throw new Error(`history map requests: ${JSON.stringify(historyRequests.slice(0, 12))}`);
+}
+const mobile = await browser.newContext({ viewport: { width: 400, height: 800 }, hasTouch: true, isMobile: true, storageState: await context.storageState() });
+const m = await mobile.newPage();
+await m.addInitScript(() => localStorage.setItem("shell_override", "mobile"));
+await m.goto(`${base}/app/`);
+await m.locator("canvas.maplibregl-canvas").waitFor({ timeout: 20000 });
+await m.waitForTimeout(3000);
+await m.screenshot({ path: "out/mobile.png" });
+await m.goto(`${base}/app/history?from=2025-03-01&to=2025-03-02`);
+await m.getByRole("img", { name: /Days with location history/ }).waitFor({ timeout: 20000 });
+await m.waitForTimeout(3000);
+await m.screenshot({ path: "out/mobile-history.png" });
 // Import a synthetic Timeline through the real UI: picker -> chunked upload -> worker -> summary.
 await page.getByRole("link", { name: "History" }).click();
 const chooser = page.waitForEvent("filechooser");
@@ -48,13 +77,6 @@ await page
   .getByText(/(new|unchanged) segments|already imported/)
   .waitFor({ timeout: 60000 });
 await page.screenshot({ path: "out/history.png" });
-const mobile = await browser.newContext({ viewport: { width: 400, height: 800 }, hasTouch: true, isMobile: true, storageState: await context.storageState() });
-const m = await mobile.newPage();
-await m.addInitScript(() => localStorage.setItem("shell_override", "mobile"));
-await m.goto(`${base}/app/`);
-await m.locator("canvas.maplibregl-canvas").waitFor({ timeout: 20000 });
-await m.waitForTimeout(3000);
-await m.screenshot({ path: "out/mobile.png" });
 } catch (e) {
   await page.screenshot({ path: "out/failure.png" }).catch(() => {});
   console.log(JSON.stringify({ failedAt: page.url(), consoleErrors: log, body: (await page.locator("body").innerText().catch(() => "")).slice(0, 400), error: String(e).slice(0, 300) }));
