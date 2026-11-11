@@ -150,6 +150,14 @@ class LocationPoint(models.Model):
     )
     received_at = models.DateTimeField(auto_now_add=True)
     extra = models.JSONField(null=True, blank=True)
+    # Web Mercator tile of the point at zoom 20, Morton-interleaved (history migration 0008).
+    # Map tiles select points by key ranges: PostGIS's `&&` is not LEAKPROOF, so under RLS the
+    # GiST index on `geom` can't be used, while bigint comparisons can (travel/history/tiles.py).
+    tile_key = models.GeneratedField(
+        expression=Func(F("geom"), function="app.tile_key", output_field=models.BigIntegerField()),
+        output_field=models.BigIntegerField(),
+        db_persist=True,
+    )
 
     class Meta:
         constraints = [
@@ -161,6 +169,7 @@ class LocationPoint(models.Model):
         ]
         indexes = [
             models.Index(fields=["owner", "ts"], name="point_owner_ts_idx"),
+            models.Index(fields=["owner", "tile_key"], name="point_owner_tile_idx"),
             BrinIndex(fields=["ts"], name="point_ts_brin"),
         ]
 
