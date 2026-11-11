@@ -50,9 +50,9 @@ Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhi
      Run after item 3 has measured tile timings at 500 MB–1 GB. Then run `./dev restore-test` once the disk is fixed, to confirm the generated `tile_key` column restores.
      - Status: todo (waits on item 3)
 6. **[X] T18 core:** the permission-critical trips API, with endpoint tests for every role and visibility rule.
-   - Status: in progress (dispatched 2026-11-11)
+   - Status: done (2026-11-11)
 7. **[X] T7:** tracker endpoints, built and tested locally.
-   - Status: todo
+   - Status: in progress (dispatched 2026-11-11)
 8. **[X] Tracker exposure, under all of these conditions:**
    - Route only the tracker paths. Every other path on that hostname returns 404 at the proxy until go-live.
    - The exposed service runs with production settings: DEBUG off, allowed hosts set, HTTPS only, HSTS, security headers.
@@ -77,7 +77,7 @@ Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhi
 12. **[M] T10:** coverage report, without the trip comparison.
     - Status: todo
     - **→ Review pause A:** history, flights, and tracking are live. I'll try them.
-13. **[H] The rest of T18.**
+13. **[H] The rest of T18:** tags, stops, notes, media, tracks, the routes listing, bulk edit, duplicates/join/merge, leg reorder and list filters. Make sure a removed participant can no longer edit or delete their notes and tracks, matching the leg rule from item 6. Apply Adam's answer to Q-16.
     - Status: todo
 14. **[M] T26:** places.
     - Status: todo
@@ -238,3 +238,4 @@ Nature: mech = mechanical, mod = moderate, hard. Size is S/M/L/XL with approxima
 - 2026-11-11: item 2 done and verified (pushed, tree clean, `./dev test-quick` 512 + 18 passed; builder-xhigh confirmed running Opus 5.5 at xhigh).
 - 2026-11-11: item 3 blocked because the /bulk HDD is failing (read-only, I/O errors); item 4 deferred. Skipping ahead to item 5, which doesn't write to /bulk.
 - 2026-11-11: item 5 done and verified (pushed, tree clean, `./dev test-quick` 601 + 26 passed; builder-high confirmed at high; RLS migration 0007 checked: same conditions, evaluated once per statement). Added fix item 5a for low-zoom scaling, segment tile key and the e2e upload check, gated on item 3's measurements.
+- 2026-11-11: item 6 done and verified (pushed, tree clean, `./dev test-quick` 1072 + 26 passed; builder-xhigh at xhigh). Item 13 now lists item 6's leftovers, including aligning note/track rules for removed participants. D-81 and Q-16 are waiting for Adam.
