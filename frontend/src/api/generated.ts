@@ -24,6 +24,21 @@ import type {
 } from '@tanstack/react-query';
 
 import { apiFetch } from './client';
+export type CabinClass = typeof CabinClass[keyof typeof CabinClass];
+
+
+export const CabinClass = {
+  economy: 'economy',
+  premium_economy: 'premium_economy',
+  business: 'business',
+  first: 'first',
+  other: 'other',
+} as const;
+
+export interface ConsentIn {
+  public_consent: boolean;
+}
+
 export interface CoverageDayOut {
   day: string;
   points: number;
@@ -42,6 +57,17 @@ export interface CoverageOut {
   first_day: string | null;
   last_day: string | null;
 }
+
+export type DatePrecision = typeof DatePrecision[keyof typeof DatePrecision];
+
+
+export const DatePrecision = {
+  exact: 'exact',
+  day: 'day',
+  month: 'month',
+  year: 'year',
+  approximate: 'approximate',
+} as const;
 
 export type DeviceClass = typeof DeviceClass[keyof typeof DeviceClass];
 
@@ -81,6 +107,131 @@ export const Kind = {
   gpx: 'gpx',
 } as const;
 
+export type TravelMode = typeof TravelMode[keyof typeof TravelMode];
+
+
+export const TravelMode = {
+  drive: 'drive',
+  flight: 'flight',
+  train: 'train',
+  bus: 'bus',
+  boat: 'boat',
+  walk: 'walk',
+  other: 'other',
+} as const;
+
+export type ParticipantScope = typeof ParticipantScope[keyof typeof ParticipantScope];
+
+
+export const ParticipantScope = {
+  trip: 'trip',
+  author: 'author',
+} as const;
+
+export interface LegIn {
+  aircraft_registration?: string | null;
+  aircraft_type_id?: number | null;
+  airline_id?: number | null;
+  cabin_class?: CabinClass | null;
+  destination_airport_id?: number | null;
+  destination_label?: string | null;
+  /** IANA zone name */
+  end_tz?: string | null;
+  end_utc?: string | null;
+  flight_number?: string | null;
+  mode: TravelMode;
+  origin_airport_id?: number | null;
+  origin_label?: string | null;
+  /** core legs only; a contributed leg is always 'author' */
+  participant_scope?: ParticipantScope | null;
+  seat?: string | null;
+  /** IANA zone name */
+  start_tz?: string | null;
+  start_utc?: string | null;
+  time_precision?: DatePrecision | null;
+  /** a vehicle the caller can see */
+  vehicle_id?: number | null;
+}
+
+/**
+ * Another account as the family sees it (the directory, D-76).
+ */
+export interface UserRef {
+  display_name: string;
+  id: number;
+}
+
+export interface VehicleRef {
+  id: number;
+  label: string;
+}
+
+export interface LegOut {
+  aircraft_registration: string;
+  aircraft_type_id: number | null;
+  airline_id: number | null;
+  author: UserRef;
+  cabin_class: string;
+  can_edit: boolean;
+  current_route_id: number | null;
+  destination_airport_id: number | null;
+  destination_label: string;
+  destination_stop_id: number | null;
+  distance_m: number | null;
+  end_tz: string;
+  end_utc: string | null;
+  flight_number: string;
+  id: number;
+  is_contribution: boolean;
+  mode: string;
+  origin_airport_id: number | null;
+  origin_label: string;
+  origin_stop_id: number | null;
+  /** people effectively on this leg */
+  participant_ids: number[];
+  participant_scope: string;
+  seat: string;
+  sequence: number;
+  start_tz: string;
+  start_utc: string | null;
+  time_precision: string;
+  trip_id: number;
+  /** null when the leg has no vehicle or the caller can't see it (hidden) */
+  vehicle: VehicleRef | null;
+}
+
+export interface LegParticipationIn {
+  on_leg: boolean;
+}
+
+/**
+ * Only the fields sent are changed.
+ */
+export interface LegPatchIn {
+  aircraft_registration?: string | null;
+  aircraft_type_id?: number | null;
+  airline_id?: number | null;
+  cabin_class?: CabinClass | null;
+  destination_airport_id?: number | null;
+  destination_label?: string | null;
+  /** IANA zone name */
+  end_tz?: string | null;
+  end_utc?: string | null;
+  flight_number?: string | null;
+  mode?: TravelMode | null;
+  origin_airport_id?: number | null;
+  origin_label?: string | null;
+  /** core legs only; a contributed leg is always 'author' */
+  participant_scope?: ParticipantScope | null;
+  seat?: string | null;
+  /** IANA zone name */
+  start_tz?: string | null;
+  start_utc?: string | null;
+  time_precision?: DatePrecision | null;
+  /** a vehicle the caller can see */
+  vehicle_id?: number | null;
+}
+
 export interface MeOut {
   display_name: string;
   email: string;
@@ -89,6 +240,26 @@ export interface MeOut {
   person_id: number | null;
   privacy_notice_ack_at: string | null;
   role: string;
+}
+
+export interface ParticipantIn {
+  person_id: number;
+}
+
+export interface PersonRef {
+  display_name: string;
+  id: number;
+}
+
+export interface ParticipantOut {
+  can_set_consent: boolean;
+  is_me: boolean;
+  leg_ids: number[];
+  /** a trip-level participant (else only on some legs) */
+  on_trip: boolean;
+  person: PersonRef;
+  /** null unless on_trip */
+  public_consent: boolean | null;
 }
 
 export interface PointsTileIn {
@@ -105,11 +276,183 @@ export interface PreferenceIn {
   value: unknown;
 }
 
+export type PublicMode = typeof PublicMode[keyof typeof PublicMode];
+
+
+export const PublicMode = {
+  unlisted: 'unlisted',
+  listed: 'listed',
+} as const;
+
+export interface PurposeRef {
+  id: number;
+  name: string;
+}
+
+export type Status = typeof Status[keyof typeof Status];
+
+
+export const Status = {
+  candidate: 'candidate',
+  confirmed: 'confirmed',
+} as const;
+
 export interface TimeRangeIn {
   /** inclusive, with offset */
   from?: string | null;
   /** exclusive, with offset */
   to?: string | null;
+}
+
+export type TripAccessOutAddLeg = typeof TripAccessOutAddLeg[keyof typeof TripAccessOutAddLeg] | null;
+
+
+export const TripAccessOutAddLeg = {
+  core: 'core',
+  contribution: 'contribution',
+} as const;
+
+/**
+ * What the caller may do with this trip (the UI hides what it can't do).
+ */
+export interface TripAccessOut {
+  add_leg: TripAccessOutAddLeg;
+  contribute: boolean;
+  delete: boolean;
+  edit: boolean;
+}
+
+/**
+ * Public-page settings; only for those who may change them (owner, or the Admin).
+ */
+export interface TripSharingOut {
+  privacy_zone_enabled: boolean;
+  privacy_zone_radius_m: number;
+  public_description: string;
+  public_mode: string;
+  public_show_times: boolean;
+  public_slug: string;
+}
+
+export interface TripDetailOut {
+  access: TripAccessOut;
+  cover_media_id: number | null;
+  created_at: string;
+  date_precision: string;
+  edited_in_app_at: string | null;
+  end_date: string;
+  id: number;
+  is_owner: boolean;
+  legs: LegOut[];
+  locked: boolean;
+  needs_review: boolean;
+  notes: string;
+  owner: UserRef;
+  participants: ParticipantOut[];
+  photo_limit_per_contributor: number;
+  purpose: PurposeRef | null;
+  sharing: TripSharingOut | null;
+  source: string;
+  start_date: string;
+  status: string;
+  title: string;
+  updated_at: string;
+  visibility: string;
+}
+
+export type Visibility = typeof Visibility[keyof typeof Visibility];
+
+
+export const Visibility = {
+  private: 'private',
+  participants: 'participants',
+  family: 'family',
+  public: 'public',
+} as const;
+
+export interface TripIn {
+  date_precision?: DatePrecision | null;
+  end_date: string;
+  notes?: string | null;
+  photo_limit_per_contributor?: number | null;
+  privacy_zone_enabled?: boolean | null;
+  privacy_zone_radius_m?: number | null;
+  public_description?: string | null;
+  /** public trips only */
+  public_mode?: PublicMode | null;
+  public_show_times?: boolean | null;
+  purpose_id?: number | null;
+  start_date: string;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  title: string;
+  /** default: the purpose's default visibility, else participants */
+  visibility?: Visibility | null;
+}
+
+export interface TripListIn {
+  /** trips ending on or after */
+  from?: string | null;
+  /**
+     * @minimum 1
+     * @maximum 500
+     */
+  limit?: number;
+  /** @minimum 0 */
+  offset?: number;
+  /** trips this person is on */
+  person?: number | null;
+  /** text in the title */
+  q?: string | null;
+  status?: Status | null;
+  /** trips starting on or before */
+  to?: string | null;
+  visibility?: Visibility | null;
+}
+
+export interface TripOut {
+  cover_media_id: number | null;
+  created_at: string;
+  date_precision: string;
+  end_date: string;
+  id: number;
+  is_owner: boolean;
+  locked: boolean;
+  needs_review: boolean;
+  owner: UserRef;
+  purpose: PurposeRef | null;
+  source: string;
+  start_date: string;
+  status: string;
+  title: string;
+  updated_at: string;
+  visibility: string;
+}
+
+export interface TripPageOut {
+  count: number;
+  items: TripOut[];
+}
+
+/**
+ * Only the fields sent are changed.
+ */
+export interface TripPatchIn {
+  date_precision?: DatePrecision | null;
+  end_date?: string | null;
+  notes?: string | null;
+  photo_limit_per_contributor?: number | null;
+  privacy_zone_enabled?: boolean | null;
+  privacy_zone_radius_m?: number | null;
+  public_description?: string | null;
+  public_mode?: PublicMode | null;
+  public_show_times?: boolean | null;
+  purpose_id?: number | null;
+  start_date?: string | null;
+  title?: string | null;
+  visibility?: Visibility | null;
 }
 
 export interface UploadIn {
@@ -173,6 +516,36 @@ device_class?: 'any' | 'desktop' | 'mobile';
 export type ListPreferences200 = { [key: string]: unknown };
 
 export type SetPreference200 = { [key: string]: unknown };
+
+export type ListTripsParams = {
+/**
+ * trips ending on or after
+ */
+from?: string | null;
+/**
+ * trips starting on or before
+ */
+to?: string | null;
+visibility?: Visibility | null;
+status?: Status | null;
+/**
+ * trips this person is on
+ */
+person?: number | null;
+/**
+ * text in the title
+ */
+q?: string | null;
+/**
+ * @minimum 1
+ * @maximum 500
+ */
+limit?: number;
+/**
+ * @minimum 0
+ */
+offset?: number;
+};
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
@@ -775,6 +1148,452 @@ export function useGetImport<TData = Awaited<ReturnType<typeof getImport>>, TErr
 
 
 
+export const getDeleteLegUrl = (legId: number,) => {
+
+
+
+
+  return `/api/v1/legs/${legId}`
+}
+
+/**
+ * @summary Delete Leg
+ */
+export const deleteLeg = async (legId: number, options?: Parameters<typeof apiFetch>[1]): Promise<void> => {
+
+  return apiFetch<void>(getDeleteLegUrl(legId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteLegMutationKey = () => ['deleteLeg'] as const;
+
+export const getDeleteLegMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteLeg>>, TError,DeleteLegMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteLeg>>, TError,DeleteLegMutationVariables, TContext> => {
+
+const mutationKey = getDeleteLegMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteLeg>>, DeleteLegMutationVariables> = (props) => {
+          const {legId} = props ?? {};
+
+          return  deleteLeg(legId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteLegMutationResult = NonNullable<Awaited<ReturnType<typeof deleteLeg>>>
+
+    export type DeleteLegMutationError = unknown
+    export type DeleteLegMutationVariables = {legId: number}
+
+    /**
+ * @summary Delete Leg
+ */
+export const useDeleteLeg = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteLeg>>, TError,DeleteLegMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteLeg>>,
+        TError,
+        DeleteLegMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeleteLegMutationOptions(options), queryClient);
+    }
+
+export const getGetLegUrl = (legId: number,) => {
+
+
+
+
+  return `/api/v1/legs/${legId}`
+}
+
+/**
+ * @summary Get Leg
+ */
+export const getLeg = async (legId: number, options?: Parameters<typeof apiFetch>[1]): Promise<LegOut> => {
+
+  return apiFetch<LegOut>(getGetLegUrl(legId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetLegQueryKey = (legId: number,) => {
+    return [
+    `/api/v1/legs/${legId}`
+    ] as const;
+    }
+
+
+export const getGetLegQueryOptions = <TData = Awaited<ReturnType<typeof getLeg>>, TError = unknown>(legId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLeg>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetLegQueryKey(legId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getLeg>>> = ({ signal }) => getLeg(legId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: legId !== null && legId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getLeg>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetLegQueryResult = NonNullable<Awaited<ReturnType<typeof getLeg>>>
+export type GetLegQueryError = unknown
+
+
+export function useGetLeg<TData = Awaited<ReturnType<typeof getLeg>>, TError = unknown>(
+ legId: number, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLeg>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getLeg>>,
+          TError,
+          Awaited<ReturnType<typeof getLeg>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetLeg<TData = Awaited<ReturnType<typeof getLeg>>, TError = unknown>(
+ legId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLeg>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getLeg>>,
+          TError,
+          Awaited<ReturnType<typeof getLeg>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetLeg<TData = Awaited<ReturnType<typeof getLeg>>, TError = unknown>(
+ legId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLeg>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get Leg
+ */
+
+export function useGetLeg<TData = Awaited<ReturnType<typeof getLeg>>, TError = unknown>(
+ legId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLeg>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetLegQueryOptions(legId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateLegUrl = (legId: number,) => {
+
+
+
+
+  return `/api/v1/legs/${legId}`
+}
+
+/**
+ * @summary Update Leg
+ */
+export const updateLeg = async (legId: number,
+    legPatchIn: LegPatchIn, options?: Parameters<typeof apiFetch>[1]): Promise<LegOut> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return apiFetch<LegOut>(getUpdateLegUrl(legId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(legPatchIn)
+  }
+);}
+
+
+
+
+
+export const getUpdateLegMutationKey = () => ['updateLeg'] as const;
+
+export const getUpdateLegMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateLeg>>, TError,UpdateLegMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateLeg>>, TError,UpdateLegMutationVariables, TContext> => {
+
+const mutationKey = getUpdateLegMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateLeg>>, UpdateLegMutationVariables> = (props) => {
+          const {legId,data} = props ?? {};
+
+          return  updateLeg(legId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateLegMutationResult = NonNullable<Awaited<ReturnType<typeof updateLeg>>>
+    export type UpdateLegMutationBody = LegPatchIn
+    export type UpdateLegMutationError = unknown
+    export type UpdateLegMutationVariables = {legId: number;data: LegPatchIn}
+
+    /**
+ * @summary Update Leg
+ */
+export const useUpdateLeg = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateLeg>>, TError,UpdateLegMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof updateLeg>>,
+        TError,
+        UpdateLegMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateLegMutationOptions(options), queryClient);
+    }
+
+export const getSetMyLegParticipationUrl = (legId: number,) => {
+
+
+
+
+  return `/api/v1/legs/${legId}/my-participation`
+}
+
+/**
+ * @summary Set My Leg Participation
+ */
+export const setMyLegParticipation = async (legId: number,
+    legParticipationIn: LegParticipationIn, options?: Parameters<typeof apiFetch>[1]): Promise<LegOut> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return apiFetch<LegOut>(getSetMyLegParticipationUrl(legId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(legParticipationIn)
+  }
+);}
+
+
+
+
+
+export const getSetMyLegParticipationMutationKey = () => ['setMyLegParticipation'] as const;
+
+export const getSetMyLegParticipationMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setMyLegParticipation>>, TError,SetMyLegParticipationMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setMyLegParticipation>>, TError,SetMyLegParticipationMutationVariables, TContext> => {
+
+const mutationKey = getSetMyLegParticipationMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setMyLegParticipation>>, SetMyLegParticipationMutationVariables> = (props) => {
+          const {legId,data} = props ?? {};
+
+          return  setMyLegParticipation(legId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetMyLegParticipationMutationResult = NonNullable<Awaited<ReturnType<typeof setMyLegParticipation>>>
+    export type SetMyLegParticipationMutationBody = LegParticipationIn
+    export type SetMyLegParticipationMutationError = unknown
+    export type SetMyLegParticipationMutationVariables = {legId: number;data: LegParticipationIn}
+
+    /**
+ * @summary Set My Leg Participation
+ */
+export const useSetMyLegParticipation = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setMyLegParticipation>>, TError,SetMyLegParticipationMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof setMyLegParticipation>>,
+        TError,
+        SetMyLegParticipationMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSetMyLegParticipationMutationOptions(options), queryClient);
+    }
+
+export const getSetLegParticipationUrl = (legId: number,
+    personId: number,) => {
+
+
+
+
+  return `/api/v1/legs/${legId}/participants/${personId}`
+}
+
+/**
+ * Whether a person was on this leg. Core editors set it for anyone they can see; a
+ * participant sets it for themselves and people they manage.
+ * @summary Set Leg Participation
+ */
+export const setLegParticipation = async (legId: number,
+    personId: number,
+    legParticipationIn: LegParticipationIn, options?: Parameters<typeof apiFetch>[1]): Promise<LegOut> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return apiFetch<LegOut>(getSetLegParticipationUrl(legId,personId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(legParticipationIn)
+  }
+);}
+
+
+
+
+
+export const getSetLegParticipationMutationKey = () => ['setLegParticipation'] as const;
+
+export const getSetLegParticipationMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setLegParticipation>>, TError,SetLegParticipationMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setLegParticipation>>, TError,SetLegParticipationMutationVariables, TContext> => {
+
+const mutationKey = getSetLegParticipationMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setLegParticipation>>, SetLegParticipationMutationVariables> = (props) => {
+          const {legId,personId,data} = props ?? {};
+
+          return  setLegParticipation(legId,personId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetLegParticipationMutationResult = NonNullable<Awaited<ReturnType<typeof setLegParticipation>>>
+    export type SetLegParticipationMutationBody = LegParticipationIn
+    export type SetLegParticipationMutationError = unknown
+    export type SetLegParticipationMutationVariables = {legId: number;personId: number;data: LegParticipationIn}
+
+    /**
+ * @summary Set Leg Participation
+ */
+export const useSetLegParticipation = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setLegParticipation>>, TError,SetLegParticipationMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof setLegParticipation>>,
+        TError,
+        SetLegParticipationMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSetLegParticipationMutationOptions(options), queryClient);
+    }
+
 export const getGetMeUrl = () => {
 
 
@@ -1147,6 +1966,1025 @@ export const useSetPreference = <TError = unknown,
         TContext
       > => {
       return useMutation(getSetPreferenceMutationOptions(options), queryClient);
+    }
+
+export const getListTripsUrl = (params?: ListTripsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/trips?${stringifiedParams}` : `/api/v1/trips`
+}
+
+/**
+ * Trips the caller can see (PLAN.md §6.2), newest first.
+ * @summary List Trips
+ */
+export const listTrips = async (params?: ListTripsParams, options?: Parameters<typeof apiFetch>[1]): Promise<TripPageOut> => {
+
+  return apiFetch<TripPageOut>(getListTripsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListTripsQueryKey = (params?: ListTripsParams,) => {
+    return [
+    `/api/v1/trips`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListTripsQueryOptions = <TData = Awaited<ReturnType<typeof listTrips>>, TError = unknown>(params?: ListTripsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTrips>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListTripsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listTrips>>> = ({ signal }) => listTrips(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listTrips>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListTripsQueryResult = NonNullable<Awaited<ReturnType<typeof listTrips>>>
+export type ListTripsQueryError = unknown
+
+
+export function useListTrips<TData = Awaited<ReturnType<typeof listTrips>>, TError = unknown>(
+ params: undefined |  ListTripsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTrips>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listTrips>>,
+          TError,
+          Awaited<ReturnType<typeof listTrips>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListTrips<TData = Awaited<ReturnType<typeof listTrips>>, TError = unknown>(
+ params?: ListTripsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTrips>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listTrips>>,
+          TError,
+          Awaited<ReturnType<typeof listTrips>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListTrips<TData = Awaited<ReturnType<typeof listTrips>>, TError = unknown>(
+ params?: ListTripsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTrips>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List Trips
+ */
+
+export function useListTrips<TData = Awaited<ReturnType<typeof listTrips>>, TError = unknown>(
+ params?: ListTripsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listTrips>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListTripsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateTripUrl = () => {
+
+
+
+
+  return `/api/v1/trips`
+}
+
+/**
+ * Members and the Admin create trips they own; Viewers are read-only (D-27).
+ * @summary Create Trip
+ */
+export const createTrip = async (tripIn: TripIn, options?: Parameters<typeof apiFetch>[1]): Promise<TripDetailOut> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return apiFetch<TripDetailOut>(getCreateTripUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(tripIn)
+  }
+);}
+
+
+
+
+
+export const getCreateTripMutationKey = () => ['createTrip'] as const;
+
+export const getCreateTripMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createTrip>>, TError,CreateTripMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createTrip>>, TError,CreateTripMutationVariables, TContext> => {
+
+const mutationKey = getCreateTripMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createTrip>>, CreateTripMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createTrip(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateTripMutationResult = NonNullable<Awaited<ReturnType<typeof createTrip>>>
+    export type CreateTripMutationBody = TripIn
+    export type CreateTripMutationError = unknown
+    export type CreateTripMutationVariables = {data: TripIn}
+
+    /**
+ * @summary Create Trip
+ */
+export const useCreateTrip = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createTrip>>, TError,CreateTripMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof createTrip>>,
+        TError,
+        CreateTripMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateTripMutationOptions(options), queryClient);
+    }
+
+export const getDeleteTripUrl = (tripId: number,) => {
+
+
+
+
+  return `/api/v1/trips/${tripId}`
+}
+
+/**
+ * Only the owner deletes a trip, with everyone's contributions on it (D-17).
+ * @summary Delete Trip
+ */
+export const deleteTrip = async (tripId: number, options?: Parameters<typeof apiFetch>[1]): Promise<void> => {
+
+  return apiFetch<void>(getDeleteTripUrl(tripId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteTripMutationKey = () => ['deleteTrip'] as const;
+
+export const getDeleteTripMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTrip>>, TError,DeleteTripMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteTrip>>, TError,DeleteTripMutationVariables, TContext> => {
+
+const mutationKey = getDeleteTripMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteTrip>>, DeleteTripMutationVariables> = (props) => {
+          const {tripId} = props ?? {};
+
+          return  deleteTrip(tripId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteTripMutationResult = NonNullable<Awaited<ReturnType<typeof deleteTrip>>>
+
+    export type DeleteTripMutationError = unknown
+    export type DeleteTripMutationVariables = {tripId: number}
+
+    /**
+ * @summary Delete Trip
+ */
+export const useDeleteTrip = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTrip>>, TError,DeleteTripMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteTrip>>,
+        TError,
+        DeleteTripMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeleteTripMutationOptions(options), queryClient);
+    }
+
+export const getGetTripUrl = (tripId: number,) => {
+
+
+
+
+  return `/api/v1/trips/${tripId}`
+}
+
+/**
+ * @summary Get Trip
+ */
+export const getTrip = async (tripId: number, options?: Parameters<typeof apiFetch>[1]): Promise<TripDetailOut> => {
+
+  return apiFetch<TripDetailOut>(getGetTripUrl(tripId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetTripQueryKey = (tripId: number,) => {
+    return [
+    `/api/v1/trips/${tripId}`
+    ] as const;
+    }
+
+
+export const getGetTripQueryOptions = <TData = Awaited<ReturnType<typeof getTrip>>, TError = unknown>(tripId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTrip>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetTripQueryKey(tripId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTrip>>> = ({ signal }) => getTrip(tripId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: tripId !== null && tripId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTrip>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetTripQueryResult = NonNullable<Awaited<ReturnType<typeof getTrip>>>
+export type GetTripQueryError = unknown
+
+
+export function useGetTrip<TData = Awaited<ReturnType<typeof getTrip>>, TError = unknown>(
+ tripId: number, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTrip>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getTrip>>,
+          TError,
+          Awaited<ReturnType<typeof getTrip>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetTrip<TData = Awaited<ReturnType<typeof getTrip>>, TError = unknown>(
+ tripId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTrip>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getTrip>>,
+          TError,
+          Awaited<ReturnType<typeof getTrip>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetTrip<TData = Awaited<ReturnType<typeof getTrip>>, TError = unknown>(
+ tripId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTrip>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get Trip
+ */
+
+export function useGetTrip<TData = Awaited<ReturnType<typeof getTrip>>, TError = unknown>(
+ tripId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTrip>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetTripQueryOptions(tripId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateTripUrl = (tripId: number,) => {
+
+
+
+
+  return `/api/v1/trips/${tripId}`
+}
+
+/**
+ * Trip core (title, dates, purpose, visibility, sharing): the owner, or the Admin.
+ * @summary Update Trip
+ */
+export const updateTrip = async (tripId: number,
+    tripPatchIn: TripPatchIn, options?: Parameters<typeof apiFetch>[1]): Promise<TripDetailOut> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return apiFetch<TripDetailOut>(getUpdateTripUrl(tripId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(tripPatchIn)
+  }
+);}
+
+
+
+
+
+export const getUpdateTripMutationKey = () => ['updateTrip'] as const;
+
+export const getUpdateTripMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTrip>>, TError,UpdateTripMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateTrip>>, TError,UpdateTripMutationVariables, TContext> => {
+
+const mutationKey = getUpdateTripMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateTrip>>, UpdateTripMutationVariables> = (props) => {
+          const {tripId,data} = props ?? {};
+
+          return  updateTrip(tripId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateTripMutationResult = NonNullable<Awaited<ReturnType<typeof updateTrip>>>
+    export type UpdateTripMutationBody = TripPatchIn
+    export type UpdateTripMutationError = unknown
+    export type UpdateTripMutationVariables = {tripId: number;data: TripPatchIn}
+
+    /**
+ * @summary Update Trip
+ */
+export const useUpdateTrip = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTrip>>, TError,UpdateTripMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof updateTrip>>,
+        TError,
+        UpdateTripMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateTripMutationOptions(options), queryClient);
+    }
+
+export const getListLegsUrl = (tripId: number,) => {
+
+
+
+
+  return `/api/v1/trips/${tripId}/legs`
+}
+
+/**
+ * @summary List Legs
+ */
+export const listLegs = async (tripId: number, options?: Parameters<typeof apiFetch>[1]): Promise<LegOut[]> => {
+
+  return apiFetch<LegOut[]>(getListLegsUrl(tripId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListLegsQueryKey = (tripId: number,) => {
+    return [
+    `/api/v1/trips/${tripId}/legs`
+    ] as const;
+    }
+
+
+export const getListLegsQueryOptions = <TData = Awaited<ReturnType<typeof listLegs>>, TError = unknown>(tripId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listLegs>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListLegsQueryKey(tripId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listLegs>>> = ({ signal }) => listLegs(tripId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: tripId !== null && tripId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listLegs>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListLegsQueryResult = NonNullable<Awaited<ReturnType<typeof listLegs>>>
+export type ListLegsQueryError = unknown
+
+
+export function useListLegs<TData = Awaited<ReturnType<typeof listLegs>>, TError = unknown>(
+ tripId: number, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listLegs>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listLegs>>,
+          TError,
+          Awaited<ReturnType<typeof listLegs>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListLegs<TData = Awaited<ReturnType<typeof listLegs>>, TError = unknown>(
+ tripId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listLegs>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listLegs>>,
+          TError,
+          Awaited<ReturnType<typeof listLegs>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListLegs<TData = Awaited<ReturnType<typeof listLegs>>, TError = unknown>(
+ tripId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listLegs>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List Legs
+ */
+
+export function useListLegs<TData = Awaited<ReturnType<typeof listLegs>>, TError = unknown>(
+ tripId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listLegs>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListLegsQueryOptions(tripId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateLegUrl = (tripId: number,) => {
+
+
+
+
+  return `/api/v1/trips/${tripId}/legs`
+}
+
+/**
+ * Core editors add core legs; participants (Members) add their own legs, which only they
+ * edit and which count just them as travelers unless they add others (D-22).
+ * @summary Create Leg
+ */
+export const createLeg = async (tripId: number,
+    legIn: LegIn, options?: Parameters<typeof apiFetch>[1]): Promise<LegOut> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return apiFetch<LegOut>(getCreateLegUrl(tripId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(legIn)
+  }
+);}
+
+
+
+
+
+export const getCreateLegMutationKey = () => ['createLeg'] as const;
+
+export const getCreateLegMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createLeg>>, TError,CreateLegMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createLeg>>, TError,CreateLegMutationVariables, TContext> => {
+
+const mutationKey = getCreateLegMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createLeg>>, CreateLegMutationVariables> = (props) => {
+          const {tripId,data} = props ?? {};
+
+          return  createLeg(tripId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateLegMutationResult = NonNullable<Awaited<ReturnType<typeof createLeg>>>
+    export type CreateLegMutationBody = LegIn
+    export type CreateLegMutationError = unknown
+    export type CreateLegMutationVariables = {tripId: number;data: LegIn}
+
+    /**
+ * @summary Create Leg
+ */
+export const useCreateLeg = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createLeg>>, TError,CreateLegMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof createLeg>>,
+        TError,
+        CreateLegMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateLegMutationOptions(options), queryClient);
+    }
+
+export const getListParticipantsUrl = (tripId: number,) => {
+
+
+
+
+  return `/api/v1/trips/${tripId}/participants`
+}
+
+/**
+ * Everyone on the trip: trip-level participants first, then people only on some legs.
+ * @summary List Participants
+ */
+export const listParticipants = async (tripId: number, options?: Parameters<typeof apiFetch>[1]): Promise<ParticipantOut[]> => {
+
+  return apiFetch<ParticipantOut[]>(getListParticipantsUrl(tripId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListParticipantsQueryKey = (tripId: number,) => {
+    return [
+    `/api/v1/trips/${tripId}/participants`
+    ] as const;
+    }
+
+
+export const getListParticipantsQueryOptions = <TData = Awaited<ReturnType<typeof listParticipants>>, TError = unknown>(tripId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listParticipants>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListParticipantsQueryKey(tripId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listParticipants>>> = ({ signal }) => listParticipants(tripId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: tripId !== null && tripId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listParticipants>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListParticipantsQueryResult = NonNullable<Awaited<ReturnType<typeof listParticipants>>>
+export type ListParticipantsQueryError = unknown
+
+
+export function useListParticipants<TData = Awaited<ReturnType<typeof listParticipants>>, TError = unknown>(
+ tripId: number, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listParticipants>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listParticipants>>,
+          TError,
+          Awaited<ReturnType<typeof listParticipants>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListParticipants<TData = Awaited<ReturnType<typeof listParticipants>>, TError = unknown>(
+ tripId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listParticipants>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listParticipants>>,
+          TError,
+          Awaited<ReturnType<typeof listParticipants>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListParticipants<TData = Awaited<ReturnType<typeof listParticipants>>, TError = unknown>(
+ tripId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listParticipants>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List Participants
+ */
+
+export function useListParticipants<TData = Awaited<ReturnType<typeof listParticipants>>, TError = unknown>(
+ tripId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listParticipants>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListParticipantsQueryOptions(tripId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getAddParticipantUrl = (tripId: number,) => {
+
+
+
+
+  return `/api/v1/trips/${tripId}/participants`
+}
+
+/**
+ * Core editors add people they can see. On a 'participants' trip this shares the trip
+ * with that person's account.
+ * @summary Add Participant
+ */
+export const addParticipant = async (tripId: number,
+    participantIn: ParticipantIn, options?: Parameters<typeof apiFetch>[1]): Promise<ParticipantOut> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return apiFetch<ParticipantOut>(getAddParticipantUrl(tripId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(participantIn)
+  }
+);}
+
+
+
+
+
+export const getAddParticipantMutationKey = () => ['addParticipant'] as const;
+
+export const getAddParticipantMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addParticipant>>, TError,AddParticipantMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof addParticipant>>, TError,AddParticipantMutationVariables, TContext> => {
+
+const mutationKey = getAddParticipantMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof addParticipant>>, AddParticipantMutationVariables> = (props) => {
+          const {tripId,data} = props ?? {};
+
+          return  addParticipant(tripId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AddParticipantMutationResult = NonNullable<Awaited<ReturnType<typeof addParticipant>>>
+    export type AddParticipantMutationBody = ParticipantIn
+    export type AddParticipantMutationError = unknown
+    export type AddParticipantMutationVariables = {tripId: number;data: ParticipantIn}
+
+    /**
+ * @summary Add Participant
+ */
+export const useAddParticipant = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addParticipant>>, TError,AddParticipantMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof addParticipant>>,
+        TError,
+        AddParticipantMutationVariables,
+        TContext
+      > => {
+      return useMutation(getAddParticipantMutationOptions(options), queryClient);
+    }
+
+export const getRemoveParticipantUrl = (tripId: number,
+    personId: number,) => {
+
+
+
+
+  return `/api/v1/trips/${tripId}/participants/${personId}`
+}
+
+/**
+ * Takes the person off the trip and off every leg override (D-81).
+ * @summary Remove Participant
+ */
+export const removeParticipant = async (tripId: number,
+    personId: number, options?: Parameters<typeof apiFetch>[1]): Promise<void> => {
+
+  return apiFetch<void>(getRemoveParticipantUrl(tripId,personId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getRemoveParticipantMutationKey = () => ['removeParticipant'] as const;
+
+export const getRemoveParticipantMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeParticipant>>, TError,RemoveParticipantMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof removeParticipant>>, TError,RemoveParticipantMutationVariables, TContext> => {
+
+const mutationKey = getRemoveParticipantMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof removeParticipant>>, RemoveParticipantMutationVariables> = (props) => {
+          const {tripId,personId} = props ?? {};
+
+          return  removeParticipant(tripId,personId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RemoveParticipantMutationResult = NonNullable<Awaited<ReturnType<typeof removeParticipant>>>
+
+    export type RemoveParticipantMutationError = unknown
+    export type RemoveParticipantMutationVariables = {tripId: number;personId: number}
+
+    /**
+ * @summary Remove Participant
+ */
+export const useRemoveParticipant = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeParticipant>>, TError,RemoveParticipantMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof removeParticipant>>,
+        TError,
+        RemoveParticipantMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRemoveParticipantMutationOptions(options), queryClient);
+    }
+
+export const getSetParticipantConsentUrl = (tripId: number,
+    personId: number,) => {
+
+
+
+
+  return `/api/v1/trips/${tripId}/participants/${personId}/consent`
+}
+
+/**
+ * Public consent for a participant's name, notes, photos and legs (§6.6): decided by the
+ * participant, or for a person without an account by their managing user (D-21).
+ * @summary Set Participant Consent
+ */
+export const setParticipantConsent = async (tripId: number,
+    personId: number,
+    consentIn: ConsentIn, options?: Parameters<typeof apiFetch>[1]): Promise<ParticipantOut> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return apiFetch<ParticipantOut>(getSetParticipantConsentUrl(tripId,personId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(consentIn)
+  }
+);}
+
+
+
+
+
+export const getSetParticipantConsentMutationKey = () => ['setParticipantConsent'] as const;
+
+export const getSetParticipantConsentMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setParticipantConsent>>, TError,SetParticipantConsentMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setParticipantConsent>>, TError,SetParticipantConsentMutationVariables, TContext> => {
+
+const mutationKey = getSetParticipantConsentMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setParticipantConsent>>, SetParticipantConsentMutationVariables> = (props) => {
+          const {tripId,personId,data} = props ?? {};
+
+          return  setParticipantConsent(tripId,personId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetParticipantConsentMutationResult = NonNullable<Awaited<ReturnType<typeof setParticipantConsent>>>
+    export type SetParticipantConsentMutationBody = ConsentIn
+    export type SetParticipantConsentMutationError = unknown
+    export type SetParticipantConsentMutationVariables = {tripId: number;personId: number;data: ConsentIn}
+
+    /**
+ * @summary Set Participant Consent
+ */
+export const useSetParticipantConsent = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setParticipantConsent>>, TError,SetParticipantConsentMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof setParticipantConsent>>,
+        TError,
+        SetParticipantConsentMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSetParticipantConsentMutationOptions(options), queryClient);
     }
 
 export const getCreateUploadUrl = () => {

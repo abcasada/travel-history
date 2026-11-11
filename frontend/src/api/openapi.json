@@ -1,6 +1,30 @@
 {
   "components": {
     "schemas": {
+      "CabinClass": {
+        "enum": [
+          "economy",
+          "premium_economy",
+          "business",
+          "first",
+          "other"
+        ],
+        "title": "CabinClass",
+        "type": "string"
+      },
+      "ConsentIn": {
+        "properties": {
+          "public_consent": {
+            "title": "Public Consent",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "public_consent"
+        ],
+        "title": "ConsentIn",
+        "type": "object"
+      },
       "CoverageDayOut": {
         "properties": {
           "day": {
@@ -92,6 +116,17 @@
         ],
         "title": "CoverageOut",
         "type": "object"
+      },
+      "DatePrecision": {
+        "enum": [
+          "exact",
+          "day",
+          "month",
+          "year",
+          "approximate"
+        ],
+        "title": "DatePrecision",
+        "type": "string"
       },
       "DeviceClass": {
         "enum": [
@@ -194,6 +229,677 @@
         "title": "Kind",
         "type": "string"
       },
+      "LegIn": {
+        "properties": {
+          "aircraft_registration": {
+            "anyOf": [
+              {
+                "maxLength": 16,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Aircraft Registration"
+          },
+          "aircraft_type_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Aircraft Type Id"
+          },
+          "airline_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Airline Id"
+          },
+          "cabin_class": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CabinClass"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destination_airport_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination Airport Id"
+          },
+          "destination_label": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination Label"
+          },
+          "end_tz": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "IANA zone name",
+            "title": "End Tz"
+          },
+          "end_utc": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Utc"
+          },
+          "flight_number": {
+            "anyOf": [
+              {
+                "maxLength": 16,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flight Number"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/TravelMode"
+          },
+          "origin_airport_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origin Airport Id"
+          },
+          "origin_label": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origin Label"
+          },
+          "participant_scope": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ParticipantScope"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "core legs only; a contributed leg is always 'author'"
+          },
+          "seat": {
+            "anyOf": [
+              {
+                "maxLength": 8,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seat"
+          },
+          "start_tz": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "IANA zone name",
+            "title": "Start Tz"
+          },
+          "start_utc": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Utc"
+          },
+          "time_precision": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DatePrecision"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "vehicle_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "a vehicle the caller can see",
+            "title": "Vehicle Id"
+          }
+        },
+        "required": [
+          "mode"
+        ],
+        "title": "LegIn",
+        "type": "object"
+      },
+      "LegOut": {
+        "properties": {
+          "aircraft_registration": {
+            "title": "Aircraft Registration",
+            "type": "string"
+          },
+          "aircraft_type_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Aircraft Type Id"
+          },
+          "airline_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Airline Id"
+          },
+          "author": {
+            "$ref": "#/components/schemas/UserRef"
+          },
+          "cabin_class": {
+            "title": "Cabin Class",
+            "type": "string"
+          },
+          "can_edit": {
+            "title": "Can Edit",
+            "type": "boolean"
+          },
+          "current_route_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Route Id"
+          },
+          "destination_airport_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination Airport Id"
+          },
+          "destination_label": {
+            "title": "Destination Label",
+            "type": "string"
+          },
+          "destination_stop_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination Stop Id"
+          },
+          "distance_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distance M"
+          },
+          "end_tz": {
+            "title": "End Tz",
+            "type": "string"
+          },
+          "end_utc": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Utc"
+          },
+          "flight_number": {
+            "title": "Flight Number",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_contribution": {
+            "title": "Is Contribution",
+            "type": "boolean"
+          },
+          "mode": {
+            "title": "Mode",
+            "type": "string"
+          },
+          "origin_airport_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origin Airport Id"
+          },
+          "origin_label": {
+            "title": "Origin Label",
+            "type": "string"
+          },
+          "origin_stop_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origin Stop Id"
+          },
+          "participant_ids": {
+            "description": "people effectively on this leg",
+            "items": {
+              "type": "integer"
+            },
+            "title": "Participant Ids",
+            "type": "array"
+          },
+          "participant_scope": {
+            "title": "Participant Scope",
+            "type": "string"
+          },
+          "seat": {
+            "title": "Seat",
+            "type": "string"
+          },
+          "sequence": {
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "start_tz": {
+            "title": "Start Tz",
+            "type": "string"
+          },
+          "start_utc": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Utc"
+          },
+          "time_precision": {
+            "title": "Time Precision",
+            "type": "string"
+          },
+          "trip_id": {
+            "title": "Trip Id",
+            "type": "integer"
+          },
+          "vehicle": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VehicleRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null when the leg has no vehicle or the caller can't see it (hidden)"
+          }
+        },
+        "required": [
+          "id",
+          "trip_id",
+          "sequence",
+          "mode",
+          "start_utc",
+          "start_tz",
+          "end_utc",
+          "end_tz",
+          "time_precision",
+          "origin_label",
+          "destination_label",
+          "origin_stop_id",
+          "destination_stop_id",
+          "vehicle",
+          "author",
+          "is_contribution",
+          "participant_scope",
+          "current_route_id",
+          "distance_m",
+          "airline_id",
+          "flight_number",
+          "origin_airport_id",
+          "destination_airport_id",
+          "aircraft_type_id",
+          "aircraft_registration",
+          "seat",
+          "cabin_class",
+          "participant_ids",
+          "can_edit"
+        ],
+        "title": "LegOut",
+        "type": "object"
+      },
+      "LegParticipationIn": {
+        "properties": {
+          "on_leg": {
+            "title": "On Leg",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "on_leg"
+        ],
+        "title": "LegParticipationIn",
+        "type": "object"
+      },
+      "LegPatchIn": {
+        "description": "Only the fields sent are changed.",
+        "properties": {
+          "aircraft_registration": {
+            "anyOf": [
+              {
+                "maxLength": 16,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Aircraft Registration"
+          },
+          "aircraft_type_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Aircraft Type Id"
+          },
+          "airline_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Airline Id"
+          },
+          "cabin_class": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CabinClass"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "destination_airport_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination Airport Id"
+          },
+          "destination_label": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination Label"
+          },
+          "end_tz": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "IANA zone name",
+            "title": "End Tz"
+          },
+          "end_utc": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Utc"
+          },
+          "flight_number": {
+            "anyOf": [
+              {
+                "maxLength": 16,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flight Number"
+          },
+          "mode": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TravelMode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "origin_airport_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origin Airport Id"
+          },
+          "origin_label": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origin Label"
+          },
+          "participant_scope": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ParticipantScope"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "core legs only; a contributed leg is always 'author'"
+          },
+          "seat": {
+            "anyOf": [
+              {
+                "maxLength": 8,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seat"
+          },
+          "start_tz": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "IANA zone name",
+            "title": "Start Tz"
+          },
+          "start_utc": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Utc"
+          },
+          "time_precision": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DatePrecision"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "vehicle_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "a vehicle the caller can see",
+            "title": "Vehicle Id"
+          }
+        },
+        "title": "LegPatchIn",
+        "type": "object"
+      },
       "MeOut": {
         "properties": {
           "display_name": {
@@ -260,6 +966,94 @@
         "title": "MeOut",
         "type": "object"
       },
+      "ParticipantIn": {
+        "properties": {
+          "person_id": {
+            "title": "Person Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "person_id"
+        ],
+        "title": "ParticipantIn",
+        "type": "object"
+      },
+      "ParticipantOut": {
+        "properties": {
+          "can_set_consent": {
+            "title": "Can Set Consent",
+            "type": "boolean"
+          },
+          "is_me": {
+            "title": "Is Me",
+            "type": "boolean"
+          },
+          "leg_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Leg Ids",
+            "type": "array"
+          },
+          "on_trip": {
+            "description": "a trip-level participant (else only on some legs)",
+            "title": "On Trip",
+            "type": "boolean"
+          },
+          "person": {
+            "$ref": "#/components/schemas/PersonRef"
+          },
+          "public_consent": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null unless on_trip",
+            "title": "Public Consent"
+          }
+        },
+        "required": [
+          "person",
+          "on_trip",
+          "public_consent",
+          "leg_ids",
+          "is_me",
+          "can_set_consent"
+        ],
+        "title": "ParticipantOut",
+        "type": "object"
+      },
+      "ParticipantScope": {
+        "enum": [
+          "trip",
+          "author"
+        ],
+        "title": "ParticipantScope",
+        "type": "string"
+      },
+      "PersonRef": {
+        "properties": {
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "display_name"
+        ],
+        "title": "PersonRef",
+        "type": "object"
+      },
       "PointsTileIn": {
         "properties": {
           "from": {
@@ -324,6 +1118,40 @@
         "title": "PreferenceIn",
         "type": "object"
       },
+      "PublicMode": {
+        "enum": [
+          "unlisted",
+          "listed"
+        ],
+        "title": "PublicMode",
+        "type": "string"
+      },
+      "PurposeRef": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "PurposeRef",
+        "type": "object"
+      },
+      "Status": {
+        "enum": [
+          "candidate",
+          "confirmed"
+        ],
+        "title": "Status",
+        "type": "string"
+      },
       "TimeRangeIn": {
         "properties": {
           "from": {
@@ -354,6 +1182,766 @@
           }
         },
         "title": "TimeRangeIn",
+        "type": "object"
+      },
+      "TravelMode": {
+        "enum": [
+          "drive",
+          "flight",
+          "train",
+          "bus",
+          "boat",
+          "walk",
+          "other"
+        ],
+        "title": "TravelMode",
+        "type": "string"
+      },
+      "TripAccessOut": {
+        "description": "What the caller may do with this trip (the UI hides what it can't do).",
+        "properties": {
+          "add_leg": {
+            "anyOf": [
+              {
+                "enum": [
+                  "core",
+                  "contribution"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Add Leg"
+          },
+          "contribute": {
+            "title": "Contribute",
+            "type": "boolean"
+          },
+          "delete": {
+            "title": "Delete",
+            "type": "boolean"
+          },
+          "edit": {
+            "title": "Edit",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "edit",
+          "delete",
+          "contribute",
+          "add_leg"
+        ],
+        "title": "TripAccessOut",
+        "type": "object"
+      },
+      "TripDetailOut": {
+        "properties": {
+          "access": {
+            "$ref": "#/components/schemas/TripAccessOut"
+          },
+          "cover_media_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Media Id"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "date_precision": {
+            "title": "Date Precision",
+            "type": "string"
+          },
+          "edited_in_app_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edited In App At"
+          },
+          "end_date": {
+            "format": "date",
+            "title": "End Date",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_owner": {
+            "title": "Is Owner",
+            "type": "boolean"
+          },
+          "legs": {
+            "items": {
+              "$ref": "#/components/schemas/LegOut"
+            },
+            "title": "Legs",
+            "type": "array"
+          },
+          "locked": {
+            "title": "Locked",
+            "type": "boolean"
+          },
+          "needs_review": {
+            "title": "Needs Review",
+            "type": "boolean"
+          },
+          "notes": {
+            "title": "Notes",
+            "type": "string"
+          },
+          "owner": {
+            "$ref": "#/components/schemas/UserRef"
+          },
+          "participants": {
+            "items": {
+              "$ref": "#/components/schemas/ParticipantOut"
+            },
+            "title": "Participants",
+            "type": "array"
+          },
+          "photo_limit_per_contributor": {
+            "title": "Photo Limit Per Contributor",
+            "type": "integer"
+          },
+          "purpose": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PurposeRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sharing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TripSharingOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "start_date": {
+            "format": "date",
+            "title": "Start Date",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "visibility": {
+            "title": "Visibility",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "start_date",
+          "end_date",
+          "date_precision",
+          "status",
+          "visibility",
+          "source",
+          "locked",
+          "needs_review",
+          "purpose",
+          "owner",
+          "is_owner",
+          "cover_media_id",
+          "created_at",
+          "updated_at",
+          "notes",
+          "photo_limit_per_contributor",
+          "edited_in_app_at",
+          "sharing",
+          "access",
+          "participants",
+          "legs"
+        ],
+        "title": "TripDetailOut",
+        "type": "object"
+      },
+      "TripIn": {
+        "properties": {
+          "date_precision": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DatePrecision"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "end_date": {
+            "format": "date",
+            "title": "End Date",
+            "type": "string"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "photo_limit_per_contributor": {
+            "anyOf": [
+              {
+                "maximum": 1000,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Photo Limit Per Contributor"
+          },
+          "privacy_zone_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Privacy Zone Enabled"
+          },
+          "privacy_zone_radius_m": {
+            "anyOf": [
+              {
+                "maximum": 50000,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Privacy Zone Radius M"
+          },
+          "public_description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Description"
+          },
+          "public_mode": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PublicMode"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "public trips only"
+          },
+          "public_show_times": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Show Times"
+          },
+          "purpose_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Purpose Id"
+          },
+          "start_date": {
+            "format": "date",
+            "title": "Start Date",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "visibility": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Visibility"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "default: the purpose's default visibility, else participants"
+          }
+        },
+        "required": [
+          "title",
+          "start_date",
+          "end_date"
+        ],
+        "title": "TripIn",
+        "type": "object"
+      },
+      "TripListIn": {
+        "properties": {
+          "from": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "trips ending on or after",
+            "title": "From"
+          },
+          "limit": {
+            "default": 100,
+            "maximum": 500,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "default": 0,
+            "minimum": 0,
+            "title": "Offset",
+            "type": "integer"
+          },
+          "person": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "trips this person is on",
+            "title": "Person"
+          },
+          "q": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "text in the title",
+            "title": "Q"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Status"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "to": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "trips starting on or before",
+            "title": "To"
+          },
+          "visibility": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Visibility"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "TripListIn",
+        "type": "object"
+      },
+      "TripOut": {
+        "properties": {
+          "cover_media_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Media Id"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "date_precision": {
+            "title": "Date Precision",
+            "type": "string"
+          },
+          "end_date": {
+            "format": "date",
+            "title": "End Date",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_owner": {
+            "title": "Is Owner",
+            "type": "boolean"
+          },
+          "locked": {
+            "title": "Locked",
+            "type": "boolean"
+          },
+          "needs_review": {
+            "title": "Needs Review",
+            "type": "boolean"
+          },
+          "owner": {
+            "$ref": "#/components/schemas/UserRef"
+          },
+          "purpose": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PurposeRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "start_date": {
+            "format": "date",
+            "title": "Start Date",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "visibility": {
+            "title": "Visibility",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "start_date",
+          "end_date",
+          "date_precision",
+          "status",
+          "visibility",
+          "source",
+          "locked",
+          "needs_review",
+          "purpose",
+          "owner",
+          "is_owner",
+          "cover_media_id",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "TripOut",
+        "type": "object"
+      },
+      "TripPageOut": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TripOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "count",
+          "items"
+        ],
+        "title": "TripPageOut",
+        "type": "object"
+      },
+      "TripPatchIn": {
+        "description": "Only the fields sent are changed.",
+        "properties": {
+          "date_precision": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DatePrecision"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Date"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "photo_limit_per_contributor": {
+            "anyOf": [
+              {
+                "maximum": 1000,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Photo Limit Per Contributor"
+          },
+          "privacy_zone_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Privacy Zone Enabled"
+          },
+          "privacy_zone_radius_m": {
+            "anyOf": [
+              {
+                "maximum": 50000,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Privacy Zone Radius M"
+          },
+          "public_description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Description"
+          },
+          "public_mode": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PublicMode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "public_show_times": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Show Times"
+          },
+          "purpose_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Purpose Id"
+          },
+          "start_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Date"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "visibility": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Visibility"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "TripPatchIn",
+        "type": "object"
+      },
+      "TripSharingOut": {
+        "description": "Public-page settings; only for those who may change them (owner, or the Admin).",
+        "properties": {
+          "privacy_zone_enabled": {
+            "title": "Privacy Zone Enabled",
+            "type": "boolean"
+          },
+          "privacy_zone_radius_m": {
+            "title": "Privacy Zone Radius M",
+            "type": "integer"
+          },
+          "public_description": {
+            "title": "Public Description",
+            "type": "string"
+          },
+          "public_mode": {
+            "title": "Public Mode",
+            "type": "string"
+          },
+          "public_show_times": {
+            "title": "Public Show Times",
+            "type": "boolean"
+          },
+          "public_slug": {
+            "title": "Public Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "public_mode",
+          "public_slug",
+          "public_description",
+          "public_show_times",
+          "privacy_zone_enabled",
+          "privacy_zone_radius_m"
+        ],
+        "title": "TripSharingOut",
         "type": "object"
       },
       "UploadIn": {
@@ -443,6 +2031,53 @@
         ],
         "title": "UploadOut",
         "type": "object"
+      },
+      "UserRef": {
+        "description": "Another account as the family sees it (the directory, D-76).",
+        "properties": {
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "display_name"
+        ],
+        "title": "UserRef",
+        "type": "object"
+      },
+      "VehicleRef": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "label"
+        ],
+        "title": "VehicleRef",
+        "type": "object"
+      },
+      "Visibility": {
+        "enum": [
+          "private",
+          "participants",
+          "family",
+          "public"
+        ],
+        "title": "Visibility",
+        "type": "string"
       }
     },
     "securitySchemes": {
@@ -818,6 +2453,235 @@
         ]
       }
     },
+    "/api/v1/legs/{leg_id}": {
+      "delete": {
+        "operationId": "deleteLeg",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "leg_id",
+            "required": true,
+            "schema": {
+              "title": "Leg Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Delete Leg",
+        "tags": [
+          "trips"
+        ]
+      },
+      "get": {
+        "operationId": "getLeg",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "leg_id",
+            "required": true,
+            "schema": {
+              "title": "Leg Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LegOut"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Get Leg",
+        "tags": [
+          "trips"
+        ]
+      },
+      "patch": {
+        "operationId": "updateLeg",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "leg_id",
+            "required": true,
+            "schema": {
+              "title": "Leg Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LegPatchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LegOut"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Update Leg",
+        "tags": [
+          "trips"
+        ]
+      }
+    },
+    "/api/v1/legs/{leg_id}/my-participation": {
+      "put": {
+        "operationId": "setMyLegParticipation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "leg_id",
+            "required": true,
+            "schema": {
+              "title": "Leg Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LegParticipationIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LegOut"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Set My Leg Participation",
+        "tags": [
+          "trips"
+        ]
+      }
+    },
+    "/api/v1/legs/{leg_id}/participants/{person_id}": {
+      "put": {
+        "description": "Whether a person was on this leg. Core editors set it for anyone they can see; a\nparticipant sets it for themselves and people they manage.",
+        "operationId": "setLegParticipation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "leg_id",
+            "required": true,
+            "schema": {
+              "title": "Leg Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "person_id",
+            "required": true,
+            "schema": {
+              "title": "Person Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LegParticipationIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LegOut"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Set Leg Participation",
+        "tags": [
+          "trips"
+        ]
+      }
+    },
     "/api/v1/me": {
       "get": {
         "operationId": "getMe",
@@ -981,6 +2845,616 @@
         "summary": "Set Preference",
         "tags": [
           "me"
+        ]
+      }
+    },
+    "/api/v1/trips": {
+      "get": {
+        "description": "Trips the caller can see (PLAN.md \u00a76.2), newest first.",
+        "operationId": "listTrips",
+        "parameters": [
+          {
+            "description": "trips ending on or after",
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "trips ending on or after",
+              "title": "From"
+            }
+          },
+          {
+            "description": "trips starting on or before",
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "trips starting on or before",
+              "title": "To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "visibility",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Visibility"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Status"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          {
+            "description": "trips this person is on",
+            "in": "query",
+            "name": "person",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "trips this person is on",
+              "title": "Person"
+            }
+          },
+          {
+            "description": "text in the title",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "text in the title",
+              "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TripPageOut"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "List Trips",
+        "tags": [
+          "trips"
+        ]
+      },
+      "post": {
+        "description": "Members and the Admin create trips they own; Viewers are read-only (D-27).",
+        "operationId": "createTrip",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TripIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TripDetailOut"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Create Trip",
+        "tags": [
+          "trips"
+        ]
+      }
+    },
+    "/api/v1/trips/{trip_id}": {
+      "delete": {
+        "description": "Only the owner deletes a trip, with everyone's contributions on it (D-17).",
+        "operationId": "deleteTrip",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trip_id",
+            "required": true,
+            "schema": {
+              "title": "Trip Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Delete Trip",
+        "tags": [
+          "trips"
+        ]
+      },
+      "get": {
+        "operationId": "getTrip",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trip_id",
+            "required": true,
+            "schema": {
+              "title": "Trip Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TripDetailOut"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Get Trip",
+        "tags": [
+          "trips"
+        ]
+      },
+      "patch": {
+        "description": "Trip core (title, dates, purpose, visibility, sharing): the owner, or the Admin.",
+        "operationId": "updateTrip",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trip_id",
+            "required": true,
+            "schema": {
+              "title": "Trip Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TripPatchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TripDetailOut"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Update Trip",
+        "tags": [
+          "trips"
+        ]
+      }
+    },
+    "/api/v1/trips/{trip_id}/legs": {
+      "get": {
+        "operationId": "listLegs",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trip_id",
+            "required": true,
+            "schema": {
+              "title": "Trip Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LegOut"
+                  },
+                  "title": "Response",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "List Legs",
+        "tags": [
+          "trips"
+        ]
+      },
+      "post": {
+        "description": "Core editors add core legs; participants (Members) add their own legs, which only they\nedit and which count just them as travelers unless they add others (D-22).",
+        "operationId": "createLeg",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trip_id",
+            "required": true,
+            "schema": {
+              "title": "Trip Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LegIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LegOut"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Create Leg",
+        "tags": [
+          "trips"
+        ]
+      }
+    },
+    "/api/v1/trips/{trip_id}/participants": {
+      "get": {
+        "description": "Everyone on the trip: trip-level participants first, then people only on some legs.",
+        "operationId": "listParticipants",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trip_id",
+            "required": true,
+            "schema": {
+              "title": "Trip Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ParticipantOut"
+                  },
+                  "title": "Response",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "List Participants",
+        "tags": [
+          "trips"
+        ]
+      },
+      "post": {
+        "description": "Core editors add people they can see. On a 'participants' trip this shares the trip\nwith that person's account.",
+        "operationId": "addParticipant",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trip_id",
+            "required": true,
+            "schema": {
+              "title": "Trip Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ParticipantIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParticipantOut"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Add Participant",
+        "tags": [
+          "trips"
+        ]
+      }
+    },
+    "/api/v1/trips/{trip_id}/participants/{person_id}": {
+      "delete": {
+        "description": "Takes the person off the trip and off every leg override (D-81).",
+        "operationId": "removeParticipant",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trip_id",
+            "required": true,
+            "schema": {
+              "title": "Trip Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "person_id",
+            "required": true,
+            "schema": {
+              "title": "Person Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Remove Participant",
+        "tags": [
+          "trips"
+        ]
+      }
+    },
+    "/api/v1/trips/{trip_id}/participants/{person_id}/consent": {
+      "put": {
+        "description": "Public consent for a participant's name, notes, photos and legs (\u00a76.6): decided by the\nparticipant, or for a person without an account by their managing user (D-21).",
+        "operationId": "setParticipantConsent",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trip_id",
+            "required": true,
+            "schema": {
+              "title": "Trip Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "person_id",
+            "required": true,
+            "schema": {
+              "title": "Person Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsentIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParticipantOut"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Set Participant Consent",
+        "tags": [
+          "trips"
         ]
       }
     },
