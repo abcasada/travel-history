@@ -11,8 +11,8 @@ Inspected 2026-10-19 (`lscpu`, `free`, `lsblk`, `docker info`, `docker ps`):
 |---|---|---|
 | CPU | Intel Xeon W3565, 4 cores / 4 threads, 3.2 GHz (2009, Nehalem) | **SSE4.2, no AVX/AVX2.** Every native binary we ship (wheels, Rust/Go tools, Valhalla) must run on x86-64-v2. Verified per image in CI-style smoke tests. |
 | RAM | 11 GiB, 4 GiB swap | Shared with other apps. |
-| SSD | 112 GB; root LV 55 GB (28 GB free); ~55 GB of the volume group appears unallocated (needs `sudo vgs` to confirm) | Docker root `/var/lib/docker` lives here, so DB volumes are on SSD. |
-| HDD | 931 GB at `/storage/hdd1` (empty apart from `media/`, `shares/`, `backups/`) | Bulk storage: raw imports, photos, backup outbox. |
+| SSD | 112 GB; root LV extended to 108 GB on 2026-11-10 (about 70 GB free) | Docker root `/var/lib/docker` lives here, so DB volumes are on SSD. |
+| HDD | 931 GB at `/storage/hdd1` (empty apart from `media/`, `shares/`, `backups/`) | Bulk storage: raw imports, photos, backup outbox. **2026-11-11: went emergency read-only with I/O errors (Hitachi HUA721010); Adam to check or replace it.** |
 | OS / Docker | Ubuntu 26.04.1 LTS, kernel 7.0, Docker 29.8, Compose v5.6 | No `make`, `node`, `pre-commit` on the host — all tooling runs in containers via `./dev`. |
 | Other apps | bible app, gas-gauge reader, pinpoint challenge, weather, flight-pricing, Home Assistant image | All bind `127.0.0.1:<port>`; each has its own compose project. |
 | Public ingress | **Cloudflare Tunnel**, no local reverse proxy or TLS | A shared, dashboard-managed `cloudflared` (host networking, `~/apps/cloudflared`) plus one app that runs its own tunnel container. TLS terminates at Cloudflare. |

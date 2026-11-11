@@ -70,6 +70,7 @@ All commands run in containers through `./dev` (see `./dev help`):
 - `./dev setup` — first-time: hooks path, `.env` from `.env.example`, bulk dirs
 - `./dev up` / `./dev down` — start/stop the dev stack (db, web, worker, mock OIDC, Mailpit, Vite)
 - `./dev test` — backend (pytest) + frontend (Vitest, type-check) tests; `./dev test-backend [args]`, `./dev test-frontend`
+- `./dev test-quick` — the quick suite: skips tests marked `slow` (run at each item's end; D-79)
 - `./dev lint` — ruff + Biome
 - `./dev manage <cmd>` — Django management commands (`migrate` runs as the owner role)
 - `./dev psql` — psql as the owner role (never expose the DB port)

@@ -101,7 +101,7 @@ Other guides: [backups to the NAS](docs/backup-nas.md), [restore](docs/restore.m
 - D-40 Road snapping with Valhalla map matching 🔒
 - D-41 Mode detection reimplemented from ideas, user-correctable
 - D-42 Android companion: AppAuth + UIDT/WorkManager uploads
-- D-43 No open-source license yet
+- D-43 No open-source license yet (superseded by D-80)
 - D-44 Postgres runs as uid 999; other containers as the host user
 - D-45 Table grants applied by one module after every migrate
 - D-46 Dev stack = compose.yaml + compose.dev.yaml; tests in a tools container
@@ -136,15 +136,18 @@ Other guides: [backups to the NAS](docs/backup-nas.md), [restore](docs/restore.m
 - D-75 Orchestrator owns the roadmap; scope/decision changes need Adam
 - D-76 D-72 enforced by a row policy on `accounts_user` + a `security_barrier` directory view (names, person link, active flag), not column grants
 - D-77 Rate limiter: atomic upsert on a dedicated autocommit connection, HMAC keys, hourly cleanup
+- D-78 Base images pinned to exact version + digest (≥ 14 days old)
+- D-79 `./dev test-quick` skips `slow` tests; `./dev test` runs all
+- D-80 MIT license
 
 ## 25. Open questions (for Adam, answer whenever — nothing is blocked on these)
 
 | ID | Question | Current assumption |
 |---|---|---|
 | Q-1 | The GitHub repo `abcasada/travel-history` already exists and is **public**. Make it private? (`gh repo edit abcasada/travel-history --visibility private --accept-visibility-change-consequences`) | **Answered 2026-11-10:** leave public; keep contents public-safe. |
-| Q-2 | When will the Ryzen 5 3600 / 32 GB migration happen? | Develop on the current host with small data. |
-| Q-3 | The SSD's volume group seems to have ~55 GB unallocated. Extend the root LV (`sudo lvextend -r -l +100%FREE ubuntu-vg/ubuntu-lv`)? It's a host change, so I won't do it. | Not extended. |
-| Q-4 | North America Valhalla build: rented cloud VM (first build, a few dollars) or local on the Ryzen host? | Kansas extract only until you choose. |
+| Q-2 | When will the Ryzen 5 3600 / 32 GB migration happen? | **Answered 2026-11-10:** probably about 2 months out (around mid-January 2027). Develop on the current host with small data until then. |
+| Q-3 | The SSD's volume group seems to have ~55 GB unallocated. Extend the root LV (`sudo lvextend -r -l +100%FREE ubuntu-vg/ubuntu-lv`)? It's a host change, so I won't do it. | **Done by Adam 2026-11-10:** root LV is 108 GB (about 70 GB free). Bulk data goes on the 1 TB HDD. |
+| Q-4 | North America Valhalla build: rented cloud VM (first build, a few dollars) or local on the Ryzen host? | Locally on the Ryzen host: this Xeon lacks the RAM (11 GiB vs about 16–28 GB peak). Kansas extract until then. |
 | Q-5 | Backup NAS: what OS/filesystem (ZFS, btrfs, Synology…)? Needed to make `docs/backup-nas.md` concrete. | Generic rsync-over-SSH pull + snapshots. |
 | Q-6 | Should Viewers be able to contribute (notes/photos) to trips they're on, or stay read-only? | **Answered 2026-11-10:** read-only. |
 | Q-7 | For participants without accounts (e.g. kids), who decides whether their name/legs appear on public pages? | **Answered 2026-11-10:** the managing user decides. |
@@ -153,6 +156,6 @@ Other guides: [backups to the NAS](docs/backup-nas.md), [restore](docs/restore.m
 | Q-10 | Email: Resend (recommended) or SMTP2GO? Is Cloudflare Email Routing active on adamcasada.com (so I can double-check the SPF/DMARC records)? | Resend; existing apex SPF untouched. |
 | Q-11 | Defaults OK? Privacy-zone radius 1 km; public pages show dates only; home addresses private by default. | **Still open (2026-11-10):** 1 km is the default for now, but Adam may revisit the radius soon; keep it a single setting that is easy to change. Dates-only and private home addresses assumed yes. |
 | Q-12 | Switch the secret scanner from gitleaks (now security-patches-only) to its successor Betterleaks? | Keep gitleaks for now. |
-| Q-13 | Any intention to publish the source? (Would decide a license, e.g. MIT or AGPL.) | No license (private). |
+| Q-13 | Any intention to publish the source? (Would decide a license, e.g. MIT or AGPL.) | **Answered 2026-11-10:** MIT license (D-80). |
 | Q-14 | Should family members be able to see each other's **vehicles' ownership history** (who owned it when), or only the vehicle and current owner? | **Answered 2026-11-10:** full history visible to family unless hidden. |
-| Q-15 | The server's LAN address is DHCP-assigned. A DHCP reservation on the EdgeRouter would keep the dev binding stable (router change → yours). | Binding uses the current address from `.env`. |
+| Q-15 | The server's LAN address is DHCP-assigned. A DHCP reservation on the EdgeRouter would keep the dev binding stable (router change → yours). | **Resolved 2026-11-10:** the server already has a fixed address outside the router's DHCP range. |

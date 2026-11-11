@@ -5,7 +5,7 @@ like "PLAN.md §N" still resolve; the section map in PLAN.md says which file hol
 
 ## 27. Licenses and attributions
 
-This repository: no license granted yet (all rights reserved; Q-13). Third-party notices are
+This repository: MIT (`LICENSE`, D-80). Third-party notices are
 collected in `THIRD_PARTY_NOTICES.md` and shown on the app's About page.
 
 | Item | License | Required attribution / obligation |

@@ -31,15 +31,15 @@ Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhi
       - Report before and after timings.
    8. **Finish:** full suite, lint, and type checks green; commit and push.
 2. **[X] T4 + T2:** account privacy, and the database-backed rate limiter. Tests must cover concurrent requests.
-   - Status: in progress (dispatched 2026-11-10)
+   - Status: done (2026-11-11)
 3. **[M] T5:** a 500 MB–1 GB synthetic import test. Record time, peak memory, and database growth. If it's over budget or fails: ESCALATE.
-   - Status: todo
+   - Status: blocked (2026-11-11): the HDD behind /bulk is read-only with I/O errors; needs Adam to fix or replace the disk.
 4. **[M] T11 + real import:**
    - Wipe the synthetic data, after confirming the target is the dev database and holds only synthetic data.
    - Import my real export and verify the counts.
    - Confirm a nightly backup has run that includes real data.
    - Needs `AGE_RECIPIENT` and my export; if either is missing, defer this item.
-   - Status: todo
+   - Status: deferred (no AGE_RECIPIENT or export yet; /bulk also needs a working disk)
 5. **[H] T6:** raw-history map. ← my history becomes viewable
    - Status: todo
 6. **[X] T18 core:** the permission-critical trips API, with endpoint tests for every role and visibility rule.
@@ -228,3 +228,5 @@ Nature: mech = mechanical, mod = moderate, hard. Size is S/M/L/XL with approxima
 
 ## Changelog
 - 2026-11-10: item 1 done and verified (commits pushed, tree clean, `./dev test-quick` 432 + 18 passed; builder-medium confirmed running Opus 5.5 at medium effort).
+- 2026-11-11: item 2 done and verified (pushed, tree clean, `./dev test-quick` 512 + 18 passed; builder-xhigh confirmed running Opus 5.5 at xhigh).
+- 2026-11-11: item 3 blocked because the /bulk HDD is failing (read-only, I/O errors); item 4 deferred. Skipping ahead to item 5, which doesn't write to /bulk.

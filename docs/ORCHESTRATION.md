@@ -31,7 +31,7 @@
 
   Don't do heavy re-planning yourself.
 - **Environment facts:**
-  - The host currently has about 11 GiB of RAM and about 21 GB of free SSD.
+  - The host currently has about 11 GiB of RAM and about 70 GB of free SSD (root LV extended 2026-11-10). Bulk data lives on the 1 TB HDD at /storage/hdd1.
   - The Ryzen migration is pending, and the North America routing build waits for it.
 
 ## How you orchestrate
