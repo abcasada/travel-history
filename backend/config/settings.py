@@ -86,6 +86,12 @@ def _db(user_var: str, password_var: str, default_user: str) -> dict:
 # public renderer uses; it can only read the public snapshot tables (PLAN.md §6.5).
 DATABASES = {
     "default": _db("DB_USER", "DB_PASSWORD", "travel_app"),
+    # The rate limiter's own autocommit connection, same role (D-77): counts are final at once,
+    # whatever happens to the request's transaction, and bucket row locks last one statement.
+    "ratelimit": {
+        **_db("DB_USER", "DB_PASSWORD", "travel_app"),
+        "TEST": {"MIRROR": "default"},
+    },
     "public": {
         **_db("DB_PUBLIC_USER", "DB_PUBLIC_PASSWORD", "travel_public"),
         "TEST": {"MIRROR": "default"},
@@ -97,6 +103,10 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_USER_MODEL = "accounts.User"
 AUTHENTICATION_BACKENDS = ["django.contrib.auth.backends.ModelBackend"]
 LOGIN_URL = "/auth/login"
+
+# Header with the real client address when every request arrives through a proxy (e.g.
+# "CF-Connecting-IP" behind the Cloudflare Tunnel); empty = use the socket address.
+RATELIMIT_CLIENT_IP_HEADER = env.str("RATELIMIT_CLIENT_IP_HEADER", "")
 
 # --- OIDC (PLAN.md §7.1, §7.2) -------------------------------------------------------------
 OIDC_ISSUER = env.str("OIDC_ISSUER", "")

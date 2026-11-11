@@ -24,7 +24,7 @@ Versions are the latest stable on 2026-10-19 (sources: `docs/research/stack-libr
 | Compression | zstandard 0.25 | Raw-file archive. |
 | Push | pywebpush 2.5 (VAPID) | §7.5. |
 | Misc | qrcode, polyline, gpxpy, puremagic, whitenoise, gunicorn (gthread) | |
-| Rate limits | small PostgreSQL-backed fixed-window counter (`travel.core.ratelimit`) | django-ratelimit is stale (last release 2023); no Redis. D-10. |
+| Rate limits | small PostgreSQL-backed fixed-window counter (`travel.core.ratelimit`): atomic upsert on its own autocommit connection, HMAC-hashed keys, hourly cleanup | django-ratelimit is stale (last release 2023); no Redis. D-10, D-77. |
 | Tests / quality | pytest + pytest-django, hypothesis, factory_boy; ruff (lint + format) | |
 
 ### 4.2 Frontend

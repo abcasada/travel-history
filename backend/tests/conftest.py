@@ -6,6 +6,13 @@ the owner role (pytest-django's setup); fixtures that need to bypass RLS to buil
 import pytest
 from django.db import connections
 
+RATELIMIT_ALIAS = "ratelimit"
+
+
+def _uses_rate_limiter(marker) -> bool:
+    databases = marker.kwargs.get("databases") or ()
+    return databases == "__all__" or RATELIMIT_ALIAS in databases
+
 
 @pytest.fixture(autouse=True)
 def _run_db_tests_as_app_role(request):
@@ -14,8 +21,15 @@ def _run_db_tests_as_app_role(request):
         yield
         return
     request.getfixturevalue("db" if not marker.kwargs.get("transaction") else "transactional_db")
-    with connections["default"].cursor() as cursor:
-        cursor.execute("SET ROLE travel_app")
+    aliases = ["default", RATELIMIT_ALIAS] if _uses_rate_limiter(marker) else ["default"]
+    for alias in aliases:
+        with connections[alias].cursor() as cursor:
+            cursor.execute("SET ROLE travel_app")
     yield
-    with connections["default"].cursor() as cursor:
-        cursor.execute("RESET ROLE")
+    for alias in aliases:
+        with connections[alias].cursor() as cursor:
+            cursor.execute("RESET ROLE")
+    if RATELIMIT_ALIAS in aliases:
+        # The limiter's connection autocommits (D-77): its rows outlive the test's rollback.
+        with connections[RATELIMIT_ALIAS].cursor() as cursor:
+            cursor.execute("DELETE FROM core_ratelimitbucket")
