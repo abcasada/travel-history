@@ -46,7 +46,7 @@ object under §6.2. "Participant" means a Member whose person participates in th
 | Contributions: edit / delete | own | own | own | ❌ | ❌ | ❌ |
 | Which legs *I* was on (own overrides) | own person | own person | own person | ❌ | ❌ | ❌ |
 | Public consent for my name/notes/photos/legs | own | own | own | ❌ | own | ❌ |
-| Raw history (points, segments, imports, coverage) | own only | own only | own only | own only | ❌ (no imports) | ❌ |
+| Raw history (points, segments, imports, coverage; also the history map's tiles and coverage strip) | own only | own only | own only | own only | ❌ (no imports) | ❌ |
 | Home periods | own; family-shared ones read-only | own; shared read-only | — | shared read-only | shared read-only | ❌ |
 | Tags (definitions) | own | own | own | own | ❌ | ❌ |
 | Person: create | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
@@ -68,6 +68,11 @@ Notes:
 - A *core* leg is one created by the owner or the Admin (`is_contribution = false`). A
   contributor's leg (`is_contribution = true`) is edited only by its author.
 - Viewers are read-only. To contribute, a user must be a Member (Open question Q-6).
+- History map (milestone 2.3): the point/segment tiles and coverage strip are reads of raw
+  history, not a new action. RLS alone limits them to the caller's rows (the builders never
+  filter by owner); `tests/permissions/test_history_tiles.py` checks every actor through the API
+  and by calling the builders as `travel_app` under each RLS context, with another user's points
+  in the same aggregated cell. A Viewer gets empty tiles (Viewers have no raw history).
 - Accounts (D-72, D-76): a deactivated account reads nothing, not even its own row (D-53). Other
   users' accounts are read only through the `accounts_userdirectory` view, never the `user` table.
 
@@ -101,6 +106,13 @@ contributions keep their author. Account privacy (D-76) is `core` migration 0002
 `accounts/migrations/0003_user_directory.py`; the only view `travel_app` may read is listed in
 `db_privileges.APP_READABLE_VIEWS`. Every request runs in one transaction with
 `app.user_id` set by `RlsContextMiddleware`; workers use `rls_context(user_id)`.
+
+**Performance notes (milestone 2.3).** Policies on large tables write the role check as
+`(SELECT app.is_family())`, so PostgreSQL computes it once per statement (an InitPlan) instead of
+once per row; same rule, `history/migrations/0007_rls_once_per_statement.py` (points, segments,
+coverage). Under RLS, a query condition is used as an index condition only if its operator is
+LEAKPROOF; PostGIS operators such as `&&` are not, so spatial lookups as `travel_app` go through
+leakproof bigint keys instead (§14).
 
 ### 6.5 Public pages: separate read-only path
 

@@ -20,7 +20,7 @@ ingestion.
 | People, vehicles | `GET/POST /persons`, `PATCH /persons/{id}`; `GET/POST /vehicles`, `GET /vehicles/match?year=&make=&model=&nickname=&plate_last4=`, `PATCH /vehicles/{id}`, `GET/POST /vehicles/{id}/ownership`, `POST /vehicles/merge`, `POST /vehicles/quick-rental` |
 | Home periods | `GET/POST /home-periods`, `PATCH/DELETE /home-periods/{id}`, `GET /home-periods/suggestions`, `GET /home-periods/validation` |
 | Uploads and imports | `POST /uploads` (→ id, chunk size), `PUT /uploads/{id}/chunks/{n}` (+ `Content-Range`, SHA-256 per chunk), `POST /uploads/{id}/complete` (→ import batch), `GET /imports`, `GET /imports/{id}` (summary) |
-| Raw history | `GET /history/tiles/{z}/{x}/{y}.mvt`, `GET /history/segments?from=&to=`, `GET /history/coverage?from=&to=`, `GET /history/bakeoff` |
+| Raw history | `GET /history/tiles/{z}/{x}/{y}.mvt?from=&to=&source=` (points), `GET /history/segments/tiles/{z}/{x}/{y}.mvt?from=&to=` (Timeline segments, z ≥ 5), `GET /history/coverage?from=&to=&tz=` (days with data, ≤ 400 days), `GET /history/bakeoff`. Built in milestone 2.3 except the bakeoff; segments are served as tiles rather than a JSON list (bounded per tile; §14). |
 | Flights | `GET /flights/template.csv`, `POST /flights/import` (upload id), `GET /flights/unmatched` |
 | Routing | `POST /routing/route` (waypoints → OSRM-format route + provenance), `POST /routing/match` (internal use) |
 | Stats | `GET /stats/summary`, `/stats/territories?level=country\|region\|county&mode=through\|stopped`, `/stats/distance?by=vehicle\|mode\|year`, `/stats/flights` |

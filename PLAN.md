@@ -5,15 +5,15 @@
 > This index plus the files it links are the source of truth for design and progress. Keep them
 > current (CLAUDE.md requires it). Read the index every session; open design docs on demand.
 
-**Status (2026-11-10):** Phase 1 complete; phase 2 (Timeline and tracking) in progress —
-milestones 2.1–2.2 done. Work now follows the orchestrated work order in
+**Status (2026-11-11):** Phase 1 complete; phase 2 (Timeline and tracking) in progress —
+milestones 2.1–2.3 done. Work now follows the orchestrated work order in
 [docs/ROADMAP.md](docs/ROADMAP.md) (process: [docs/ORCHESTRATION.md](docs/ORCHESTRATION.md)).
 
 | Phase | Status | Detail |
 |---|---|---|
 | 0 Adam (exports, backup key, NAS) | ⛔ waiting on Adam | [phases](docs/design/phases.md) |
 | 1 Skeleton | ✅ 2026-10-20 | [phases](docs/design/phases.md) |
-| 2 Timeline and tracking | 🔄 2.1–2.2 done | [phases](docs/design/phases.md) |
+| 2 Timeline and tracking | 🔄 2.1–2.3 done | [phases](docs/design/phases.md) |
 | 3 Flights · 4 Catalog · 5 Routes · 6 Statistics | ⏳ | [phases](docs/design/phases.md) |
 | 7 Mobile and photos · 8 Family and public · 9 Android · 10 Later | ⏳ | [phases](docs/design/phases.md) |
 

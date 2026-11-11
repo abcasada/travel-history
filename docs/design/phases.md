@@ -39,7 +39,7 @@ Status markers: ✅ done · 🔄 in progress · ⏳ not started · ⛔ blocked o
 |---|---|
 | 2.1 Uploads + raw store ✅ 2026-10-20 | Resumable chunked upload API; raw file stored zstd, 0440, checksum-verified; identical re-upload detected by hash; per-user quota; `./dev restore-test` verifies raw-file checksums end to end (verified live: upload → worker → archive → backup → restore → checksum) |
 | 2.2 Timeline import + diff ✅ 2026-10-21 | Streaming parse (memory bounded: peak memory stays flat as files grow — tested 20k vs 80k points); diff per §8.3; versions kept; absent ≠ deleted; in-app edits win; review flags; import summary page. iOS marked unverified until a real sample is checked (verified in the browser: upload → worker → summary) |
-| 2.3 Raw-history map | MVT endpoint (own points only, RLS), date filter, segment overlay, coverage strip |
+| 2.3 Raw-history map ✅ 2026-11-11 | MVT endpoint (own points only, RLS), date filter, segment overlay, coverage strip (points + segments tiles with grid aggregation and bounds, coverage API, both shells; permission tests at API and RLS level; timings in §14; verified in headless Chrome in both shells) |
 | 2.4 Tracker ingestion | OwnTracks + Overland endpoints with device tokens (create/revoke/rate-limit); setup pages with QR/deep links; Colota evaluated; battery notes |
 | 2.5 Home periods | Suggestions per §10.1 (synthetic multi-year fixture with two moves and a long stay detects all three), manual entry, gap/overlap validation |
 | 2.6 Coverage + bake-off | Daily coverage per user and source; comparison of trips detected by each source; bake-off page |
