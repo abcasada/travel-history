@@ -41,9 +41,16 @@ Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhi
    - Needs `AGE_RECIPIENT` and my export; if either is missing, defer this item.
    - Status: deferred (no AGE_RECIPIENT or export yet; /bulk also needs a working disk)
 5. **[H] T6:** raw-history map. ← my history becomes viewable
-   - Status: in progress (dispatched 2026-11-11)
+   - Status: done (2026-11-11)
+   - **5a. [H] T6 follow-ups:**
+     - a per-day grid roll-up so z0–6 tiles stay fast with millions of points;
+     - a spatial key for segment tiles;
+     - make the e2e upload check verify its own upload, not an earlier one.
+
+     Run after item 3 has measured tile timings at 500 MB–1 GB. Then run `./dev restore-test` once the disk is fixed, to confirm the generated `tile_key` column restores.
+     - Status: todo (waits on item 3)
 6. **[X] T18 core:** the permission-critical trips API, with endpoint tests for every role and visibility rule.
-   - Status: todo
+   - Status: in progress (dispatched 2026-11-11)
 7. **[X] T7:** tracker endpoints, built and tested locally.
    - Status: todo
 8. **[X] Tracker exposure, under all of these conditions:**
@@ -230,3 +237,4 @@ Nature: mech = mechanical, mod = moderate, hard. Size is S/M/L/XL with approxima
 - 2026-11-10: item 1 done and verified (commits pushed, tree clean, `./dev test-quick` 432 + 18 passed; builder-medium confirmed running Opus 5.5 at medium effort).
 - 2026-11-11: item 2 done and verified (pushed, tree clean, `./dev test-quick` 512 + 18 passed; builder-xhigh confirmed running Opus 5.5 at xhigh).
 - 2026-11-11: item 3 blocked because the /bulk HDD is failing (read-only, I/O errors); item 4 deferred. Skipping ahead to item 5, which doesn't write to /bulk.
+- 2026-11-11: item 5 done and verified (pushed, tree clean, `./dev test-quick` 601 + 26 passed; builder-high confirmed at high; RLS migration 0007 checked: same conditions, evaluated once per statement). Added fix item 5a for low-zoom scaling, segment tile key and the e2e upload check, gated on item 3's measurements.
