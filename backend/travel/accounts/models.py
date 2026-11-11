@@ -59,6 +59,25 @@ class User(AbstractBaseUser):
         return self.role == Role.ADMIN
 
 
+class UserDirectory(models.Model):
+    """What family members may know about each other's accounts (D-72, D-76): a read-only view
+    over `accounts_user` with a fixed column list. Read other users through this, never through
+    `User`: row-level security hides other users' `accounts_user` rows (only the account itself
+    and the Admin see them), so joins or lookups on `User` silently return nothing for them."""
+
+    id = models.BigIntegerField(primary_key=True)
+    display_name = models.CharField(max_length=150)
+    person_id = models.BigIntegerField(null=True)
+    is_active = models.BooleanField()
+
+    class Meta:
+        managed = False
+        db_table = "accounts_userdirectory"
+
+    def __str__(self) -> str:
+        return self.display_name
+
+
 class Person(models.Model):
     """Anyone who travels, with or without a login. The managing user of a person is its linked
     user if there is one, otherwise `created_by`."""

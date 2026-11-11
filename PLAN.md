@@ -134,6 +134,7 @@ Other guides: [backups to the NAS](docs/backup-nas.md), [restore](docs/restore.m
 - D-73 Before go-live, only tracker ingestion paths are public
 - D-74 Build method: orchestrator at Opus high + Opus subagents
 - D-75 Orchestrator owns the roadmap; scope/decision changes need Adam
+- D-76 D-72 enforced by a row policy on `accounts_user` + a `security_barrier` directory view (names, person link, active flag), not column grants
 
 ## 25. Open questions (for Adam, answer whenever — nothing is blocked on these)
 

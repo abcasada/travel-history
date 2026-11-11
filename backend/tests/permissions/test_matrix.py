@@ -18,7 +18,7 @@ from django.db import DatabaseError, connection, transaction
 
 from tests.helpers import as_owner
 from tests.permissions.conftest import build_family
-from travel.accounts.models import AccessRequest, DeviceToken, Person, User
+from travel.accounts.models import AccessRequest, DeviceToken, Person, User, UserDirectory
 from travel.core import policy
 from travel.core.rls import set_context
 from travel.history.models import HomePeriod, LocationPoint, RawFile, TimelineSegment
@@ -291,6 +291,24 @@ ACTIONS = {
         lambda f, a: updates(User, f.alice.pk, role="admin"),
         lambda f, u: policy.can_change_role(u, f.alice),
     ),
+    # Account privacy (D-72, D-76): the account row (email, OIDC subject, role) is for the
+    # account itself and the Admin; the family reads names through the directory view.
+    "view_alice_account": (
+        lambda f, a: sees(User, f.alice.pk),
+        lambda f, u: policy.can_view_account(u, f.alice),
+    ),
+    "view_ivan_account": (
+        lambda f, a: sees(User, f.ivan.pk),
+        lambda f, u: policy.can_view_account(u, f.ivan),
+    ),
+    "view_alice_name": (
+        lambda f, a: sees(UserDirectory, f.alice.pk),
+        lambda f, u: policy.can_view_directory(u),
+    ),
+    "view_ivan_name": (
+        lambda f, a: sees(UserDirectory, f.ivan.pk),
+        lambda f, u: policy.can_view_directory(u),
+    ),
     "view_kid": (lambda f, a: sees(Person, f.kid.pk), None),
     "view_alices_private_person": (lambda f, a: sees(Person, f.alices_private_person.pk), None),
 }
@@ -341,6 +359,10 @@ MATRIX = {
     "view_plate":                  (F, T, F, F, F, F, F),
     "view_access_request":         (T, F, F, F, F, F, F),
     "make_alice_admin":            (T, F, F, F, F, F, F),
+    "view_alice_account":          (T, T, F, F, F, F, F),
+    "view_ivan_account":           (T, F, F, F, F, F, F),
+    "view_alice_name":             (T, T, T, T, T, F, F),
+    "view_ivan_name":              (T, T, T, T, T, F, F),
     "view_kid":                    (T, T, T, T, T, F, F),
     "view_alices_private_person":  (F, T, F, F, F, F, F),
 }  # fmt: skip
@@ -437,5 +459,8 @@ def test_permission_matrix(scenario, action, actor_name, expected):
     if policy_probe is not None:
         user = actor if actor else AnonymousUser()
         if actor is not None:
-            user.refresh_from_db()
+            # As the owner: a deactivated account cannot read its own row (D-53), and the
+            # policy layer must still refuse a stale object for it.
+            with as_owner():
+                user.refresh_from_db()
         assert bool(policy_probe(f, user)) is expected, f"policy layer: {action} by {actor_name}"

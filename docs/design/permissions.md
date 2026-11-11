@@ -55,6 +55,8 @@ object under §6.2. "Participant" means a Member whose person participates in th
 | Vehicle: use on own legs | any visible | any visible | any visible | any visible | ❌ | ❌ |
 | Vehicle: edit / ownership history / merge | if visible | managing user | managing user | managing user | ❌ | ❌ |
 | Vehicle plate / VIN: read | ❌ unless managing | managing user | managing user | managing user | ❌ | ❌ |
+| Account: email, OIDC issuer/subject, role (the `user` row) | ✅ | own | own | own | own | ❌ |
+| Account: display name, linked person, active flag (directory, D-76) | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
 | Device tokens, push subscriptions, integrations, preferences | own | own | own | own | own (prefs, push) | ❌ |
 | Tracker ingestion (write points) | — | — | — | — | — | device token only (write-only) |
 | Access requests, allowlist, invites, roles | ✅ | ❌ | ❌ | ❌ | ❌ | submit request only |
@@ -66,6 +68,8 @@ Notes:
 - A *core* leg is one created by the owner or the Admin (`is_contribution = false`). A
   contributor's leg (`is_contribution = true`) is edited only by its author.
 - Viewers are read-only. To contribute, a user must be a Member (Open question Q-6).
+- Accounts (D-72, D-76): a deactivated account reads nothing, not even its own row (D-53). Other
+  users' accounts are read only through the `accounts_userdirectory` view, never the `user` table.
 
 ### 6.4 Row-level security policies
 
@@ -84,6 +88,7 @@ schema and fails if any user-owned table lacks RLS or a policy for each command.
 | `vehicle_private` | managing user | managing user | managing user | managing user |
 | `home_period` | `managed_by = me OR (shared_with_family AND app.is_family())` | `managed_by = me` | `managed_by = me` | `managed_by = me` |
 | `person` | `visibility = family` or creator or linked user or on a trip I can view | any member | managing user or Admin | managing user |
+| `user` | own row (active) or Admin or `auth` context; family reads `accounts_userdirectory` (id, display name, person, active; `app.is_family()`) | `auth` context or Admin | own row, Admin, `auth` context (guard triggers: role, identity, active flag) | none (deactivate instead) |
 | `access_request`, `allowlist_entry`, `invite`, `audit_log` | Admin | via public endpoint function / Admin | Admin | Admin |
 | reference datasets | everyone (no RLS) | owner role only | owner role only | owner role only |
 
@@ -92,7 +97,9 @@ helpers live in schema `app` and are executable only by `travel_app`. Guard trig
 column rules RLS cannot: only the Admin changes roles or (de)activates accounts; identity fields
 change only at login; trip owners change only through a transfer; leg author/trip/contribution
 status are fixed; only a participant (or their managing user) sets their public consent;
-contributions keep their author. Every request runs in one transaction with
+contributions keep their author. Account privacy (D-76) is `core` migration 0002 tightened by
+`accounts/migrations/0003_user_directory.py`; the only view `travel_app` may read is listed in
+`db_privileges.APP_READABLE_VIEWS`. Every request runs in one transaction with
 `app.user_id` set by `RlsContextMiddleware`; workers use `rls_context(user_id)`.
 
 ### 6.5 Public pages: separate read-only path

@@ -4,6 +4,7 @@ statements* a role may run at all. Keep this the single place that grants anythi
 
 - travel_app: DML on everything, except read-only reference data and statements that would
   break append-only/immutable tables.
+- travel_app: SELECT on the views listed in APP_READABLE_VIEWS (nothing else that is a view).
 - travel_public: SELECT on the public snapshot tables only (PLAN.md §6.5).
 """
 
@@ -25,6 +26,12 @@ NO_UPDATE_FOR_APP = {
     "history_locationpoint",
     "history_rawfile",
     "trips_route",
+}
+
+# Views the app role may read. Views run with their owner's rights, so each one is a deliberate
+# window past row-level security: list it here and give it a test (D-76).
+APP_READABLE_VIEWS = {
+    "accounts_userdirectory",  # family-visible account columns (D-72)
 }
 
 # The only tables the public renderer may read.
@@ -82,6 +89,13 @@ def apply(using: str = "default") -> None:
                     statements.append(f"REVOKE UPDATE ON {quoted} FROM {APP_ROLE}")
             if table in PUBLIC_READABLE_TABLES:
                 statements.append(f"GRANT SELECT ON {quoted} TO {PUBLIC_ROLE}")
+        # A partial migrate may run before a view exists.
+        cursor.execute("SELECT viewname FROM pg_views WHERE schemaname = 'public'")
+        existing_views = {row[0] for row in cursor.fetchall()}
+        for view in sorted(APP_READABLE_VIEWS & existing_views):
+            quoted = connection.ops.quote_name(view)
+            statements.append(f"REVOKE ALL ON {quoted} FROM {APP_ROLE}")
+            statements.append(f"GRANT SELECT ON {quoted} TO {APP_ROLE}")
         # Our SECURITY DEFINER functions in `public` (trigger helpers) run with the owner's
         # rights; nobody needs to call them directly. Triggers still fire without EXECUTE.
         cursor.execute(
