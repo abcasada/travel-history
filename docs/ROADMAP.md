@@ -41,7 +41,7 @@ Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhi
    - Needs `AGE_RECIPIENT` and my export; if either is missing, defer this item.
    - Status: deferred (no AGE_RECIPIENT or export yet; /bulk also needs a working disk)
 5. **[H] T6:** raw-history map. ← my history becomes viewable
-   - Status: todo
+   - Status: in progress (dispatched 2026-11-11)
 6. **[X] T18 core:** the permission-critical trips API, with endpoint tests for every role and visibility rule.
    - Status: todo
 7. **[X] T7:** tracker endpoints, built and tested locally.
