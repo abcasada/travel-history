@@ -91,6 +91,17 @@ def can_edit_trip_core(user, trip: Trip) -> bool:
     return trip.owner_id == user.pk or (is_admin(user) and can_view_trip(user, trip))
 
 
+def can_set_trip_visibility(user, trip: Trip, visibility: str) -> bool:
+    """The owner chooses freely. The Admin edits only trips they can see, so they cannot
+    make one invisible to themselves (row-level security checks the updated row against the
+    read policy too)."""
+    if not can_edit_trip_core(user, trip):
+        return False
+    if trip.owner_id == user.pk or visibility in (Visibility.FAMILY, Visibility.PUBLIC):
+        return True
+    return visibility == Visibility.PARTICIPANTS and is_trip_participant(user, trip)
+
+
 def can_view_trip_sharing(user, trip: Trip) -> bool:
     """Public mode, unlisted-link slug, privacy zone: the people who may change them. The slug
     is a capability URL, so nobody else needs it (trips API, D-81)."""

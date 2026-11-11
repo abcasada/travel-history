@@ -167,6 +167,10 @@ def _trips_api_actions():
                 policy.can_edit_leg(u, f.bob_leg) and policy.can_use_vehicle(u, f.hidden_vehicle)
             ),
         ),
+        "make_trip_private:family": (
+            lambda f, a: updates(Trip, f.trips[fam].pk, visibility="private"),
+            lambda f, u: policy.can_set_trip_visibility(u, f.trips[fam], "private"),
+        ),
         "set_own_purpose:family": (
             lambda f, a: updates(Trip, f.trips[fam].pk, purpose=f.alice_purpose),
             lambda f, u: policy.can_set_trip_purpose(u, f.trips[fam], f.alice_purpose),
@@ -467,6 +471,7 @@ MATRIX = {
     "use_vehicle_on_core_leg":              (T, T, F, F, F, F, F),
     "use_hidden_vehicle_on_core_leg":       (F, T, F, F, F, F, F),
     "use_hidden_vehicle_on_bobs_leg":       (F, F, F, F, F, F, F),
+    "make_trip_private:family":             (F, T, F, F, F, F, F),
     "set_own_purpose:family":               (T, T, F, F, F, F, F),
     "set_foreign_purpose:family":           (F, F, F, F, F, F, F),
     "set_cover_own_photo:family":           (T, T, F, F, F, F, F),
