@@ -2,7 +2,7 @@
 
 Handoff note for the next session or subagent. Keep it short; overwrite, don't append history.
 
-- **In flight:** item 7 (T7 tracker endpoints), dispatched to builder-xhigh 2026-11-11. Items 1, 2, 5 and 6 are done and verified.
+- **In flight:** item 7 (T7 tracker endpoints), builder-xhigh working. Plan: new `travel/tracking` package (token service, strict OwnTracks/Overland schemas, ingest views outside Ninja at `/api/v1/ingest/*`, token-management API `/api/v1/tracking/tokens`, setup links + QR), history migration 0009 (point INSERT needs a member owner and the owner's unrevoked token), log redaction filter + query-token scrub middleware, Trackers page in the SPA, docs/tracking/. Items 1, 2, 5 and 6 are done and verified.
 - **Next:** item 8 (tracker exposure) needs Adam's "go" and DNS record, so ask him as soon as item 7 lands, then continue with item 9. Item 3 is blocked (HDD), item 4 is deferred, item 5a waits on item 3.
 - **For item 13:** the scope and the notes/tracks alignment are listed in ROADMAP.md item 13; details are in docs/design/permissions.md.
 - **Item 5 note:** the Morton `tile_key` and InitPlan RLS policies are documented in docs/design/map-rendering.md §14; Adam was asked whether to record them as a decision. The follow-ups are now item 5a in ROADMAP.md.
