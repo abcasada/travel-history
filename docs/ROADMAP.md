@@ -6,7 +6,7 @@ Only the orchestrator and the planner edit this file. Status values: todo · in 
 Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhigh. Task IDs (T1…T46) and finding numbers (#1…#16) are from the 2026-10-21 audit; their descriptions and dependencies are in the Task reference below. Each item is one dispatch unless noted.
 
 1. **[M] Stage 0 housekeeping** (details below). Skip it if already done.
-   - Status: in progress (dispatched 2026-11-10)
+   - Status: done (2026-11-10)
 
    **Item 1 details: Stage 0 housekeeping**
    1. **Restructure PLAN.md** (it's ~35k tokens):
@@ -227,3 +227,4 @@ Nature: mech = mechanical, mod = moderate, hard. Size is S/M/L/XL with approxima
 | 16 | **Permission tests that don't exist yet.** The matrix (45 actions × 7 actors) covers the RLS and policy layers, and the upload, import and preferences endpoints have API-level tests. Missing, because the features don't exist: API-level tests for trips, legs, vehicles and homes; public-page leak tests; ingestion-token tests. | — | track (each must land with its feature) |
 
 ## Changelog
+- 2026-11-10: item 1 done and verified (commits pushed, tree clean, `./dev test-quick` 432 + 18 passed; builder-medium confirmed running Opus 5.5 at medium effort).
