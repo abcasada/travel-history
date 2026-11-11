@@ -6,15 +6,16 @@
 > current (CLAUDE.md requires it). Read the index every session; open design docs on demand.
 
 **Status (2026-11-11):** Phase 1 complete; phase 2 (Timeline and tracking) in progress —
-milestones 2.1–2.3 done. Work now follows the orchestrated work order in
-[docs/ROADMAP.md](docs/ROADMAP.md) (process: [docs/ORCHESTRATION.md](docs/ORCHESTRATION.md)).
+milestones 2.1–2.3 done. Phase 4: the trips API core (T18 core) is done. Work now follows the
+orchestrated work order in [docs/ROADMAP.md](docs/ROADMAP.md) (process:
+[docs/ORCHESTRATION.md](docs/ORCHESTRATION.md)).
 
 | Phase | Status | Detail |
 |---|---|---|
 | 0 Adam (exports, backup key, NAS) | ⛔ waiting on Adam | [phases](docs/design/phases.md) |
 | 1 Skeleton | ✅ 2026-10-20 | [phases](docs/design/phases.md) |
 | 2 Timeline and tracking | 🔄 2.1–2.3 done | [phases](docs/design/phases.md) |
-| 3 Flights · 4 Catalog · 5 Routes · 6 Statistics | ⏳ | [phases](docs/design/phases.md) |
+| 3 Flights · 4 Catalog · 5 Routes · 6 Statistics | ⏳ (4: trips API core done) | [phases](docs/design/phases.md) |
 | 7 Mobile and photos · 8 Family and public · 9 Android · 10 Later | ⏳ | [phases](docs/design/phases.md) |
 
 ## Section map
@@ -139,6 +140,7 @@ Other guides: [backups to the NAS](docs/backup-nas.md), [restore](docs/restore.m
 - D-78 Base images pinned to exact version + digest (≥ 14 days old)
 - D-79 `./dev test-quick` skips `slow` tests; `./dev test` runs all
 - D-80 MIT license
+- D-81 Trips API: 404 for invisible, 403 for forbidden; removing a participant clears their leg overrides; sharing settings to core editors only; reference guards (pending Adam)
 
 ## 25. Open questions (for Adam, answer whenever — nothing is blocked on these)
 
@@ -159,3 +161,4 @@ Other guides: [backups to the NAS](docs/backup-nas.md), [restore](docs/restore.m
 | Q-13 | Any intention to publish the source? (Would decide a license, e.g. MIT or AGPL.) | **Answered 2026-11-10:** MIT license (D-80). |
 | Q-14 | Should family members be able to see each other's **vehicles' ownership history** (who owned it when), or only the vehicle and current owner? | **Answered 2026-11-10:** full history visible to family unless hidden. |
 | Q-15 | The server's LAN address is DHCP-assigned. A DHCP reservation on the EdgeRouter would keep the dev binding stable (router change → yours). | **Resolved 2026-11-10:** the server already has a fixed address outside the router's DHCP range. |
+| Q-16 | A participant contributed their own leg (e.g. a separate flight home) and is later removed from the trip. Should that leg keep sharing the trip with them, and who may delete it? | Today: no. Visibility counts trip-level participants and per-leg includes only, so the removed person loses access to a "participants" trip; their leg stays, and nobody can delete it short of deleting the trip. Recommended: keep the visibility rule, and let the owner delete contributions by people no longer on the trip (item 13 / T34). |

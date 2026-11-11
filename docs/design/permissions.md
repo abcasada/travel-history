@@ -7,7 +7,7 @@ like "PLAN.md §N" still resolve; the section map in PLAN.md says which file hol
 
 ### 6.1 Principles
 
-- Enforced twice: in the app (DRF permission classes and queryset scoping) **and** in PostgreSQL
+- Enforced twice: in the app (`travel.core.policy`, consulted by every endpoint) **and** in PostgreSQL
   with row-level security. Either layer alone must be enough to stop a leak; tests exercise both.
 - Fail closed. Every request runs inside a transaction that sets
   `set_config('app.user_id', <id>, true)` (transaction-local). If it is unset, every policy
@@ -42,9 +42,15 @@ object under §6.2. "Participant" means a Member whose person participates in th
 | Trip: create | ✅ | ✅ | — | ✅ | ❌ | ❌ |
 | Trip core: edit title, dates, purpose, cover, visibility, participants, core legs, routes | vis | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Trip: delete | ❌ (decision D-17) | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Trip visibility: change it so the editor no longer sees the trip | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Trip sharing settings (public mode, unlisted-link slug, privacy zone): read | vis | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Trip purpose: set (only the trip owner's own purposes) | vis | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Legs, participants (trip-level and per leg), participants' consent: read | vis | ✅ | vis | vis | vis | ❌ |
+| Participants: add (only people the editor can see) / remove | vis | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Notes, photos, own legs, own tags, own GPS track: add | vis + participant | ✅ | ✅ | ❌ | ❌ | ❌ |
 | Contributions: edit / delete | own | own | own | ❌ | ❌ | ❌ |
 | Which legs *I* was on (own overrides) | own person | own person | own person | ❌ | ❌ | ❌ |
+| Who was on a leg (anyone's overrides) | vis (people they can see) | ✅ (people they can see) | ❌ | ❌ | ❌ | ❌ |
 | Public consent for my name/notes/photos/legs | own | own | own | ❌ | own | ❌ |
 | Raw history (points, segments, imports, coverage; also the history map's tiles and coverage strip) | own only | own only | own only | own only | ❌ (no imports) | ❌ |
 | Home periods | own; family-shared ones read-only | own; shared read-only | — | shared read-only | shared read-only | ❌ |
@@ -53,6 +59,7 @@ object under §6.2. "Participant" means a Member whose person participates in th
 | Person: edit | ✅ | managing user | managing user | managing user | ❌ | ❌ |
 | Vehicle: read | vis (not hidden, or managing) | managing or not hidden | same | same | not hidden | ❌ |
 | Vehicle: use on own legs | any visible | any visible | any visible | any visible | ❌ | ❌ |
+| A leg's vehicle: read (shown as none if the reader can't see the vehicle) | same as Vehicle: read | same | same | same | same | ❌ |
 | Vehicle: edit / ownership history / merge | if visible | managing user | managing user | managing user | ❌ | ❌ |
 | Vehicle plate / VIN: read | ❌ unless managing | managing user | managing user | managing user | ❌ | ❌ |
 | Account: email, OIDC issuer/subject, role (the `user` row) | ✅ | own | own | own | own | ❌ |
@@ -75,6 +82,25 @@ Notes:
   in the same aggregated cell. A Viewer gets empty tiles (Viewers have no raw history).
 - Accounts (D-72, D-76): a deactivated account reads nothing, not even its own row (D-53). Other
   users' accounts are read only through the `accounts_userdirectory` view, never the `user` table.
+- Trips API (work-order item 6, D-81; endpoints in [api.md](api.md) §17):
+  - Every endpoint asks `travel.core.policy` and runs under RLS. A trip the caller can't see
+    answers **404** (its existence isn't revealed), a visible trip they may not change **403**,
+    a signed-out or deactivated caller **401**. A hidden or missing reference (person, purpose,
+    vehicle) gets the same answer as a nonexistent one, so ids can't be probed.
+  - *Effective participant* (§6.2) means a trip-level participant, or a person added to any
+    leg by an include override. The author of a contributed leg (`participant_scope = author`)
+    is on that leg, but that alone doesn't share the trip; it only matters once the author is
+    no longer a participant (Q-16).
+  - Removing a participant removes their per-leg overrides on that trip too, so a leftover leg
+    include can't keep sharing the trip with them. Legs they contributed stay theirs.
+  - The Admin edits only trips they can see, so they can't make a trip invisible to
+    themselves (RLS checks the updated row against the read policy too; the policy mirrors it).
+  - Responses name other accounts by directory id and display name only; no trips response
+    contains anyone's email or OIDC identity (each response is scanned in the tests). Sharing
+    settings go only to core editors (the unlisted slug is a capability URL).
+  - Tests: `tests/permissions/test_trips_api.py` (every endpoint × every actor, plus what each
+    actor sees), `test_trip_guards.py` (the reference triggers as `travel_app`), and the matrix
+    (65 actions × 7 actors).
 
 ### 6.4 Row-level security policies
 
@@ -85,9 +111,9 @@ schema and fails if any user-owned table lacks RLS or a policy for each command.
 |---|---|---|---|---|
 | `location_point`, `timeline_segment`, `raw_file`, `import_batch`, `coverage_report`, `detection_run`, `rejected_candidate`, `device_token`, `push_subscription`, `integration_setting`, `user_preference`, `tag` | `owner = app.user_id()` | same | same (points/raw files: never, trigger) | owner (points: purge only) |
 | `trip` | `app.can_view_trip(id)` | `owner = me AND app.can_create()` | `app.can_edit_trip_core(id)` | `owner = me` |
-| `leg`, `route` | `app.can_view_trip(trip)` | core editor, or contributor with `author = me` | core editor on core legs, author on own | same as update |
-| `trip_participant` | view trip | core editor | core editor; own `public_consent` via function | core editor |
-| `leg_participant_override` | view trip | core editor, or `person = my person` | same | same |
+| `leg`, `route` | `app.can_view_trip(trip)` | core editor, or contributor with `author = me` | core editor on core legs, author on own (while they may contribute) | same as update |
+| `trip_participant` | view trip | core editor, and the person is visible to them | core editor; own `public_consent` via function; the person stays visible | core editor |
+| `leg_participant_override` | view trip | core editor, or a person I manage who may contribute; the person visible to me | same | same |
 | `trip_note`, `media`, `trip_tag`, `track_contribution` | view trip | contributor and `author = me` | `author = me` | `author = me` |
 | `vehicle`, `vehicle_ownership` | `app.can_view_vehicle(v)` | any member | `app.can_manage_vehicle(v)` | managing user |
 | `vehicle_private` | managing user | managing user | managing user | managing user |
@@ -106,6 +132,15 @@ contributions keep their author. Account privacy (D-76) is `core` migration 0002
 `accounts/migrations/0003_user_directory.py`; the only view `travel_app` may read is listed in
 `db_privileges.APP_READABLE_VIEWS`. Every request runs in one transaction with
 `app.user_id` set by `RlsContextMiddleware`; workers use `rls_context(user_id)`.
+
+**Trips API (work-order item 6).** `trips/migrations/0003_trip_api_guards.py` adds the person
+visibility checks above, makes deleting a contributed leg need the same right as editing it
+(the author, while they may still contribute), and adds triggers for references, which
+foreign keys check without RLS: a trip's purpose belongs to its owner and its cover photo to the
+trip; a leg's stops belong to its trip and its current route is one of its own versions (these
+apply to every role); a leg takes only a vehicle the acting user can see (owner role exempt).
+Each fires only when the column is set or changed, so an existing reference never blocks an
+unrelated edit.
 
 **Performance notes (milestone 2.3).** Policies on large tables write the role check as
 `(SELECT app.is_family())`, so PostgreSQL computes it once per statement (an InitPlan) instead of

@@ -54,13 +54,13 @@ Status markers: ✅ done · 🔄 in progress · ⏳ not started · ⛔ blocked o
 | 3.4 Dedupe | Flights deduplicated against Timeline flying segments |
 | 3.5 Other importers | MyFlightRadar24, Flighty, App in the Air, TripIt, JetLog, byAir (from format specs) — may slip to phase 10 |
 
-### Phase 4 — Catalog ⏳
+### Phase 4 — Catalog 🔄
 
 | Milestone | Acceptance criteria |
 |---|---|
 | 4.1 Valhalla (Kansas) | `valhalla` compose project builds Kansas tiles; route + trace_route work through the backend; full NA build **not** run without approval |
 | 4.2 Auto-detection + review queue | §11 on synthetic fixtures (overnight, day trip, multi-mode); review queue fully keyboard-driven; rejected never resurface; confirmed locked |
-| 4.3 Desktop catalog | Map home screen; list + map with persisted divider; filters; tags; participants; bulk edit; shortcuts help |
+| 4.3 Desktop catalog 🔄 | Map home screen; list + map with persisted divider; filters; tags; participants; bulk edit; shortcuts help. Trips API core (T18 core, item 6) ✅ 2026-11-11: trips, legs, participants and consent endpoints with API-level tests for every role and RLS-level tests (matrix 65 actions × 7 actors); the rest of T18 (item 13) and the UI (T19) to come |
 | 4.4 Vehicles | Ownership history with exactly-one-owner constraint; "is it this one?" check; merge; rental quick-add |
 | 4.5 Map matching | Drive legs map-matched with Valhalla; stored as frozen routes |
 
