@@ -336,6 +336,60 @@ ACTIONS = {
         lambda f, a: sees(DeviceToken, f.alice_token.pk),
         lambda f, u: policy.can_access_raw_history(u, f.alice.pk),
     ),
+    # Device tokens and tracker ingestion (work-order item 7). Tracker requests act as the
+    # token's owner, so "ingest with a token" is an insert in that user's context.
+    "create_own_token": (
+        lambda f, a: inserts(
+            lambda: DeviceToken.objects.create(
+                user_id=uid(f, a),
+                name="new",
+                kind="overland",
+                token_prefix="trk_new",
+                token_hash="c" * 64,
+            )
+        ),
+        lambda f, u: policy.can_create_device_token(u),
+    ),
+    "revoke_alice_token": (
+        lambda f, a: updates(DeviceToken, f.alice_token.pk, revoked_at=f.now),
+        lambda f, u: policy.can_revoke_device_token(u, f.alice_token),
+    ),
+    "unrevoke_alice_token": (
+        lambda f, a: updates(DeviceToken, f.alice_revoked_token.pk, revoked_at=None),
+        None,
+    ),
+    "insert_own_point": (
+        lambda f, a: inserts(
+            lambda: LocationPoint.objects.create(
+                owner_id=uid(f, a), ts=f.now, geom=f.alice_point.geom, source="gpx"
+            )
+        ),
+        lambda f, u: policy.can_import(u),
+    ),
+    "ingest_with_alice_token": (
+        lambda f, a: inserts(
+            lambda: LocationPoint.objects.create(
+                owner_id=uid(f, a),
+                ts=f.now,
+                geom=f.alice_point.geom,
+                source="owntracks",
+                device=f.alice_token,
+            )
+        ),
+        lambda f, u: policy.can_ingest_points(u, f.alice_token),
+    ),
+    "ingest_with_alice_revoked_token": (
+        lambda f, a: inserts(
+            lambda: LocationPoint.objects.create(
+                owner_id=uid(f, a),
+                ts=f.now,
+                geom=f.alice_point.geom,
+                source="owntracks",
+                device=f.alice_revoked_token,
+            )
+        ),
+        lambda f, u: policy.can_ingest_points(u, f.alice_revoked_token),
+    ),
     "view_alice_home": (
         lambda f, a: sees(HomePeriod, f.alice_home.pk),
         lambda f, u: policy.can_view_home_period(u, f.alice_home),
@@ -441,6 +495,12 @@ MATRIX = {
     "view_alice_segment":          (F, T, F, F, F, F, F),
     "view_alice_rawfile":          (F, T, F, F, F, F, F),
     "view_alice_token":            (F, T, F, F, F, F, F),
+    "create_own_token":            (T, T, T, T, F, F, F),
+    "revoke_alice_token":          (F, T, F, F, F, F, F),
+    "unrevoke_alice_token":        (F, F, F, F, F, F, F),
+    "insert_own_point":            (T, T, T, T, F, F, F),
+    "ingest_with_alice_token":     (F, T, F, F, F, F, F),
+    "ingest_with_alice_revoked_token": (F, F, F, F, F, F, F),
     "view_alice_home":             (F, T, F, F, F, F, F),
     "view_alice_shared_home":      (T, T, T, T, T, F, F),
     "edit_alice_shared_home":      (F, T, F, F, F, F, F),

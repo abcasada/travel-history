@@ -16,7 +16,7 @@ from typing import Annotated
 from django.conf import settings
 from django.utils import timezone
 from django.views.decorators.debug import sensitive_variables
-from ninja import Router, Schema
+from ninja import Router, Schema, Status
 from ninja.errors import HttpError
 from pydantic import StringConstraints
 
@@ -79,7 +79,7 @@ def create_token(request, payload: DeviceTokenIn):
         token_hash=new.token_hash,
     )
     built = setup.build(device, new.secret, setup.base_url(request))
-    return 201, {"device": device, "token": new.secret, "setup": built}
+    return Status(201, {"device": device, "token": new.secret, "setup": built})
 
 
 @router.post(

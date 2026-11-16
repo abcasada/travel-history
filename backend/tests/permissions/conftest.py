@@ -149,6 +149,14 @@ def build_family() -> SimpleNamespace:
             token_prefix="trk_abc",
             token_hash="a" * 64,
         )
+        f.alice_revoked_token = DeviceToken.objects.create(
+            user=f.alice,
+            name="old phone",
+            kind="owntracks",
+            token_prefix="trk_old",
+            token_hash="b" * 64,
+            revoked_at=timezone.now(),
+        )
         f.request = AccessRequest.objects.create(
             name="Synthetic Cousin", email="cousin@example.test", relationship="cousin"
         )
