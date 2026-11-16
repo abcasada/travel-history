@@ -215,3 +215,17 @@ def test_formatter_redacts_arguments_and_tracebacks():
             "x", logging.ERROR, __file__, 1, "got %s", (SAMPLE,), sys.exc_info()
         )
     assert SAMPLE not in formatter.format(record)
+
+
+def test_production_access_log_omits_query_strings(settings):
+    """gunicorn's default access line includes the query string; the image's CMD replaces it
+    with the path alone (checked live with gunicorn when this was written)."""
+    from pathlib import Path
+
+    dockerfile = Path(settings.BASE_DIR, "Dockerfile").read_text()
+    command = json.loads(
+        next(line for line in dockerfile.splitlines() if line.startswith("CMD"))[3:]
+    )
+    log_format = command[command.index("--access-logformat") + 1]
+    assert "%(U)s" in log_format
+    assert "%(r)s" not in log_format and "%(q)s" not in log_format

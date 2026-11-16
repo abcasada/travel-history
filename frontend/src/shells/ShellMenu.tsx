@@ -1,3 +1,4 @@
+import { Link } from "react-router";
 import { csrfToken } from "../api/client";
 import { useMe } from "../auth/AuthGate";
 import { type ShellOverride, useShellMode } from "./useShellMode";
@@ -33,6 +34,9 @@ export function ShellMenu() {
             </option>
           ))}
         </select>
+        <Link to="/trackers" className="mb-1 block rounded px-2 py-1 hover:bg-slate-100">
+          Location trackers
+        </Link>
         <form method="post" action="/auth/logout">
           <input type="hidden" name="csrfmiddlewaretoken" value={csrfToken() ?? ""} />
           <button type="submit" className="w-full rounded px-2 py-1 text-left hover:bg-slate-100">

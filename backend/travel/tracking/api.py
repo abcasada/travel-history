@@ -11,6 +11,7 @@ migration 0004).
 """
 
 import datetime as dt
+from enum import StrEnum
 from typing import Annotated
 
 from django.conf import settings
@@ -28,12 +29,14 @@ from . import setup, tokens
 router = Router(tags=["tracking"])
 
 Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
+# The tracker app a token is for (`DeviceToken.Kind`), under a name of its own in the schema.
+TrackerKind = StrEnum("TrackerKind", {kind.name: kind.value for kind in DeviceToken.Kind})
 
 
 class DeviceTokenOut(Schema):
     id: int
     name: str
-    kind: DeviceToken.Kind
+    kind: TrackerKind
     token_prefix: str
     created_at: dt.datetime
     last_used_at: dt.datetime | None
@@ -43,7 +46,7 @@ class DeviceTokenOut(Schema):
 
 class DeviceTokenIn(Schema):
     name: Name
-    kind: DeviceToken.Kind
+    kind: TrackerKind
 
 
 class DeviceTokenCreatedOut(Schema):

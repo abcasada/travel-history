@@ -78,6 +78,59 @@ export const DeviceClass = {
   mobile: 'mobile',
 } as const;
 
+export type TrackerKind = typeof TrackerKind[keyof typeof TrackerKind];
+
+
+export const TrackerKind = {
+  owntracks: 'owntracks',
+  overland: 'overland',
+  gpslogger: 'gpslogger',
+  colota: 'colota',
+  generic: 'generic',
+} as const;
+
+export interface DeviceTokenOut {
+  created_at: string;
+  id: number;
+  kind: TrackerKind;
+  last_used_at: string | null;
+  name: string;
+  points_received: number;
+  revoked_at: string | null;
+  token_prefix: string;
+}
+
+/**
+ * How to point one tracker app at this server. `link` and both QR codes contain the
+ * token; none of this can be shown again.
+ */
+export interface Setup {
+  auth: string;
+  body_template?: string | null;
+  content_type?: string;
+  endpoint: string;
+  link?: string | null;
+  link_qr?: string | null;
+  token_qr: string;
+  tracker: string;
+  username?: string | null;
+}
+
+export interface DeviceTokenCreatedOut {
+  device: DeviceTokenOut;
+  setup: Setup;
+  token: string;
+}
+
+export interface DeviceTokenIn {
+  kind: TrackerKind;
+  /**
+     * @minLength 1
+     * @maxLength 100
+     */
+  name: string;
+}
+
 export type ImportBatchOutSummary = { [key: string]: unknown };
 
 export interface ImportBatchOut {
@@ -1966,6 +2019,269 @@ export const useSetPreference = <TError = unknown,
         TContext
       > => {
       return useMutation(getSetPreferenceMutationOptions(options), queryClient);
+    }
+
+export const getListDeviceTokensUrl = () => {
+
+
+
+
+  return `/api/v1/tracking/tokens`
+}
+
+/**
+ * @summary List Tokens
+ */
+export const listDeviceTokens = async ( options?: Parameters<typeof apiFetch>[1]): Promise<DeviceTokenOut[]> => {
+
+  return apiFetch<DeviceTokenOut[]>(getListDeviceTokensUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListDeviceTokensQueryKey = () => {
+    return [
+    `/api/v1/tracking/tokens`
+    ] as const;
+    }
+
+
+export const getListDeviceTokensQueryOptions = <TData = Awaited<ReturnType<typeof listDeviceTokens>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listDeviceTokens>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListDeviceTokensQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listDeviceTokens>>> = ({ signal }) => listDeviceTokens({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listDeviceTokens>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListDeviceTokensQueryResult = NonNullable<Awaited<ReturnType<typeof listDeviceTokens>>>
+export type ListDeviceTokensQueryError = unknown
+
+
+export function useListDeviceTokens<TData = Awaited<ReturnType<typeof listDeviceTokens>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listDeviceTokens>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listDeviceTokens>>,
+          TError,
+          Awaited<ReturnType<typeof listDeviceTokens>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListDeviceTokens<TData = Awaited<ReturnType<typeof listDeviceTokens>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listDeviceTokens>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listDeviceTokens>>,
+          TError,
+          Awaited<ReturnType<typeof listDeviceTokens>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListDeviceTokens<TData = Awaited<ReturnType<typeof listDeviceTokens>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listDeviceTokens>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List Tokens
+ */
+
+export function useListDeviceTokens<TData = Awaited<ReturnType<typeof listDeviceTokens>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listDeviceTokens>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListDeviceTokensQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateDeviceTokenUrl = () => {
+
+
+
+
+  return `/api/v1/tracking/tokens`
+}
+
+/**
+ * @summary Create Token
+ */
+export const createDeviceToken = async (deviceTokenIn: DeviceTokenIn, options?: Parameters<typeof apiFetch>[1]): Promise<DeviceTokenCreatedOut> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return apiFetch<DeviceTokenCreatedOut>(getCreateDeviceTokenUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(deviceTokenIn)
+  }
+);}
+
+
+
+
+
+export const getCreateDeviceTokenMutationKey = () => ['createDeviceToken'] as const;
+
+export const getCreateDeviceTokenMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createDeviceToken>>, TError,CreateDeviceTokenMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createDeviceToken>>, TError,CreateDeviceTokenMutationVariables, TContext> => {
+
+const mutationKey = getCreateDeviceTokenMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createDeviceToken>>, CreateDeviceTokenMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createDeviceToken(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateDeviceTokenMutationResult = NonNullable<Awaited<ReturnType<typeof createDeviceToken>>>
+    export type CreateDeviceTokenMutationBody = DeviceTokenIn
+    export type CreateDeviceTokenMutationError = unknown
+    export type CreateDeviceTokenMutationVariables = {data: DeviceTokenIn}
+
+    /**
+ * @summary Create Token
+ */
+export const useCreateDeviceToken = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createDeviceToken>>, TError,CreateDeviceTokenMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof createDeviceToken>>,
+        TError,
+        CreateDeviceTokenMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateDeviceTokenMutationOptions(options), queryClient);
+    }
+
+export const getRevokeDeviceTokenUrl = (tokenId: number,) => {
+
+
+
+
+  return `/api/v1/tracking/tokens/${tokenId}/revoke`
+}
+
+/**
+ * @summary Revoke Token
+ */
+export const revokeDeviceToken = async (tokenId: number, options?: Parameters<typeof apiFetch>[1]): Promise<DeviceTokenOut> => {
+
+  return apiFetch<DeviceTokenOut>(getRevokeDeviceTokenUrl(tokenId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getRevokeDeviceTokenMutationKey = () => ['revokeDeviceToken'] as const;
+
+export const getRevokeDeviceTokenMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revokeDeviceToken>>, TError,RevokeDeviceTokenMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof revokeDeviceToken>>, TError,RevokeDeviceTokenMutationVariables, TContext> => {
+
+const mutationKey = getRevokeDeviceTokenMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof revokeDeviceToken>>, RevokeDeviceTokenMutationVariables> = (props) => {
+          const {tokenId} = props ?? {};
+
+          return  revokeDeviceToken(tokenId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RevokeDeviceTokenMutationResult = NonNullable<Awaited<ReturnType<typeof revokeDeviceToken>>>
+
+    export type RevokeDeviceTokenMutationError = unknown
+    export type RevokeDeviceTokenMutationVariables = {tokenId: number}
+
+    /**
+ * @summary Revoke Token
+ */
+export const useRevokeDeviceToken = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revokeDeviceToken>>, TError,RevokeDeviceTokenMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof revokeDeviceToken>>,
+        TError,
+        RevokeDeviceTokenMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRevokeDeviceTokenMutationOptions(options), queryClient);
     }
 
 export const getListTripsUrl = (params?: ListTripsParams,) => {

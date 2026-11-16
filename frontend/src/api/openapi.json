@@ -137,6 +137,110 @@
         "title": "DeviceClass",
         "type": "string"
       },
+      "DeviceTokenCreatedOut": {
+        "properties": {
+          "device": {
+            "$ref": "#/components/schemas/DeviceTokenOut"
+          },
+          "setup": {
+            "$ref": "#/components/schemas/Setup"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "device",
+          "token",
+          "setup"
+        ],
+        "title": "DeviceTokenCreatedOut",
+        "type": "object"
+      },
+      "DeviceTokenIn": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/TrackerKind"
+          },
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "kind"
+        ],
+        "title": "DeviceTokenIn",
+        "type": "object"
+      },
+      "DeviceTokenOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/TrackerKind"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used At"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "points_received": {
+            "title": "Points Received",
+            "type": "integer"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          },
+          "token_prefix": {
+            "title": "Token Prefix",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "token_prefix",
+          "created_at",
+          "last_used_at",
+          "revoked_at",
+          "points_received"
+        ],
+        "title": "DeviceTokenOut",
+        "type": "object"
+      },
       "ImportBatchOut": {
         "properties": {
           "created_at": {
@@ -1144,6 +1248,84 @@
         "title": "PurposeRef",
         "type": "object"
       },
+      "Setup": {
+        "description": "How to point one tracker app at this server. `link` and both QR codes contain the\ntoken; none of this can be shown again.",
+        "properties": {
+          "auth": {
+            "title": "Auth",
+            "type": "string"
+          },
+          "body_template": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Body Template"
+          },
+          "content_type": {
+            "default": "application/json",
+            "title": "Content Type",
+            "type": "string"
+          },
+          "endpoint": {
+            "title": "Endpoint",
+            "type": "string"
+          },
+          "link": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Link"
+          },
+          "link_qr": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Link Qr"
+          },
+          "token_qr": {
+            "title": "Token Qr",
+            "type": "string"
+          },
+          "tracker": {
+            "title": "Tracker",
+            "type": "string"
+          },
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          }
+        },
+        "required": [
+          "tracker",
+          "endpoint",
+          "auth",
+          "token_qr"
+        ],
+        "title": "Setup",
+        "type": "object"
+      },
       "Status": {
         "enum": [
           "candidate",
@@ -1183,6 +1365,17 @@
         },
         "title": "TimeRangeIn",
         "type": "object"
+      },
+      "TrackerKind": {
+        "enum": [
+          "owntracks",
+          "overland",
+          "gpslogger",
+          "colota",
+          "generic"
+        ],
+        "title": "TrackerKind",
+        "type": "string"
       },
       "TravelMode": {
         "enum": [
@@ -2845,6 +3038,118 @@
         "summary": "Set Preference",
         "tags": [
           "me"
+        ]
+      }
+    },
+    "/api/v1/tracking/tokens": {
+      "get": {
+        "operationId": "listDeviceTokens",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DeviceTokenOut"
+                  },
+                  "title": "Response",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "List Tokens",
+        "tags": [
+          "tracking"
+        ]
+      },
+      "post": {
+        "operationId": "createDeviceToken",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceTokenIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceTokenCreatedOut"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Create Token",
+        "tags": [
+          "tracking"
+        ]
+      }
+    },
+    "/api/v1/tracking/tokens/{token_id}/revoke": {
+      "post": {
+        "operationId": "revokeDeviceToken",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token_id",
+            "required": true,
+            "schema": {
+              "title": "Token Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceTokenOut"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Revoke Token",
+        "tags": [
+          "tracking"
         ]
       }
     },

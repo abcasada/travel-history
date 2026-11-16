@@ -39,4 +39,6 @@ COPY backend/ ./
 COPY --from=frontend /src/dist /app/spa_root/app
 RUN DJANGO_SECRET_KEY=build-only python manage.py collectstatic --noinput >/dev/null
 EXPOSE 8000
-CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "2", "--threads", "4", "--worker-class", "gthread", "--access-logfile", "-"]
+# The access log prints the path without the query string (%(U)s, not the request line), so a
+# tracker token sent as ?token= can't land in it even if the app's scrubbing were bypassed.
+CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "2", "--threads", "4", "--worker-class", "gthread", "--access-logfile", "-", "--access-logformat", "%(h)s %(t)s \"%(m)s %(U)s %(H)s\" %(s)s %(b)s %(M)sms \"%(a)s\""]

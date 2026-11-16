@@ -1,6 +1,7 @@
 import { Route, Routes } from "react-router";
 import { HistoryPage } from "./History";
 import { Placeholder } from "./Placeholder";
+import { TrackersPage } from "./Trackers";
 
 /** List-pane content per route; both shells render the same routes. */
 export function ListRoutes() {
@@ -12,6 +13,7 @@ export function ListRoutes() {
       <Route path="stats" element={<Placeholder title="Statistics" phase="phase 6" />} />
       <Route path="vehicles" element={<Placeholder title="Vehicles" phase="phase 4" />} />
       <Route path="history" element={<HistoryPage />} />
+      <Route path="trackers" element={<TrackersPage />} />
       <Route path="*" element={<Placeholder title="Not found" phase="—" />} />
     </Routes>
   );
