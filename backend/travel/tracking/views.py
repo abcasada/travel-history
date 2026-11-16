@@ -29,7 +29,7 @@ from django.views.decorators.debug import sensitive_variables
 from travel.core import ratelimit
 from travel.core.ratelimit import Rate
 
-from . import ingest, payloads, tokens
+from . import ingest, payloads
 from .payloads import PayloadError
 
 log = logging.getLogger(__name__)
@@ -92,7 +92,7 @@ def _handle(request: HttpRequest, endpoint: str) -> HttpResponse:
     except PayloadError as error:
         return _error(error.status, error.detail)
 
-    token_hash = tokens.hash_from_request(request)
+    token_hash = getattr(request, "ingest_token_hash", None)  # set by the first middleware
     if token_hash is None:
         return _error(401, "a valid device token is required")
     per_token = ratelimit.hit(

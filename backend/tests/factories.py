@@ -150,3 +150,22 @@ class TimelineSegmentFactory(factory.django.DjangoModelFactory):
     geom = WICHITA
     data = factory.LazyFunction(lambda: {"synthetic": True})
     fingerprint = factory.Sequence(lambda n: f"{n:064x}")
+
+
+def device_token(user: User, kind: str = "owntracks", name: str = "Synthetic phone"):
+    """A device token for `user` (created as the owner role) and its secret, for tests that
+    call the tracker endpoints. Returns (DeviceToken, secret)."""
+    from tests.helpers import as_owner
+    from travel.accounts.models import DeviceToken
+    from travel.tracking import tokens
+
+    new = tokens.generate()
+    with as_owner():
+        token = DeviceToken.objects.create(
+            user=user,
+            name=name,
+            kind=kind,
+            token_prefix=new.display_prefix,
+            token_hash=new.token_hash,
+        )
+    return token, new.secret

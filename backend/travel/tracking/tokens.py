@@ -2,10 +2,10 @@
 
 The token exists in clear only in the response that creates it and in a tracker's requests.
 The database stores its SHA-256 (checked: `devicetoken_hash_is_sha256`), the rate limiter an
-HMAC of that hash, and nothing logs it: functions that hold it are marked
-`sensitive_variables` (Django's error reports blank their locals), query-string tokens are
-cut out of the request before anything else sees it (`middleware.py`), and every log line
-passes through a redacting formatter (`travel/core/logredact.py`).
+HMAC of that hash, and nothing logs it: the first middleware takes it out of the request and
+keeps only the hash (`middleware.py`), functions that hold it are marked
+`sensitive_variables` (Django's error reports blank their locals), and every log line passes
+through a redacting formatter (`travel/core/logredact.py`).
 """
 
 from __future__ import annotations
@@ -17,7 +17,6 @@ import re
 import secrets
 from dataclasses import dataclass
 
-from django.http import HttpRequest
 from django.views.decorators.debug import sensitive_variables
 
 PREFIX = "trk_"
@@ -53,27 +52,9 @@ def is_well_formed(candidate: str | None) -> bool:
 
 
 @sensitive_variables()
-def hash_from_request(request: HttpRequest) -> str | None:
-    """The SHA-256 of the request's device token, or None if it carries none or a malformed one.
-
-    Accepted, in this order: `Authorization: Bearer <token>`, `Authorization: Basic` with the
-    token as the password (any user name: OwnTracks, GPSLogger, Colota), then `?token=` (some
-    Overland versions only take a URL), which `IngestTokenScrubMiddleware` has already moved
-    out of the query string. A request with an Authorization header is judged by the header
-    alone. Only the hash leaves this function.
-    """
-    header = request.META.get("HTTP_AUTHORIZATION", "")
-    if header:
-        candidate = _from_authorization(header)
-    else:
-        candidate = getattr(request, "ingest_query_token", None)
-    if not is_well_formed(candidate):
-        return None
-    return hash_token(candidate)
-
-
-@sensitive_variables()
-def _from_authorization(header: str) -> str | None:
+def from_authorization(header: str) -> str | None:
+    """The token in an Authorization header: `Bearer <token>`, or `Basic` with the token as
+    the password (any user name: OwnTracks, GPSLogger, Colota). Not checked for format."""
     if len(header) > MAX_AUTH_HEADER:
         return None
     scheme, _, value = header.strip().partition(" ")

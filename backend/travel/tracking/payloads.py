@@ -283,9 +283,11 @@ def _problem(kind: str) -> str:
         return "unknown field"
     if kind == "missing":
         return "required"
-    if kind.endswith(("_greater_than_equal", "_less_than_equal", "finite_number")):
+    if kind in {"greater_than_equal", "less_than_equal", "greater_than", "less_than"}:
         return "out of range"
-    if kind.endswith("too_long") or kind.endswith("too_short"):
+    if kind == "finite_number":
+        return "out of range"
+    if kind in {"too_long", "too_short", "string_too_long", "string_too_short"}:
         return "wrong length"
     if kind == "literal_error":
         return "invalid"

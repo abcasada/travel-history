@@ -10,8 +10,6 @@ including the Admin. Row-level security enforces the same (core migration 0002, 
 migration 0004).
 """
 
-from __future__ import annotations
-
 import datetime as dt
 from typing import Annotated
 
