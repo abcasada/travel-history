@@ -25,8 +25,8 @@ ingestion.
 | Routing | `POST /routing/route` (waypoints → OSRM-format route + provenance), `POST /routing/match` (internal use) |
 | Stats | `GET /stats/summary`, `/stats/territories?level=country\|region\|county&mode=through\|stopped`, `/stats/distance?by=vehicle\|mode\|year`, `/stats/flights` |
 | Tiles | `GET /tiles/trips/{z}/{x}/{y}.mvt` |
-| Devices (tracking) | `GET/POST /devices`, `DELETE /devices/{id}` (revoke), `GET /devices/{id}/setup` (QR/deep link) |
-| Ingestion (public, token) | `POST /ingest/owntracks`, `POST /ingest/overland` |
+| Devices (tracking) | Built in item 7 as `GET/POST /tracking/tokens` (list own; create → the token, once, with its setup link and QR codes) and `POST /tracking/tokens/{id}/revoke`. No separate setup endpoint: setup needs the token, which exists only in the create response. |
+| Ingestion (public, token) | `POST /ingest/owntracks` → `[]`, `POST /ingest/overland` → `{"result":"ok"}`. Plain Django views, not in the OpenAPI schema; statuses 400/401/405/411/413/415/429 ([tracking.md](tracking.md) §9.1). |
 | Push | `POST/DELETE /push/subscriptions` |
 | Admin | `GET /admin/access-requests`, `POST /admin/access-requests/{id}/approve\|reject` (requires recent re-auth), `GET/POST/DELETE /admin/allowlist`, `GET/POST /admin/invites`, `GET/PATCH /admin/users`, `GET/POST /admin/transfers` |
 | Export | `POST /export` (job) → `GET /export/{id}` (zip: GeoJSON, GPX, CSV, original files) |

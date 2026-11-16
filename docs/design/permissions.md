@@ -64,8 +64,10 @@ object under §6.2. "Participant" means a Member whose person participates in th
 | Vehicle plate / VIN: read | ❌ unless managing | managing user | managing user | managing user | ❌ | ❌ |
 | Account: email, OIDC issuer/subject, role (the `user` row) | ✅ | own | own | own | own | ❌ |
 | Account: display name, linked person, active flag (directory, D-76) | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
-| Device tokens, push subscriptions, integrations, preferences | own | own | own | own | own (prefs, push) | ❌ |
-| Tracker ingestion (write points) | — | — | — | — | — | device token only (write-only) |
+| Device tokens: list own | own | own | own | own | own (inert, see notes) | ❌ |
+| Device tokens: create / revoke own | own | own | own | own | ❌ | ❌ |
+| Push subscriptions, integrations, preferences | own | own | own | own | own (prefs, push) | ❌ |
+| Tracker ingestion (write points) | — | — | — | — | — | device token only: into its owner's history, while the token is live and the owner an active Admin/Member |
 | Access requests, allowlist, invites, roles | ✅ | ❌ | ❌ | ❌ | ❌ | submit request only |
 | Transfer offers | create/confirm | accept/decline own | — | — | — | ❌ |
 | Public profile | own | own | own | own | own | read if enabled |
@@ -80,6 +82,21 @@ Notes:
   filter by owner); `tests/permissions/test_history_tiles.py` checks every actor through the API
   and by calling the builders as `travel_app` under each RLS context, with another user's points
   in the same aggregated cell. A Viewer gets empty tiles (Viewers have no raw history).
+- Device tokens and tracker ingestion (work-order item 7, D-82; [tracking.md](tracking.md) §9.1):
+  - Nobody sees another user's tokens, not even the Admin. A token is shown once, at creation;
+    only its SHA-256 is stored. Revoking is final (a trigger refuses un-revoking and any change
+    to a token's owner, hash, prefix, kind or creation time).
+  - A tracker request acts as the token's owner. Points go only into that owner's history: RLS
+    requires `owner = app.user_id()`, and a point that names a device needs that owner's
+    unrevoked token (history migration 0009). Every point INSERT now needs an Admin or Member:
+    Viewers have no raw history, so a Viewer's leftover token (from when they were a Member) is
+    refused, can be listed, and can't be revoked until they are a Member again.
+  - Tests: `tests/permissions/test_device_tokens.py` (API for every actor, setup links, the
+    `ingest` context, the token guard, cross-user writes as `travel_app`), the matrix rows
+    `create_own_token`, `revoke_alice_token`, `unrevoke_alice_token`, `insert_own_point`,
+    `ingest_with_alice_token`, `ingest_with_alice_revoked_token` (the matrix is now 71 actions ×
+    7 actors), and the endpoint tests in `tests/test_tracking_ingest.py` (token of A never
+    writes to B, revoked, Viewer, inactive).
 - Accounts (D-72, D-76): a deactivated account reads nothing, not even its own row (D-53). Other
   users' accounts are read only through the `accounts_userdirectory` view, never the `user` table.
 - Trips API (work-order item 6, D-81; endpoints in [api.md](api.md) §17):
@@ -109,7 +126,7 @@ schema and fails if any user-owned table lacks RLS or a policy for each command.
 
 | Table group | SELECT | INSERT | UPDATE | DELETE |
 |---|---|---|---|---|
-| `location_point`, `timeline_segment`, `raw_file`, `import_batch`, `coverage_report`, `detection_run`, `rejected_candidate`, `device_token`, `push_subscription`, `integration_setting`, `user_preference`, `tag` | `owner = app.user_id()` | same | same (points/raw files: never, trigger) | owner (points: purge only) |
+| `location_point`, `timeline_segment`, `raw_file`, `import_batch`, `coverage_report`, `detection_run`, `rejected_candidate`, `device_token`, `push_subscription`, `integration_setting`, `user_preference`, `tag` | `owner = app.user_id()`; `device_token` also by hash in the `ingest` context | same; points: Admin/Member only, and a named device must be the owner's unrevoked token | same (points/raw files: never, trigger; tokens: name and counters only, revocation final) | owner (points: purge only) |
 | `trip` | `app.can_view_trip(id)` | `owner = me AND app.can_create()` | `app.can_edit_trip_core(id)` | `owner = me` |
 | `leg`, `route` | `app.can_view_trip(trip)` | core editor, or contributor with `author = me` | core editor on core legs, author on own (while they may contribute) | same as update |
 | `trip_participant` | view trip | core editor, and the person is visible to them | core editor; own `public_consent` via function; the person stays visible | core editor |

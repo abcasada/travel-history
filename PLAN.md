@@ -5,8 +5,9 @@
 > This index plus the files it links are the source of truth for design and progress. Keep them
 > current (CLAUDE.md requires it). Read the index every session; open design docs on demand.
 
-**Status (2026-11-11):** Phase 1 complete; phase 2 (Timeline and tracking) in progress —
-milestones 2.1–2.3 done. Phase 4: the trips API core (T18 core) is done. Work now follows the
+**Status (2026-11-16):** Phase 1 complete; phase 2 (Timeline and tracking) in progress —
+milestones 2.1–2.4 done (2.4 tracker ingestion built and tested locally; exposure is work-order
+item 8). Phase 4: the trips API core (T18 core) is done. Work now follows the
 orchestrated work order in [docs/ROADMAP.md](docs/ROADMAP.md) (process:
 [docs/ORCHESTRATION.md](docs/ORCHESTRATION.md)).
 
@@ -14,7 +15,7 @@ orchestrated work order in [docs/ROADMAP.md](docs/ROADMAP.md) (process:
 |---|---|---|
 | 0 Adam (exports, backup key, NAS) | ⛔ waiting on Adam | [phases](docs/design/phases.md) |
 | 1 Skeleton | ✅ 2026-10-20 | [phases](docs/design/phases.md) |
-| 2 Timeline and tracking | 🔄 2.1–2.3 done | [phases](docs/design/phases.md) |
+| 2 Timeline and tracking | 🔄 2.1–2.4 done | [phases](docs/design/phases.md) |
 | 3 Flights · 4 Catalog · 5 Routes · 6 Statistics | ⏳ (4: trips API core done) | [phases](docs/design/phases.md) |
 | 7 Mobile and photos · 8 Family and public · 9 Android · 10 Later | ⏳ | [phases](docs/design/phases.md) |
 
@@ -141,6 +142,7 @@ Other guides: [backups to the NAS](docs/backup-nas.md), [restore](docs/restore.m
 - D-79 `./dev test-quick` skips `slow` tests; `./dev test` runs all
 - D-80 MIT license
 - D-81 Trips API: 404 for invisible, 403 for forbidden; removing a participant clears their leg overrides; sharing settings to core editors only; reference guards (pending Adam)
+- D-82 Tracker ingestion: plain views, strict whole-request validation, flags in `extra`, per-token + per-address limits, Member-only point inserts with the owner's live token, tokens stripped from requests and logs
 
 ## 25. Open questions (for Adam, answer whenever — nothing is blocked on these)
 
@@ -162,3 +164,4 @@ Other guides: [backups to the NAS](docs/backup-nas.md), [restore](docs/restore.m
 | Q-14 | Should family members be able to see each other's **vehicles' ownership history** (who owned it when), or only the vehicle and current owner? | **Answered 2026-11-10:** full history visible to family unless hidden. |
 | Q-15 | The server's LAN address is DHCP-assigned. A DHCP reservation on the EdgeRouter would keep the dev binding stable (router change → yours). | **Resolved 2026-11-10:** the server already has a fixed address outside the router's DHCP range. |
 | Q-16 | A participant contributed their own leg (e.g. a separate flight home) and is later removed from the trip. Should that leg keep sharing the trip with them, and who may delete it? | Today: no. Visibility counts trip-level participants and per-leg includes only, so the removed person loses access to a "participants" trip; their leg stays, and nobody can delete it short of deleting the trip. Recommended: keep the visibility rule, and let the owner delete contributions by people no longer on the trip (item 13 / T34). |
+| Q-17 | GPSLogger's setup link (`gpslogger://properties/<https URL>`) downloads a settings file from a web address. Serving one would mean handing the token to anyone with that address (even short-lived, it passes through any proxy's logs). OK to skip it? | Skipped: the token page lists GPSLogger's fields to copy and shows a QR code of the token alone; OwnTracks, Overland and Colota get real setup links. Colota (recommended on Android) covers the convenience. |
