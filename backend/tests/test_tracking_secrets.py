@@ -142,9 +142,11 @@ def test_the_token_is_stored_nowhere_in_the_database(owner):
     )
     assert created.status_code == 201
     secret = created.json()["token"]
-    tracker = Client()
-    assert tracker.post(OWNTRACKS, location(), content_type="application/json",
-                        headers={"Authorization": f"Bearer {secret}"}).status_code == 200  # fmt: skip
+    used = Client().post(
+        OWNTRACKS, location(), content_type="application/json",
+        headers={"Authorization": f"Bearer {secret}"},
+    )  # fmt: skip
+    assert used.status_code == 200
 
     with as_owner(), connection.cursor() as cursor:
         cursor.execute(
@@ -155,9 +157,9 @@ def test_the_token_is_stored_nowhere_in_the_database(owner):
         found = []
         for table in tables:
             quoted = connection.ops.quote_name(table)
-            cursor.execute(
-                f"SELECT count(*) FROM {quoted} t WHERE t::text LIKE %s", [f"%{secret[4:]}%"]
-            )
+            # Table names come from the catalog, never from input.
+            sql = f"SELECT count(*) FROM {quoted} t WHERE t::text LIKE %s"  # noqa: S608
+            cursor.execute(sql, [f"%{secret[4:]}%"])
             if cursor.fetchone()[0]:
                 found.append(table)
         cursor.execute("SELECT token_hash, token_prefix FROM accounts_devicetoken")

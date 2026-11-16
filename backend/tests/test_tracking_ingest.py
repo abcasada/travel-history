@@ -145,10 +145,11 @@ def test_source_follows_the_token_kind(client, alice):
 
 def test_gpslogger_body_template_is_accepted(client, alice):
     token, secret = device_token(alice, kind="gpslogger")
+    # What GPSLogger sends with the documented template (docs/tracking/gpslogger.md).
     body = (
-        '{"_type":"location","lat":37.6922,"lon":-97.3375,"tst":%d,"acc":4.5,"alt":402.0,'
-        '"vel":0.0,"batt":77,"tid":"gl"}' % ago(3)
-    )
+        '{"_type":"location","lat":37.6922,"lon":-97.3375,"tst":TST,"acc":4.5,"alt":402.0,'
+        '"vel":0.0,"batt":77,"tid":"gl"}'
+    ).replace("TST", str(ago(3)))
     assert post(client, OWNTRACKS, body, secret=secret, how="basic", raw=True).status_code == 200
     assert len(points(token)) == 1
 
