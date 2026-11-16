@@ -125,7 +125,10 @@ class UserPreference(models.Model):
 
 
 class DeviceToken(models.Model):
-    """Write-only credential for a location tracker. Only the SHA-256 of the token is stored."""
+    """Write-only credential for a location tracker (PLAN.md §9.1). Only the SHA-256 of the
+    token is stored; the token itself is shown once, at creation (travel/tracking/tokens.py).
+    Tokens are revoked, never deleted (points keep a reference), and a revocation is final:
+    accounts migration 0004 freezes everything but the name and the usage counters."""
 
     class Kind(models.TextChoices):
         OWNTRACKS = "owntracks", "OwnTracks"
@@ -143,6 +146,15 @@ class DeviceToken(models.Model):
     last_used_at = models.DateTimeField(null=True, blank=True)
     revoked_at = models.DateTimeField(null=True, blank=True)
     points_received = models.BigIntegerField(default=0)
+
+    class Meta:
+        constraints = [
+            # A hex SHA-256 digest, never a token: a bug can't store the secret by accident.
+            models.CheckConstraint(
+                condition=models.Q(token_hash__regex=r"^[0-9a-f]{64}$"),  # noqa: S106
+                name="devicetoken_hash_is_sha256",
+            )
+        ]
 
     def __str__(self) -> str:
         return f"{self.name} ({self.token_prefix}…)"

@@ -34,9 +34,12 @@ INSTALLED_APPS = [
     "travel.history",
     "travel.media",
     "travel.public",
+    "travel.tracking",
 ]
 
 MIDDLEWARE = [
+    # First: takes a tracker's `?token=` out of the URL before anything can log or echo it.
+    "travel.tracking.middleware.IngestTokenScrubMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.middleware.csp.ContentSecurityPolicyMiddleware",
@@ -107,6 +110,17 @@ LOGIN_URL = "/auth/login"
 # Header with the real client address when every request arrives through a proxy (e.g.
 # "CF-Connecting-IP" behind the Cloudflare Tunnel); empty = use the socket address.
 RATELIMIT_CLIENT_IP_HEADER = env.str("RATELIMIT_CLIENT_IP_HEADER", "")
+
+# --- Tracker ingestion (PLAN.md §9.1) -------------------------------------------------------
+# Public origin trackers post to (e.g. https://travel.example.org, item 8); empty = the address
+# the browser used when the token was created.
+TRACKER_BASE_URL = env.str("TRACKER_BASE_URL", "")
+TRACKER_MAX_BODY_BYTES = env.int("TRACKER_MAX_BODY_BYTES", 5 * 1024 * 1024)
+TRACKER_MAX_POINTS = env.int("TRACKER_MAX_POINTS", 1000)  # per request (Overland batches)
+TRACKER_RATE_PER_TOKEN = env.int("TRACKER_RATE_PER_TOKEN", 120)  # requests per minute
+TRACKER_RATE_PER_IP = env.int("TRACKER_RATE_PER_IP", 600)  # requests per minute, all tokens
+TRACKER_MAX_SPEED_MPS = env.float("TRACKER_MAX_SPEED_MPS", 400.0)  # plausibility flag limit
+TRACKER_MAX_TOKENS_PER_USER = env.int("TRACKER_MAX_TOKENS_PER_USER", 20)  # active tokens
 
 # --- OIDC (PLAN.md §7.1, §7.2) -------------------------------------------------------------
 OIDC_ISSUER = env.str("OIDC_ISSUER", "")
@@ -179,11 +193,31 @@ if OIDC_ISSUER:
     SECURE_CSP["form-action"].append(f"{_issuer.scheme}://{_issuer.netloc}")
 
 # --- Logging --------------------------------------------------------------------------------
+# Every line goes through a redacting formatter (device tokens, token query parameters,
+# Authorization values; travel/core/logredact.py). Django's own handlers are replaced: its
+# `mail_admins` would send request details, and runserver's request log prints raw URLs.
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
-    "formatters": {"plain": {"format": "%(asctime)s %(levelname)s %(name)s %(message)s"}},
-    "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "plain"}},
+    "formatters": {
+        "plain": {
+            "()": "travel.core.logredact.RedactingFormatter",
+            "format": "%(asctime)s %(levelname)s %(name)s %(message)s",
+        },
+        "django.server": {
+            "()": "travel.core.logredact.RedactingServerFormatter",
+            "format": "[{server_time}] {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {"class": "logging.StreamHandler", "formatter": "plain"},
+        "django.server": {"class": "logging.StreamHandler", "formatter": "django.server"},
+    },
     "root": {"handlers": ["console"], "level": env.str("LOG_LEVEL", "INFO")},
-    "loggers": {"django.db.backends": {"level": "WARNING"}},
+    "loggers": {
+        "django": {"handlers": [], "level": "INFO", "propagate": True},
+        "django.server": {"handlers": ["django.server"], "level": "INFO", "propagate": False},
+        "django.db.backends": {"level": "WARNING"},
+    },
 }

@@ -17,7 +17,7 @@ from travel.accounts.models import Person, Role
 from travel.core.choices import Visibility
 
 if TYPE_CHECKING:
-    from travel.accounts.models import User
+    from travel.accounts.models import DeviceToken, User
     from travel.history.models import HomePeriod
     from travel.trips.models import Leg, Purpose, Trip
     from travel.vehicles.models import Vehicle
@@ -291,6 +291,29 @@ def can_access_raw_history(user, owner_id: int) -> bool:
 
 def can_import(user) -> bool:
     return can_create(user)
+
+
+# --- Device tokens and tracker ingestion (PLAN.md §9.1) ------------------------------------
+
+
+def can_list_device_tokens(user) -> bool:
+    """A user's own tokens (row-level security shows no one else's, not even to the Admin)."""
+    return is_family(user)
+
+
+def can_create_device_token(user) -> bool:
+    """Tokens record raw history, which Viewers don't have."""
+    return can_create(user)
+
+
+def can_revoke_device_token(user, token: DeviceToken) -> bool:
+    return can_create(user) and token.user_id == user.pk
+
+
+def can_ingest_points(user, token: DeviceToken) -> bool:
+    """A tracker request acting as the token's owner: points go only into that owner's
+    history, only while the token is live and the owner may have raw history."""
+    return can_create(user) and token.user_id == user.pk and token.revoked_at is None
 
 
 def can_view_home_period(user, period: HomePeriod) -> bool:
