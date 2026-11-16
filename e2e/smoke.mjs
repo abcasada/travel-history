@@ -63,6 +63,28 @@ await m.goto(`${base}/app/history?from=2025-03-01&to=2025-03-02`);
 await m.getByRole("img", { name: /Days with location history/ }).waitFor({ timeout: 20000 });
 await m.waitForTimeout(3000);
 await m.screenshot({ path: "out/mobile-history.png" });
+// Tracker ingestion (milestone 2.4): create a token on the trackers page, send one synthetic
+// OwnTracks point with it, revoke it, and check the endpoint then refuses it. Each run leaves one
+// revoked token and one point (Wichita city centre) in dev-member's history.
+await page.getByText("Dev Member").click();
+await page.getByRole("link", { name: "Location trackers" }).click();
+await page.getByLabel("Name").fill("E2E phone");
+await page.getByRole("button", { name: "Create token" }).click();
+await page.getByAltText("Setup QR code").waitFor({ timeout: 10000 });
+await page.screenshot({ path: "out/trackers.png" });
+const secret = await page.getByLabel("Token").inputValue();
+const point = { _type: "location", lat: 37.6922, lon: -97.3375, tst: Math.floor(Date.now() / 1000) - 60 };
+const send = () => page.request.post(`${base}/api/v1/ingest/owntracks`, {
+  data: point, headers: { Authorization: `Bearer ${secret}` },
+});
+const sent = await send();
+if (sent.status() !== 200 || (await sent.text()) !== "[]") throw new Error(`ingest: ${sent.status()}`);
+await page.getByRole("button", { name: /Done, hide the token/ }).click();
+page.once("dialog", (dialog) => dialog.accept());
+await page.locator("li", { hasText: "E2E phone" }).first().getByRole("button", { name: "Revoke" }).click();
+await page.locator("li", { hasText: "E2E phone" }).first().getByText(/Revoked/).waitFor();
+const refused = await send();
+if (refused.status() !== 401) throw new Error(`revoked token answered ${refused.status()}`);
 // Import a synthetic Timeline through the real UI: picker -> chunked upload -> worker -> summary.
 await page.getByRole("link", { name: "History" }).click();
 const chooser = page.waitForEvent("filechooser");

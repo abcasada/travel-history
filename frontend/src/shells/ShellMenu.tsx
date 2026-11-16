@@ -34,7 +34,11 @@ export function ShellMenu() {
             </option>
           ))}
         </select>
-        <Link to="/trackers" className="mb-1 block rounded px-2 py-1 hover:bg-slate-100">
+        <Link
+          to="/trackers"
+          className="mb-1 block rounded px-2 py-1 hover:bg-slate-100"
+          onClick={(e) => e.currentTarget.closest("details")?.removeAttribute("open")}
+        >
           Location trackers
         </Link>
         <form method="post" action="/auth/logout">

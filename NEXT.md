@@ -2,7 +2,7 @@
 
 Handoff note for the next session or subagent. Keep it short; overwrite, don't append history.
 
-- **In flight:** item 7 (T7), builder-xhigh. Done and committed: backend (`travel/tracking/`, accounts 0004, history 0009, log redaction, query/header token scrub middleware) and its tests (ingest, secrets/log capture, plausibility, permissions + matrix rows). Left: OpenAPI + client regen, Trackers page in the SPA, docs/tracking/ guides, design-doc updates (§9, §6.3/§6.4 matrix, decisions D-82, Q-17 GPSLogger link), gunicorn access-log format, full suite + e2e, push. Items 1, 2, 5 and 6 are done and verified.
+- **In flight:** item 7 (T7), builder-xhigh. Built and committed: backend, tests, Trackers page, API regen, docs/tracking/, design docs, D-82, Q-17, e2e tracker step (passes; only the known /api/v1/uploads 500 remains). Left: full `./dev test`, final lint, NEXT update, push. Items 1, 2, 5 and 6 are done and verified.
 - **Next:** item 8 (tracker exposure) needs Adam's "go" and DNS record, so ask him as soon as item 7 lands, then continue with item 9. Item 3 is blocked (HDD), item 4 is deferred, item 5a waits on item 3.
 - **For item 13:** the scope and the notes/tracks alignment are listed in ROADMAP.md item 13; details are in docs/design/permissions.md.
 - **Item 5 note:** the Morton `tile_key` and InitPlan RLS policies are documented in docs/design/map-rendering.md §14; Adam was asked whether to record them as a decision. The follow-ups are now item 5a in ROADMAP.md.
