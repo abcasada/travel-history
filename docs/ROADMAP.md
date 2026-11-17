@@ -3,6 +3,8 @@
 Only the orchestrator and the planner edit this file. Status values: todo · in progress · done · deferred · blocked.
 
 ## Work order
+
+> **Execution order override (2026-11-18, Adam: "start viewing everything so I can explore, on the soon side"):** after item 10, run **13 → 20 → 21** (the rest of the trips API, then the catalog UI), then continue with 11, 12, 14… in order. Item numbers stay the same. Review pause B (after 21) now comes before pause A (after 12). Item 4 (the real import) jumps the queue as soon as AGE_RECIPIENT and the export are both present. Item 8's post-"go" step runs as soon as Adam says "go".
 Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhigh. Task IDs (T1…T46) and finding numbers (#1…#16) are from the 2026-10-21 audit; their descriptions and dependencies are in the Task reference below. Each item is one dispatch unless noted.
 
 1. **[M] Stage 0 housekeeping** (details below). Skip it if already done.
@@ -245,3 +247,4 @@ Nature: mech = mechanical, mod = moderate, hard. Size is S/M/L/XL with approxima
 - 2026-11-17: item 3 done and verified (`./dev test-quick` 1260 + 31 passed). The builder lost Bash access at its last step, so the orchestrator committed its docs. Finding #4 is closed. The tiles confirm item 5a is needed: whole-history point tiles take 1–2 s at 3.6 M points. Point storage is about 347 B per point, so 20 M points would be about 7 GB against a 5 GB budget; the budget note is in resource-budget.md §21.1. Item 5a dispatched.
 - 2026-11-18: item 5a done and verified (`./dev test-quick` 1375 + 31 passed, now about 3.3 min). Whole-history tiles take 50–274 ms; the cost is +37 % import time and +36 % point storage (about 9.3 GB at 20 M points). D-86 is waiting for Adam. Item 8 still waits for "go", so item 9 was dispatched.
 - 2026-11-18: item 9 done and verified (`./dev test-quick` 1394 + 31 passed). D-87 (the per-user job runner) is waiting for Adam. Item 10 dispatched with synthetic flights.
+- 2026-11-18: reordered at Adam's request: items 13, 20 and 21 run right after item 10, so he can add and browse trips sooner. T19 depends only on T18, so no dependency is broken. Item 4 jumps the queue when its prerequisites arrive.
