@@ -33,7 +33,7 @@ Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhi
 2. **[X] T4 + T2:** account privacy, and the database-backed rate limiter. Tests must cover concurrent requests.
    - Status: done (2026-11-11)
 3. **[M] T5:** a 500 MB–1 GB synthetic import test. Record time, peak memory, and database growth. If it's over budget or fails: ESCALATE.
-   - Status: todo (unblocked 2026-11-17: /bulk temporarily on the SSD, D-84)
+   - Status: in progress (dispatched 2026-11-17; /bulk on the SSD, D-84)
 4. **[M] T11 + real import:**
    - Wipe the synthetic data, after confirming the target is the dev database and holds only synthetic data.
    - Import my real export and verify the counts.
@@ -67,7 +67,7 @@ Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhi
    - Show me the proxy change and the exact DNS record, and apply the change only after I reply "go". I add the DNS record myself.
    - Test from outside the LAN with a test token, then revoke it.
    - Walk me through setting up my phone with the setup guide and QR code. ← the bake-off starts
-   - Status: in progress (prepare-only dispatch 2026-11-17; waits for Adam's "go")
+   - Status: blocked on Adam's "go" (prepared and verified 2026-11-17; checklist in docs/tracking/exposure.md)
 9. **[H] T8:** nightly jobs that cover all users under RLS.
    - Status: todo
 10. **[M] T12 + T13:** flight datasets, the import template, and the conversion. Use my spreadsheet if it's present; otherwise synthetic data.
@@ -241,3 +241,4 @@ Nature: mech = mechanical, mod = moderate, hard. Size is S/M/L/XL with approxima
 - 2026-11-11: item 6 done and verified (pushed, tree clean, `./dev test-quick` 1072 + 26 passed; builder-xhigh at xhigh). Item 13 now lists item 6's leftovers, including aligning note/track rules for removed participants. D-81 and Q-16 are waiting for Adam.
 - 2026-11-16: item 7 done and verified (pushed, tree clean, `./dev test-quick` 1245 + 31 passed; builder-xhigh at xhigh). It was interrupted by the usage limit and resumed. D-82 and Q-17 are waiting for Adam.
 - 2026-11-17: Adam approved D-81, D-82, D-83 (item 5 tiles), the D-76 directory fields, Q-10, Q-12, Q-16 and Q-17. Item 3 is unblocked by D-84 (bulk on the SSD while the HDD is replaced). Item 8 is dispatched to prepare only.
+- 2026-11-17: item 8 prepared and verified (pushed, tree clean, `./dev test-quick` 1260 + 31 passed; the ingest service on 127.0.0.1:8783 returns 404 off the ingest paths and sends HSTS and security headers). Waiting for Adam's "go". Item 3 dispatched meanwhile.
