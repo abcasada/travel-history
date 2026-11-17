@@ -11,6 +11,7 @@ never email or OIDC identity (D-72, D-76).
 
 import datetime as dt
 import json
+from enum import StrEnum
 from typing import Any, Literal
 
 from django.http import HttpRequest
@@ -41,6 +42,10 @@ from .models import (
 from .services import BulkRefused, TripError
 
 router = Router(tags=["trips"])
+
+# Schema names in the OpenAPI document come from class names; Stop.Kind would clash with the
+# import batch's Kind enum.
+StopKind = StrEnum("StopKind", [(value.upper(), value) for value in Stop.Kind.values])
 
 
 # --- Output schemas ---------------------------------------------------------------------------
@@ -460,13 +465,13 @@ class StopFieldsIn(Schema):
 
 
 class StopIn(StopFieldsIn):
-    kind: Stop.Kind
+    kind: StopKind
 
 
 class StopPatchIn(StopFieldsIn):
     """Only the fields sent are changed."""
 
-    kind: Stop.Kind | None = None
+    kind: StopKind | None = None
 
 
 class MediaPatchIn(Schema):

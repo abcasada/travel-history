@@ -1,6 +1,117 @@
 {
   "components": {
     "schemas": {
+      "BulkRefusalOut": {
+        "properties": {
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "trip_id": {
+            "title": "Trip Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "trip_id",
+          "reason"
+        ],
+        "title": "BulkRefusalOut",
+        "type": "object"
+      },
+      "BulkRefusedOut": {
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "refused": {
+            "items": {
+              "$ref": "#/components/schemas/BulkRefusalOut"
+            },
+            "title": "Refused",
+            "type": "array"
+          }
+        },
+        "required": [
+          "detail",
+          "refused"
+        ],
+        "title": "BulkRefusedOut",
+        "type": "object"
+      },
+      "BulkTripsIn": {
+        "description": "Fields left out are not changed; `purpose_id: null` clears the purpose. Tags are the\ncaller's own.",
+        "properties": {
+          "add_person_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 50,
+            "title": "Add Person Ids",
+            "type": "array"
+          },
+          "add_tag_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 50,
+            "title": "Add Tag Ids",
+            "type": "array"
+          },
+          "purpose_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Purpose Id"
+          },
+          "remove_person_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 50,
+            "title": "Remove Person Ids",
+            "type": "array"
+          },
+          "remove_tag_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 50,
+            "title": "Remove Tag Ids",
+            "type": "array"
+          },
+          "trip_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "Trip Ids",
+            "type": "array"
+          },
+          "visibility": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Visibility"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "trip_ids"
+        ],
+        "title": "BulkTripsIn",
+        "type": "object"
+      },
       "CabinClass": {
         "enum": [
           "economy",
@@ -897,6 +1008,24 @@
         "title": "LegIn",
         "type": "object"
       },
+      "LegOrderIn": {
+        "properties": {
+          "leg_ids": {
+            "description": "every leg of the trip, in order",
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 1000,
+            "title": "Leg Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "leg_ids"
+        ],
+        "title": "LegOrderIn",
+        "type": "object"
+      },
       "LegOut": {
         "properties": {
           "aircraft_registration": {
@@ -931,6 +1060,11 @@
           "cabin_class": {
             "title": "Cabin Class",
             "type": "string"
+          },
+          "can_delete": {
+            "description": "can_edit, or the trip owner for a leg whose author left the trip (Q-16)",
+            "title": "Can Delete",
+            "type": "boolean"
           },
           "can_edit": {
             "title": "Can Edit",
@@ -1127,7 +1261,8 @@
           "seat",
           "cabin_class",
           "participant_ids",
-          "can_edit"
+          "can_edit",
+          "can_delete"
         ],
         "title": "LegOut",
         "type": "object"
@@ -1425,6 +1560,412 @@
         "title": "MeOut",
         "type": "object"
       },
+      "MediaOut": {
+        "description": "Photo metadata. Files are served by the photo endpoints (T31), never by path.",
+        "properties": {
+          "author": {
+            "$ref": "#/components/schemas/UserRef"
+          },
+          "can_delete": {
+            "description": "can_edit, or the trip owner once the author left",
+            "title": "Can Delete",
+            "type": "boolean"
+          },
+          "can_edit": {
+            "description": "the author, while they may still contribute",
+            "title": "Can Edit",
+            "type": "boolean"
+          },
+          "caption": {
+            "title": "Caption",
+            "type": "string"
+          },
+          "captured_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Captured At"
+          },
+          "captured_tz": {
+            "title": "Captured Tz",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "height": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "leg_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Leg Id"
+          },
+          "public_consent": {
+            "title": "Public Consent",
+            "type": "boolean"
+          },
+          "public_selected": {
+            "title": "Public Selected",
+            "type": "boolean"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "stop_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Id"
+          },
+          "trip_id": {
+            "title": "Trip Id",
+            "type": "integer"
+          },
+          "width": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width"
+          }
+        },
+        "required": [
+          "id",
+          "trip_id",
+          "author",
+          "public_consent",
+          "created_at",
+          "can_edit",
+          "can_delete",
+          "leg_id",
+          "stop_id",
+          "source",
+          "width",
+          "height",
+          "captured_at",
+          "captured_tz",
+          "caption",
+          "public_selected"
+        ],
+        "title": "MediaOut",
+        "type": "object"
+      },
+      "MediaPatchIn": {
+        "properties": {
+          "caption": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Caption"
+          },
+          "leg_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "a leg of the same trip",
+            "title": "Leg Id"
+          },
+          "public_consent": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Consent"
+          },
+          "stop_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "a stop of the same trip",
+            "title": "Stop Id"
+          }
+        },
+        "title": "MediaPatchIn",
+        "type": "object"
+      },
+      "MultiLineString": {
+        "description": "MultiLineString Model",
+        "properties": {
+          "bbox": {
+            "anyOf": [
+              {
+                "maxItems": 4,
+                "minItems": 4,
+                "prefixItems": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "maxItems": 6,
+                "minItems": 6,
+                "prefixItems": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bbox"
+          },
+          "coordinates": {
+            "items": {
+              "items": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/Position2D"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Position3D"
+                  }
+                ]
+              },
+              "minItems": 2,
+              "type": "array"
+            },
+            "title": "Coordinates",
+            "type": "array"
+          },
+          "type": {
+            "const": "MultiLineString",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "coordinates"
+        ],
+        "title": "MultiLineString",
+        "type": "object"
+      },
+      "NewPlaceIn": {
+        "properties": {
+          "address": {
+            "default": "",
+            "maxLength": 300,
+            "title": "Address",
+            "type": "string"
+          },
+          "lat": {
+            "maximum": 90,
+            "minimum": -90,
+            "title": "Lat",
+            "type": "number"
+          },
+          "lon": {
+            "maximum": 180,
+            "minimum": -180,
+            "title": "Lon",
+            "type": "number"
+          },
+          "name": {
+            "default": "",
+            "maxLength": 200,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "lon",
+          "lat"
+        ],
+        "title": "NewPlaceIn",
+        "type": "object"
+      },
+      "NoteIn": {
+        "properties": {
+          "body": {
+            "maxLength": 20000,
+            "minLength": 1,
+            "title": "Body",
+            "type": "string"
+          },
+          "public_consent": {
+            "default": false,
+            "title": "Public Consent",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "body"
+        ],
+        "title": "NoteIn",
+        "type": "object"
+      },
+      "NoteOut": {
+        "properties": {
+          "author": {
+            "$ref": "#/components/schemas/UserRef"
+          },
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "can_delete": {
+            "description": "can_edit, or the trip owner once the author left",
+            "title": "Can Delete",
+            "type": "boolean"
+          },
+          "can_edit": {
+            "description": "the author, while they may still contribute",
+            "title": "Can Edit",
+            "type": "boolean"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "public_consent": {
+            "title": "Public Consent",
+            "type": "boolean"
+          },
+          "trip_id": {
+            "title": "Trip Id",
+            "type": "integer"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "trip_id",
+          "author",
+          "public_consent",
+          "created_at",
+          "can_edit",
+          "can_delete",
+          "body",
+          "updated_at"
+        ],
+        "title": "NoteOut",
+        "type": "object"
+      },
+      "NotePatchIn": {
+        "properties": {
+          "body": {
+            "anyOf": [
+              {
+                "maxLength": 20000,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Body"
+          },
+          "public_consent": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Consent"
+          }
+        },
+        "title": "NotePatchIn",
+        "type": "object"
+      },
       "ParticipantIn": {
         "properties": {
           "person_id": {
@@ -1513,6 +2054,44 @@
         "title": "PersonRef",
         "type": "object"
       },
+      "PlaceOut": {
+        "properties": {
+          "address": {
+            "title": "Address",
+            "type": "string"
+          },
+          "country_code": {
+            "title": "Country Code",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "lat": {
+            "title": "Lat",
+            "type": "number"
+          },
+          "lon": {
+            "title": "Lon",
+            "type": "number"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "address",
+          "lon",
+          "lat",
+          "country_code"
+        ],
+        "title": "PlaceOut",
+        "type": "object"
+      },
       "PointsTileIn": {
         "properties": {
           "from": {
@@ -1557,6 +2136,40 @@
         "title": "PointsTileIn",
         "type": "object"
       },
+      "Position2D": {
+        "maxItems": 2,
+        "minItems": 2,
+        "prefixItems": [
+          {
+            "title": "Longitude",
+            "type": "number"
+          },
+          {
+            "title": "Latitude",
+            "type": "number"
+          }
+        ],
+        "type": "array"
+      },
+      "Position3D": {
+        "maxItems": 3,
+        "minItems": 3,
+        "prefixItems": [
+          {
+            "title": "Longitude",
+            "type": "number"
+          },
+          {
+            "title": "Latitude",
+            "type": "number"
+          },
+          {
+            "title": "Altitude",
+            "type": "number"
+          }
+        ],
+        "type": "array"
+      },
       "PreferenceIn": {
         "properties": {
           "device_class": {
@@ -1585,6 +2198,39 @@
         "title": "PublicMode",
         "type": "string"
       },
+      "PurposeOut": {
+        "properties": {
+          "archived": {
+            "title": "Archived",
+            "type": "boolean"
+          },
+          "default_visibility": {
+            "title": "Default Visibility",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "sort": {
+            "title": "Sort",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "default_visibility",
+          "sort",
+          "archived"
+        ],
+        "title": "PurposeOut",
+        "type": "object"
+      },
       "PurposeRef": {
         "properties": {
           "id": {
@@ -1601,6 +2247,173 @@
           "name"
         ],
         "title": "PurposeRef",
+        "type": "object"
+      },
+      "RouteDetailOut": {
+        "properties": {
+          "created_by": {
+            "$ref": "#/components/schemas/UserRef"
+          },
+          "engine": {
+            "title": "Engine",
+            "type": "string"
+          },
+          "engine_data_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Engine Data Date"
+          },
+          "engine_version": {
+            "title": "Engine Version",
+            "type": "string"
+          },
+          "geometry": {
+            "$ref": "#/components/schemas/MultiLineString"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_current": {
+            "title": "Is Current",
+            "type": "boolean"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "leg_id": {
+            "title": "Leg Id",
+            "type": "integer"
+          },
+          "length_m": {
+            "title": "Length M",
+            "type": "number"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "produced_at": {
+            "format": "date-time",
+            "title": "Produced At",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          },
+          "waypoints": {
+            "description": "ordered control points {lon, lat, role}",
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Waypoints",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "leg_id",
+          "version",
+          "kind",
+          "engine",
+          "engine_version",
+          "engine_data_date",
+          "produced_at",
+          "created_by",
+          "length_m",
+          "note",
+          "is_current",
+          "waypoints",
+          "geometry"
+        ],
+        "title": "RouteDetailOut",
+        "type": "object"
+      },
+      "RouteOut": {
+        "description": "One frozen version of a leg's route (never recomputed or changed, rule 5).",
+        "properties": {
+          "created_by": {
+            "$ref": "#/components/schemas/UserRef"
+          },
+          "engine": {
+            "title": "Engine",
+            "type": "string"
+          },
+          "engine_data_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Engine Data Date"
+          },
+          "engine_version": {
+            "title": "Engine Version",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_current": {
+            "title": "Is Current",
+            "type": "boolean"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "leg_id": {
+            "title": "Leg Id",
+            "type": "integer"
+          },
+          "length_m": {
+            "title": "Length M",
+            "type": "number"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "produced_at": {
+            "format": "date-time",
+            "title": "Produced At",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "leg_id",
+          "version",
+          "kind",
+          "engine",
+          "engine_version",
+          "engine_data_date",
+          "produced_at",
+          "created_by",
+          "length_m",
+          "note",
+          "is_current"
+        ],
+        "title": "RouteOut",
         "type": "object"
       },
       "Setup": {
@@ -1689,6 +2502,349 @@
         "title": "Status",
         "type": "string"
       },
+      "StopIn": {
+        "properties": {
+          "arrive_utc": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Arrive Utc"
+          },
+          "depart_utc": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Depart Utc"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/StopKind"
+          },
+          "leg_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Leg Id"
+          },
+          "place": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NewPlaceIn"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "or a new place, owned by the caller"
+          },
+          "place_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "a place the caller owns, or already on the trip",
+            "title": "Place Id"
+          },
+          "tz": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "IANA zone name",
+            "title": "Tz"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "StopIn",
+        "type": "object"
+      },
+      "StopKind": {
+        "enum": [
+          "lodging",
+          "destination",
+          "visit",
+          "waypoint"
+        ],
+        "title": "StopKind",
+        "type": "string"
+      },
+      "StopOut": {
+        "properties": {
+          "arrive_utc": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Arrive Utc"
+          },
+          "author": {
+            "$ref": "#/components/schemas/UserRef"
+          },
+          "can_edit": {
+            "title": "Can Edit",
+            "type": "boolean"
+          },
+          "depart_utc": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Depart Utc"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "leg_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Leg Id"
+          },
+          "place": {
+            "$ref": "#/components/schemas/PlaceOut"
+          },
+          "trip_id": {
+            "title": "Trip Id",
+            "type": "integer"
+          },
+          "tz": {
+            "title": "Tz",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "trip_id",
+          "leg_id",
+          "kind",
+          "arrive_utc",
+          "depart_utc",
+          "tz",
+          "place",
+          "author",
+          "can_edit"
+        ],
+        "title": "StopOut",
+        "type": "object"
+      },
+      "StopPatchIn": {
+        "description": "Only the fields sent are changed.",
+        "properties": {
+          "arrive_utc": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Arrive Utc"
+          },
+          "depart_utc": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Depart Utc"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StopKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "leg_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Leg Id"
+          },
+          "place": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NewPlaceIn"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "or a new place, owned by the caller"
+          },
+          "place_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "a place the caller owns, or already on the trip",
+            "title": "Place Id"
+          },
+          "tz": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "IANA zone name",
+            "title": "Tz"
+          }
+        },
+        "title": "StopPatchIn",
+        "type": "object"
+      },
+      "TagIn": {
+        "properties": {
+          "color": {
+            "default": "",
+            "description": "#rrggbb or empty",
+            "maxLength": 7,
+            "title": "Color",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "TagIn",
+        "type": "object"
+      },
+      "TagOut": {
+        "description": "One of the caller's own tag definitions.",
+        "properties": {
+          "color": {
+            "title": "Color",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "trip_count": {
+            "description": "trips the caller has put this tag on and can see",
+            "title": "Trip Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "color",
+          "trip_count"
+        ],
+        "title": "TagOut",
+        "type": "object"
+      },
+      "TagPatchIn": {
+        "properties": {
+          "color": {
+            "anyOf": [
+              {
+                "maxLength": 7,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "title": "TagPatchIn",
+        "type": "object"
+      },
       "TimeRangeIn": {
         "properties": {
           "from": {
@@ -1719,6 +2875,142 @@
           }
         },
         "title": "TimeRangeIn",
+        "type": "object"
+      },
+      "TrackIn": {
+        "properties": {
+          "end_utc": {
+            "format": "date-time",
+            "title": "End Utc",
+            "type": "string"
+          },
+          "public_consent": {
+            "default": false,
+            "title": "Public Consent",
+            "type": "boolean"
+          },
+          "start_utc": {
+            "format": "date-time",
+            "title": "Start Utc",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start_utc",
+          "end_utc"
+        ],
+        "title": "TrackIn",
+        "type": "object"
+      },
+      "TrackOut": {
+        "properties": {
+          "author": {
+            "$ref": "#/components/schemas/UserRef"
+          },
+          "can_delete": {
+            "description": "can_edit, or the trip owner once the author left",
+            "title": "Can Delete",
+            "type": "boolean"
+          },
+          "can_edit": {
+            "description": "the author, while they may still contribute",
+            "title": "Can Edit",
+            "type": "boolean"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "end_utc": {
+            "format": "date-time",
+            "title": "End Utc",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "public_consent": {
+            "title": "Public Consent",
+            "type": "boolean"
+          },
+          "route_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "built later from the author's own points (T22)",
+            "title": "Route Id"
+          },
+          "start_utc": {
+            "format": "date-time",
+            "title": "Start Utc",
+            "type": "string"
+          },
+          "trip_id": {
+            "title": "Trip Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "trip_id",
+          "author",
+          "public_consent",
+          "created_at",
+          "can_edit",
+          "can_delete",
+          "start_utc",
+          "end_utc",
+          "route_id"
+        ],
+        "title": "TrackOut",
+        "type": "object"
+      },
+      "TrackPatchIn": {
+        "properties": {
+          "end_utc": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Utc"
+          },
+          "public_consent": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Consent"
+          },
+          "start_utc": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Utc"
+          }
+        },
+        "title": "TrackPatchIn",
         "type": "object"
       },
       "TrackerKind": {
@@ -1901,6 +3193,20 @@
             "title": "Status",
             "type": "string"
           },
+          "stops": {
+            "items": {
+              "$ref": "#/components/schemas/StopOut"
+            },
+            "title": "Stops",
+            "type": "array"
+          },
+          "tags": {
+            "items": {
+              "$ref": "#/components/schemas/TripTagOut"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
           "title": {
             "title": "Title",
             "type": "string"
@@ -1930,6 +3236,7 @@
           "owner",
           "is_owner",
           "cover_media_id",
+          "tags",
           "created_at",
           "updated_at",
           "notes",
@@ -1938,7 +3245,8 @@
           "sharing",
           "access",
           "participants",
-          "legs"
+          "legs",
+          "stops"
         ],
         "title": "TripDetailOut",
         "type": "object"
@@ -2084,7 +3392,21 @@
         "type": "object"
       },
       "TripListIn": {
+        "description": "Each list filter (repeat the parameter) matches any of its values; different filters\nmust all match.",
         "properties": {
+          "bbox": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "minLon,minLat,maxLon,maxLat (WGS84; minLon > maxLon crosses the antimeridian): a current route, airport or stop inside",
+            "title": "Bbox"
+          },
           "from": {
             "anyOf": [
               {
@@ -2105,6 +3427,21 @@
             "title": "Limit",
             "type": "integer"
           },
+          "mode": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/TravelMode"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "trips with a leg of this mode",
+            "title": "Mode"
+          },
           "offset": {
             "default": 0,
             "minimum": 0,
@@ -2122,6 +3459,21 @@
             ],
             "description": "trips this person is on",
             "title": "Person"
+          },
+          "purpose": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "purpose ids",
+            "title": "Purpose"
           },
           "q": {
             "anyOf": [
@@ -2146,6 +3498,21 @@
               }
             ]
           },
+          "tag": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "tag ids (anyone's tag on the trip)",
+            "title": "Tag"
+          },
           "to": {
             "anyOf": [
               {
@@ -2158,6 +3525,21 @@
             ],
             "description": "trips starting on or before",
             "title": "To"
+          },
+          "vehicle": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "trips with a leg in this vehicle",
+            "title": "Vehicle"
           },
           "visibility": {
             "anyOf": [
@@ -2242,6 +3624,13 @@
             "title": "Status",
             "type": "string"
           },
+          "tags": {
+            "items": {
+              "$ref": "#/components/schemas/TripTagOut"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
           "title": {
             "title": "Title",
             "type": "string"
@@ -2271,6 +3660,7 @@
           "owner",
           "is_owner",
           "cover_media_id",
+          "tags",
           "created_at",
           "updated_at"
         ],
@@ -2490,6 +3880,109 @@
           "privacy_zone_radius_m"
         ],
         "title": "TripSharingOut",
+        "type": "object"
+      },
+      "TripTagDetailOut": {
+        "properties": {
+          "author": {
+            "$ref": "#/components/schemas/UserRef"
+          },
+          "by_owner": {
+            "title": "By Owner",
+            "type": "boolean"
+          },
+          "can_remove": {
+            "title": "Can Remove",
+            "type": "boolean"
+          },
+          "color": {
+            "title": "Color",
+            "type": "string"
+          },
+          "id": {
+            "description": "the tag's id",
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "color",
+          "author",
+          "by_owner",
+          "can_remove"
+        ],
+        "title": "TripTagDetailOut",
+        "type": "object"
+      },
+      "TripTagIn": {
+        "description": "One of the caller's own tags: by id, or by name (created if they have none by that name).",
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "tag_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tag Id"
+          }
+        },
+        "title": "TripTagIn",
+        "type": "object"
+      },
+      "TripTagOut": {
+        "description": "A tag on a trip. Tags are per user: the owner's are the trip's main tags (`by_owner`),\nparticipants' own tags are shown with their author.",
+        "properties": {
+          "author": {
+            "$ref": "#/components/schemas/UserRef"
+          },
+          "by_owner": {
+            "title": "By Owner",
+            "type": "boolean"
+          },
+          "color": {
+            "title": "Color",
+            "type": "string"
+          },
+          "id": {
+            "description": "the tag's id",
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "color",
+          "author",
+          "by_owner"
+        ],
+        "title": "TripTagOut",
         "type": "object"
       },
       "UploadIn": {
@@ -3296,6 +4789,51 @@
         ]
       }
     },
+    "/api/v1/legs/{leg_id}/routes": {
+      "get": {
+        "description": "Every saved version of the leg's route, newest first, without geometry.",
+        "operationId": "listLegRoutes",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "leg_id",
+            "required": true,
+            "schema": {
+              "title": "Leg Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RouteOut"
+                  },
+                  "title": "Response",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "List Leg Routes",
+        "tags": [
+          "trips"
+        ]
+      }
+    },
     "/api/v1/me": {
       "get": {
         "operationId": "getMe",
@@ -3354,6 +4892,169 @@
         "summary": "Acknowledge Privacy Notice",
         "tags": [
           "me"
+        ]
+      }
+    },
+    "/api/v1/media/{media_id}": {
+      "delete": {
+        "description": "Removes the photo from the trip. Its image files are cleaned up by the photo store's\norphan sweep (T31).",
+        "operationId": "deleteMedia",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "media_id",
+            "required": true,
+            "schema": {
+              "title": "Media Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Delete Media",
+        "tags": [
+          "trips"
+        ]
+      },
+      "patch": {
+        "operationId": "updateMedia",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "media_id",
+            "required": true,
+            "schema": {
+              "title": "Media Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MediaPatchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaOut"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Update Media",
+        "tags": [
+          "trips"
+        ]
+      }
+    },
+    "/api/v1/notes/{note_id}": {
+      "delete": {
+        "operationId": "deleteNote",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "note_id",
+            "required": true,
+            "schema": {
+              "title": "Note Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Delete Note",
+        "tags": [
+          "trips"
+        ]
+      },
+      "patch": {
+        "operationId": "updateNote",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "note_id",
+            "required": true,
+            "schema": {
+              "title": "Note Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotePatchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteOut"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Update Note",
+        "tags": [
+          "trips"
         ]
       }
     },
@@ -3462,6 +5163,41 @@
         ]
       }
     },
+    "/api/v1/purposes": {
+      "get": {
+        "description": "The caller's own purposes (a trip takes only its owner's).",
+        "operationId": "listPurposes",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PurposeOut"
+                  },
+                  "title": "Response",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "List Purposes",
+        "tags": [
+          "trips"
+        ]
+      }
+    },
     "/api/v1/reference/datasets": {
       "get": {
         "description": "Loaded reference datasets with their licenses: the attribution page.",
@@ -3494,6 +5230,283 @@
         "summary": "List Datasets",
         "tags": [
           "flights"
+        ]
+      }
+    },
+    "/api/v1/routes/{route_id}": {
+      "get": {
+        "description": "One saved version with its geometry (GeoJSON, WGS84) and control points.",
+        "operationId": "getRoute",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "route_id",
+            "required": true,
+            "schema": {
+              "title": "Route Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RouteDetailOut"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Get Route",
+        "tags": [
+          "trips"
+        ]
+      }
+    },
+    "/api/v1/stops/{stop_id}": {
+      "delete": {
+        "operationId": "deleteStop",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "stop_id",
+            "required": true,
+            "schema": {
+              "title": "Stop Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Delete Stop",
+        "tags": [
+          "trips"
+        ]
+      },
+      "patch": {
+        "operationId": "updateStop",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "stop_id",
+            "required": true,
+            "schema": {
+              "title": "Stop Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StopPatchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StopOut"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Update Stop",
+        "tags": [
+          "trips"
+        ]
+      }
+    },
+    "/api/v1/tags": {
+      "get": {
+        "description": "The caller's own tag definitions (other people's tags show only on trips).",
+        "operationId": "listTags",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TagOut"
+                  },
+                  "title": "Response",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "List Tags",
+        "tags": [
+          "trips"
+        ]
+      },
+      "post": {
+        "operationId": "createTag",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TagIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TagOut"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Create Tag",
+        "tags": [
+          "trips"
+        ]
+      }
+    },
+    "/api/v1/tags/{tag_id}": {
+      "delete": {
+        "description": "Deletes the definition and takes it off every trip it is on.",
+        "operationId": "deleteTag",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tag_id",
+            "required": true,
+            "schema": {
+              "title": "Tag Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Delete Tag",
+        "tags": [
+          "trips"
+        ]
+      },
+      "patch": {
+        "operationId": "updateTag",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tag_id",
+            "required": true,
+            "schema": {
+              "title": "Tag Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TagPatchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TagOut"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Update Tag",
+        "tags": [
+          "trips"
         ]
       }
     },
@@ -3609,6 +5622,87 @@
         ]
       }
     },
+    "/api/v1/tracks/{track_id}": {
+      "delete": {
+        "operationId": "deleteTrack",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "track_id",
+            "required": true,
+            "schema": {
+              "title": "Track Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Delete Track",
+        "tags": [
+          "trips"
+        ]
+      },
+      "patch": {
+        "operationId": "updateTrack",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "track_id",
+            "required": true,
+            "schema": {
+              "title": "Track Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TrackPatchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrackOut"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Update Track",
+        "tags": [
+          "trips"
+        ]
+      }
+    },
     "/api/v1/trips": {
       "get": {
         "description": "Trips the caller can see (PLAN.md \u00a76.2), newest first.",
@@ -3720,6 +5814,109 @@
             }
           },
           {
+            "description": "purpose ids",
+            "in": "query",
+            "name": "purpose",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "integer"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "purpose ids",
+              "title": "Purpose"
+            }
+          },
+          {
+            "description": "tag ids (anyone's tag on the trip)",
+            "in": "query",
+            "name": "tag",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "integer"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "tag ids (anyone's tag on the trip)",
+              "title": "Tag"
+            }
+          },
+          {
+            "description": "trips with a leg in this vehicle",
+            "in": "query",
+            "name": "vehicle",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "integer"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "trips with a leg in this vehicle",
+              "title": "Vehicle"
+            }
+          },
+          {
+            "description": "trips with a leg of this mode",
+            "in": "query",
+            "name": "mode",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/components/schemas/TravelMode"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "trips with a leg of this mode",
+              "title": "Mode"
+            }
+          },
+          {
+            "description": "minLon,minLat,maxLon,maxLat (WGS84; minLon > maxLon crosses the antimeridian): a current route, airport or stop inside",
+            "in": "query",
+            "name": "bbox",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "minLon,minLat,maxLon,maxLat (WGS84; minLon > maxLon crosses the antimeridian): a current route, airport or stop inside",
+              "title": "Bbox"
+            }
+          },
+          {
             "in": "query",
             "name": "limit",
             "required": false,
@@ -3803,6 +6000,57 @@
           }
         ],
         "summary": "Create Trip",
+        "tags": [
+          "trips"
+        ]
+      }
+    },
+    "/api/v1/trips/bulk": {
+      "post": {
+        "description": "Purpose, visibility, participants and the caller's own tags for many trips. All or\nnothing: if any trip may not take the change, 403 lists every refused trip and nothing is\nwritten. A trip the caller can't see answers 404, as for one trip.",
+        "operationId": "bulkEditTrips",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkTripsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TripPageOut"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkRefusedOut"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Bulk Edit Trips",
         "tags": [
           "trips"
         ]
@@ -4022,6 +6270,199 @@
         ]
       }
     },
+    "/api/v1/trips/{trip_id}/legs/order": {
+      "post": {
+        "description": "Put every leg of the trip, contributed ones included, in the given order (core editors).",
+        "operationId": "reorderLegs",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trip_id",
+            "required": true,
+            "schema": {
+              "title": "Trip Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LegOrderIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LegOut"
+                  },
+                  "title": "Response",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Reorder Legs",
+        "tags": [
+          "trips"
+        ]
+      }
+    },
+    "/api/v1/trips/{trip_id}/media": {
+      "get": {
+        "description": "Photo metadata for the trip (uploads and image files come with T31).",
+        "operationId": "listTripMedia",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trip_id",
+            "required": true,
+            "schema": {
+              "title": "Trip Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MediaOut"
+                  },
+                  "title": "Response",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "List Trip Media",
+        "tags": [
+          "trips"
+        ]
+      }
+    },
+    "/api/v1/trips/{trip_id}/notes": {
+      "get": {
+        "operationId": "listNotes",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trip_id",
+            "required": true,
+            "schema": {
+              "title": "Trip Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/NoteOut"
+                  },
+                  "title": "Response",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "List Notes",
+        "tags": [
+          "trips"
+        ]
+      },
+      "post": {
+        "description": "The owner and participants (Members) add notes; Viewers are read-only (Q-6).",
+        "operationId": "addNote",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trip_id",
+            "required": true,
+            "schema": {
+              "title": "Trip Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoteIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteOut"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Add Note",
+        "tags": [
+          "trips"
+        ]
+      }
+    },
     "/api/v1/trips/{trip_id}/participants": {
       "get": {
         "description": "Everyone on the trip: trip-level participants first, then people only on some legs.",
@@ -4214,6 +6655,332 @@
           }
         ],
         "summary": "Set Participant Consent",
+        "tags": [
+          "trips"
+        ]
+      }
+    },
+    "/api/v1/trips/{trip_id}/stops": {
+      "get": {
+        "operationId": "listStops",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trip_id",
+            "required": true,
+            "schema": {
+              "title": "Trip Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/StopOut"
+                  },
+                  "title": "Response",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "List Stops",
+        "tags": [
+          "trips"
+        ]
+      },
+      "post": {
+        "description": "Lodging, destinations and visits, at a place the caller owns or one already on the trip,\nor a new place (owned by the caller). Core editors only.",
+        "operationId": "createStop",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trip_id",
+            "required": true,
+            "schema": {
+              "title": "Trip Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StopIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StopOut"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Create Stop",
+        "tags": [
+          "trips"
+        ]
+      }
+    },
+    "/api/v1/trips/{trip_id}/tags": {
+      "get": {
+        "operationId": "listTripTags",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trip_id",
+            "required": true,
+            "schema": {
+              "title": "Trip Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TripTagDetailOut"
+                  },
+                  "title": "Response",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "List Trip Tags",
+        "tags": [
+          "trips"
+        ]
+      },
+      "post": {
+        "description": "The owner and participants (Members) put their own tags on a trip; returns its tags.",
+        "operationId": "addTripTag",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trip_id",
+            "required": true,
+            "schema": {
+              "title": "Trip Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TripTagIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TripTagDetailOut"
+                  },
+                  "title": "Response",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Add Trip Tag",
+        "tags": [
+          "trips"
+        ]
+      }
+    },
+    "/api/v1/trips/{trip_id}/tags/{tag_id}": {
+      "delete": {
+        "description": "Its author while they may still contribute; the trip owner once the author left (Q-16).",
+        "operationId": "removeTripTag",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trip_id",
+            "required": true,
+            "schema": {
+              "title": "Trip Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tag_id",
+            "required": true,
+            "schema": {
+              "title": "Tag Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Remove Trip Tag",
+        "tags": [
+          "trips"
+        ]
+      }
+    },
+    "/api/v1/trips/{trip_id}/tracks": {
+      "get": {
+        "operationId": "listTracks",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trip_id",
+            "required": true,
+            "schema": {
+              "title": "Trip Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TrackOut"
+                  },
+                  "title": "Response",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "List Tracks",
+        "tags": [
+          "trips"
+        ]
+      },
+      "post": {
+        "description": "Attach a time range of the caller's own location history to the trip (the owner and\nparticipants). Others see the route built from it, never the raw points.",
+        "operationId": "addTrack",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trip_id",
+            "required": true,
+            "schema": {
+              "title": "Trip Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TrackIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrackOut"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Add Track",
         "tags": [
           "trips"
         ]
