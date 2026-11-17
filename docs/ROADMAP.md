@@ -69,9 +69,9 @@ Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhi
    - Walk me through setting up my phone with the setup guide and QR code. ← the bake-off starts
    - Status: blocked on Adam's "go" (prepared and verified 2026-11-17; checklist in docs/tracking/exposure.md)
 9. **[H] T8:** nightly jobs that cover all users under RLS.
-   - Status: in progress (dispatched 2026-11-18)
+   - Status: done (2026-11-18)
 10. **[M] T12 + T13:** flight datasets, the import template, and the conversion. Use my spreadsheet if it's present; otherwise synthetic data.
-    - Status: todo
+    - Status: in progress (dispatched 2026-11-18; synthetic data, no spreadsheet yet)
 11. **[M] T14 + T15:** flights on the map, grouping into trips, and dedupe against Timeline. ← my flights become viewable
     - Status: todo
 12. **[M] T10:** coverage report, without the trip comparison.
@@ -244,3 +244,4 @@ Nature: mech = mechanical, mod = moderate, hard. Size is S/M/L/XL with approxima
 - 2026-11-17: item 8 prepared and verified (pushed, tree clean, `./dev test-quick` 1260 + 31 passed; the ingest service on 127.0.0.1:8783 returns 404 off the ingest paths and sends HSTS and security headers). Waiting for Adam's "go". Item 3 dispatched meanwhile.
 - 2026-11-17: item 3 done and verified (`./dev test-quick` 1260 + 31 passed). The builder lost Bash access at its last step, so the orchestrator committed its docs. Finding #4 is closed. The tiles confirm item 5a is needed: whole-history point tiles take 1–2 s at 3.6 M points. Point storage is about 347 B per point, so 20 M points would be about 7 GB against a 5 GB budget; the budget note is in resource-budget.md §21.1. Item 5a dispatched.
 - 2026-11-18: item 5a done and verified (`./dev test-quick` 1375 + 31 passed, now about 3.3 min). Whole-history tiles take 50–274 ms; the cost is +37 % import time and +36 % point storage (about 9.3 GB at 20 M points). D-86 is waiting for Adam. Item 8 still waits for "go", so item 9 was dispatched.
+- 2026-11-18: item 9 done and verified (`./dev test-quick` 1394 + 31 passed). D-87 (the per-user job runner) is waiting for Adam. Item 10 dispatched with synthetic flights.
