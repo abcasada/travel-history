@@ -113,6 +113,33 @@ case "$cmd" in
     "${scratch[@]}" python3 /backup/verify_raw.py /rt/outbox /rt/test.key
     echo "restore test passed"
     ;;
+  tracker)
+    # The internet-facing tracker endpoint: the `ingest` service (compose profile "tracker",
+    # production image, 127.0.0.1:8783; docs/tracking/exposure.md). `./dev up` and `./dev down`
+    # leave it alone, so only a deliberate deploy puts new code behind the tunnel.
+    tc() { compose --profile tracker "$@"; }
+    sub="${1:-help}"; shift || true
+    case "$sub" in
+      deploy)
+        tc build ingest
+        tc up -d ingest
+        printf 'waiting for the ingest service to be healthy'
+        for _ in $(seq 1 45); do
+          state="$(docker inspect -f '{{.State.Health.Status}}' "$(tc ps -q ingest)" 2>/dev/null || true)"
+          [ "$state" = healthy ] && break
+          printf '.'; sleep 2
+        done
+        echo " ${state:-not running}"
+        [ "$state" = healthy ] || { tc logs --tail=30 ingest; exit 1; }
+        TRACKER_SMOKE_TOKEN="${TRACKER_SMOKE_TOKEN:-}" scripts/tracker-smoke.sh </dev/null
+        ;;
+      stop)  tc stop ingest && tc rm -f ingest ;;
+      logs)  tc logs -f --tail=100 ingest ;;
+      ps)    tc ps ingest ;;
+      smoke) scripts/tracker-smoke.sh "$@" ;;
+      *)     echo "./dev tracker deploy | stop | logs | ps | smoke [https://<public host>] [--store]" ;;
+    esac
+    ;;
   npm)      node_run npm "$@" ;;
   e2e)
     # Headless Chrome (host network: containers can't reach the host's LAN address otherwise).
@@ -147,6 +174,9 @@ case "$cmd" in
 ./dev backup-now          run one encrypted backup into the outbox (needs AGE_RECIPIENT in .env)
 ./dev restore-test        backup -> restore into a scratch DB -> verify (throwaway key)
 ./dev e2e [base-url]      browser smoke test (sign-in, notice, map, both shells; screenshots in e2e/out/)
+./dev tracker deploy      build + (re)start the internet-facing tracker endpoint (127.0.0.1:8783), then smoke-test it
+./dev tracker stop|logs|ps   stop it / follow its log / show it (./dev up and ./dev down leave it alone)
+./dev tracker smoke [url] [--store]  smoke test (default the local service; https://<public host> through the tunnel)
 HELP
     ;;
 esac

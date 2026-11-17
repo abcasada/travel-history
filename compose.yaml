@@ -25,6 +25,10 @@ x-backend-env: &backend-env
   DJANGO_SECURE_COOKIES: ${DJANGO_SECURE_COOKIES:-true}
   DJANGO_BEHIND_TLS_PROXY: ${DJANGO_BEHIND_TLS_PROXY:-false}
   RATELIMIT_CLIENT_IP_HEADER: ${RATELIMIT_CLIENT_IP_HEADER:-}
+  # Internet exposure (D-73, D-85; docs/tracking/exposure.md): the public host name is guarded
+  # in every backend service; "tracker" lets it reach only the ingest endpoints until go-live.
+  TRAVEL_PUBLIC_HOSTS: ${TRAVEL_PUBLIC_HOSTS:-}
+  TRAVEL_PUBLIC_SCOPE: ${TRAVEL_PUBLIC_SCOPE:-tracker}
   TRACKER_BASE_URL: ${TRACKER_BASE_URL:-}
   TRACKER_RATE_PER_TOKEN: ${TRACKER_RATE_PER_TOKEN:-120}
   TRACKER_RATE_PER_IP: ${TRACKER_RATE_PER_IP:-600}
@@ -111,6 +115,50 @@ services:
     pids_limit: 200
     restart: unless-stopped
 
+  # The internet-facing tracker endpoint before go-live (D-73, D-85; docs/tracking/exposure.md):
+  # the production image and settings, answering only the two ingest paths whatever the Host
+  # header says. The Cloudflare Tunnel's route points at 127.0.0.1:8783. Its own profile, so
+  # `./dev up` never rebuilds it from work in progress: `./dev tracker deploy` does, on purpose.
+  # It runs side by side with either stack (dev or production) and shares their database.
+  ingest:
+    <<: *backend
+    profiles: ["tracker"]
+    environment:
+      <<: *backend-env
+      DJANGO_DEBUG: "false"
+      DJANGO_ALLOWED_HOSTS: "127.0.0.1,localhost"  # plus TRAVEL_PUBLIC_HOSTS (settings.py)
+      DJANGO_CSRF_TRUSTED_ORIGINS: ""
+      DJANGO_SECURE_COOKIES: "true"
+      DJANGO_BEHIND_TLS_PROXY: "true"
+      DJANGO_SSL_REDIRECT: "true"
+      DJANGO_HSTS_SECONDS: "31536000"
+      TRAVEL_PUBLIC_SCOPE: tracker
+      TRAVEL_INGEST_ONLY: "true"  # settings.py refuses to start without the values above
+      # Trusted because every request from outside this server arrives through the tunnel: the
+      # port is bound to 127.0.0.1 only, and only this app's containers share its networks.
+      RATELIMIT_CLIENT_IP_HEADER: CF-Connecting-IP
+      # Secrets this service never uses.
+      OIDC_CLIENT_SECRET: ""
+      SMTP_PASSWORD: ""
+    volumes: []  # no bulk storage
+    networks: [internal, edge]
+    ports:
+      - "127.0.0.1:8783:8000"
+    read_only: true
+    tmpfs: ["/tmp"]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=4)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+      start_interval: 2s
+    mem_limit: 512m
+    pids_limit: 100
+    restart: unless-stopped
+
   worker:
     <<: *backend
     command: ["python", "manage.py", "procrastinate", "worker"]
@@ -149,6 +197,8 @@ networks:
   internal:
     internal: true
   egress: {}
+  # The internet-facing `ingest` service's own network (needed to publish its port).
+  edge: {}
   # Shared with the separate `valhalla` compose project (PLAN.md §13.5); created by ./dev setup.
   valhalla:
     external: true
