@@ -41,6 +41,13 @@ export function ShellMenu() {
         >
           Location trackers
         </Link>
+        <Link
+          to="/about"
+          className="mb-1 block rounded px-2 py-1 hover:bg-slate-100"
+          onClick={(e) => e.currentTarget.closest("details")?.removeAttribute("open")}
+        >
+          About and data sources
+        </Link>
         <form method="post" action="/auth/logout">
           <input type="hidden" name="csrfmiddlewaretoken" value={csrfToken() ?? ""} />
           <button type="submit" className="w-full rounded px-2 py-1 text-left hover:bg-slate-100">

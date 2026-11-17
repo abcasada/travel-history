@@ -78,7 +78,7 @@ def test_parse_time_rejects():
         ("den", "DEN"),
         ("Denver (DEN)", "DEN"),
         ("DEN - Denver", "DEN"),
-        ("DEN – Denver", "DEN"),
+        ("DEN " + chr(0x2013) + " Denver", "DEN"),
         ("KDEN", "KDEN"),
         ("Chicago", "Chicago"),
     ],

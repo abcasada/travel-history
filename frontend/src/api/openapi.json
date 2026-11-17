@@ -117,6 +117,78 @@
         "title": "CoverageOut",
         "type": "object"
       },
+      "DatasetOut": {
+        "properties": {
+          "attribution": {
+            "title": "Attribution",
+            "type": "string"
+          },
+          "homepage_url": {
+            "title": "Homepage Url",
+            "type": "string"
+          },
+          "license": {
+            "title": "License",
+            "type": "string"
+          },
+          "license_url": {
+            "title": "License Url",
+            "type": "string"
+          },
+          "loaded_at": {
+            "format": "date-time",
+            "title": "Loaded At",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "row_count": {
+            "title": "Row Count",
+            "type": "integer"
+          },
+          "source_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Date"
+          },
+          "source_url": {
+            "title": "Source Url",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "title",
+          "version",
+          "source_date",
+          "source_url",
+          "homepage_url",
+          "license",
+          "license_url",
+          "attribution",
+          "row_count",
+          "loaded_at"
+        ],
+        "title": "DatasetOut",
+        "type": "object"
+      },
       "DatePrecision": {
         "enum": [
           "exact",
@@ -241,6 +313,266 @@
         "title": "DeviceTokenOut",
         "type": "object"
       },
+      "FlightRecordOut": {
+        "properties": {
+          "aircraft_text": {
+            "title": "Aircraft Text",
+            "type": "string"
+          },
+          "aircraft_type_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Aircraft Type Id"
+          },
+          "airline_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Airline Id"
+          },
+          "airline_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Airline Name"
+          },
+          "airline_text": {
+            "title": "Airline Text",
+            "type": "string"
+          },
+          "arr_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Arr Date"
+          },
+          "arr_time": {
+            "anyOf": [
+              {
+                "format": "time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Arr Time"
+          },
+          "cabin_class": {
+            "title": "Cabin Class",
+            "type": "string"
+          },
+          "date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date"
+          },
+          "date_precision": {
+            "title": "Date Precision",
+            "type": "string"
+          },
+          "dep_time": {
+            "anyOf": [
+              {
+                "format": "time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dep Time"
+          },
+          "destination_airport_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination Airport Id"
+          },
+          "destination_iata": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination Iata"
+          },
+          "flight_number": {
+            "title": "Flight Number",
+            "type": "string"
+          },
+          "from_code": {
+            "title": "From Code",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "import_batch_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Import Batch Id"
+          },
+          "notes": {
+            "title": "Notes",
+            "type": "string"
+          },
+          "origin_airport_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origin Airport Id"
+          },
+          "origin_iata": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origin Iata"
+          },
+          "participants": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Participants",
+            "type": "array"
+          },
+          "problems": {
+            "items": {
+              "$ref": "#/components/schemas/IssueOut"
+            },
+            "title": "Problems",
+            "type": "array"
+          },
+          "purpose": {
+            "title": "Purpose",
+            "type": "string"
+          },
+          "registration": {
+            "title": "Registration",
+            "type": "string"
+          },
+          "row_number": {
+            "title": "Row Number",
+            "type": "integer"
+          },
+          "seat": {
+            "title": "Seat",
+            "type": "string"
+          },
+          "seat_type": {
+            "title": "Seat Type",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "to_code": {
+            "title": "To Code",
+            "type": "string"
+          },
+          "trip_key": {
+            "title": "Trip Key",
+            "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/IssueOut"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "import_batch_id",
+          "row_number",
+          "status",
+          "problems",
+          "warnings",
+          "trip_key",
+          "date",
+          "date_precision",
+          "dep_time",
+          "arr_time",
+          "arr_date",
+          "from_code",
+          "to_code",
+          "origin_airport_id",
+          "destination_airport_id",
+          "origin_iata",
+          "destination_iata",
+          "airline_text",
+          "airline_id",
+          "airline_name",
+          "flight_number",
+          "aircraft_text",
+          "aircraft_type_id",
+          "registration",
+          "seat",
+          "cabin_class",
+          "seat_type",
+          "purpose",
+          "notes",
+          "participants"
+        ],
+        "title": "FlightRecordOut",
+        "type": "object"
+      },
       "ImportBatchOut": {
         "properties": {
           "created_at": {
@@ -316,6 +648,29 @@
           "finished_at"
         ],
         "title": "ImportBatchOut",
+        "type": "object"
+      },
+      "IssueOut": {
+        "properties": {
+          "detail": {
+            "default": "",
+            "title": "Detail",
+            "type": "string"
+          },
+          "field": {
+            "title": "Field",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "field",
+          "reason"
+        ],
+        "title": "IssueOut",
         "type": "object"
       },
       "Kind": {
@@ -1328,8 +1683,8 @@
       },
       "Status": {
         "enum": [
-          "candidate",
-          "confirmed"
+          "resolved",
+          "unmatched"
         ],
         "title": "Status",
         "type": "string"
@@ -2292,6 +2647,72 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/flights/records": {
+      "get": {
+        "operationId": "listFlightRecords",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Status"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "import_batch",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Import Batch"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FlightRecordOut"
+                  },
+                  "title": "Response",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "List Flight Records",
+        "tags": [
+          "flights"
+        ]
+      }
+    },
     "/api/v1/history/coverage": {
       "get": {
         "description": "Which local days (in IANA zone `tz`) have points or Timeline segments, for the coverage\nstrip; at most 400 days per request. Days without data are omitted.",
@@ -3038,6 +3459,41 @@
         "summary": "Set Preference",
         "tags": [
           "me"
+        ]
+      }
+    },
+    "/api/v1/reference/datasets": {
+      "get": {
+        "description": "Loaded reference datasets with their licenses: the attribution page.",
+        "operationId": "listDatasets",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DatasetOut"
+                  },
+                  "title": "Response",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "List Datasets",
+        "tags": [
+          "flights"
         ]
       }
     },

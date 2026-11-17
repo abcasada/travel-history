@@ -1,4 +1,5 @@
 import { Route, Routes } from "react-router";
+import { AboutPage } from "./About";
 import { HistoryPage } from "./History";
 import { Placeholder } from "./Placeholder";
 import { TrackersPage } from "./Trackers";
@@ -14,6 +15,7 @@ export function ListRoutes() {
       <Route path="vehicles" element={<Placeholder title="Vehicles" phase="phase 4" />} />
       <Route path="history" element={<HistoryPage />} />
       <Route path="trackers" element={<TrackersPage />} />
+      <Route path="about" element={<AboutPage />} />
       <Route path="*" element={<Placeholder title="Not found" phase="—" />} />
     </Routes>
   );

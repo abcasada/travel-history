@@ -58,6 +58,20 @@ export interface CoverageOut {
   last_day: string | null;
 }
 
+export interface DatasetOut {
+  attribution: string;
+  homepage_url: string;
+  license: string;
+  license_url: string;
+  loaded_at: string;
+  name: string;
+  row_count: number;
+  source_date: string | null;
+  source_url: string;
+  title: string;
+  version: string;
+}
+
 export type DatePrecision = typeof DatePrecision[keyof typeof DatePrecision];
 
 
@@ -129,6 +143,46 @@ export interface DeviceTokenIn {
      * @maxLength 100
      */
   name: string;
+}
+
+export interface IssueOut {
+  detail?: string;
+  field: string;
+  reason: string;
+}
+
+export interface FlightRecordOut {
+  aircraft_text: string;
+  aircraft_type_id: number | null;
+  airline_id: number | null;
+  airline_name: string | null;
+  airline_text: string;
+  arr_date: string | null;
+  arr_time: string | null;
+  cabin_class: string;
+  date: string | null;
+  date_precision: string;
+  dep_time: string | null;
+  destination_airport_id: number | null;
+  destination_iata: string | null;
+  flight_number: string;
+  from_code: string;
+  id: number;
+  import_batch_id: number | null;
+  notes: string;
+  origin_airport_id: number | null;
+  origin_iata: string | null;
+  participants: string[];
+  problems: IssueOut[];
+  purpose: string;
+  registration: string;
+  row_number: number;
+  seat: string;
+  seat_type: string;
+  status: string;
+  to_code: string;
+  trip_key: string;
+  warnings: IssueOut[];
 }
 
 export type ImportBatchOutSummary = { [key: string]: unknown };
@@ -346,8 +400,8 @@ export type Status = typeof Status[keyof typeof Status];
 
 
 export const Status = {
-  candidate: 'candidate',
-  confirmed: 'confirmed',
+  resolved: 'resolved',
+  unmatched: 'unmatched',
 } as const;
 
 export interface TimeRangeIn {
@@ -527,6 +581,11 @@ export interface UploadOut {
   total_size: number;
 }
 
+export type ListFlightRecordsParams = {
+status?: Status | null;
+import_batch?: number | null;
+};
+
 export type GetHistoryCoverageParams = {
 from: string;
 to: string;
@@ -618,6 +677,114 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getListFlightRecordsUrl = (params?: ListFlightRecordsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/flights/records?${stringifiedParams}` : `/api/v1/flights/records`
+}
+
+/**
+ * @summary List Flight Records
+ */
+export const listFlightRecords = async (params?: ListFlightRecordsParams, options?: Parameters<typeof apiFetch>[1]): Promise<FlightRecordOut[]> => {
+
+  return apiFetch<FlightRecordOut[]>(getListFlightRecordsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListFlightRecordsQueryKey = (params?: ListFlightRecordsParams,) => {
+    return [
+    `/api/v1/flights/records`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListFlightRecordsQueryOptions = <TData = Awaited<ReturnType<typeof listFlightRecords>>, TError = unknown>(params?: ListFlightRecordsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFlightRecords>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListFlightRecordsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listFlightRecords>>> = ({ signal }) => listFlightRecords(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listFlightRecords>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListFlightRecordsQueryResult = NonNullable<Awaited<ReturnType<typeof listFlightRecords>>>
+export type ListFlightRecordsQueryError = unknown
+
+
+export function useListFlightRecords<TData = Awaited<ReturnType<typeof listFlightRecords>>, TError = unknown>(
+ params: undefined |  ListFlightRecordsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFlightRecords>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listFlightRecords>>,
+          TError,
+          Awaited<ReturnType<typeof listFlightRecords>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListFlightRecords<TData = Awaited<ReturnType<typeof listFlightRecords>>, TError = unknown>(
+ params?: ListFlightRecordsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFlightRecords>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listFlightRecords>>,
+          TError,
+          Awaited<ReturnType<typeof listFlightRecords>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListFlightRecords<TData = Awaited<ReturnType<typeof listFlightRecords>>, TError = unknown>(
+ params?: ListFlightRecordsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFlightRecords>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List Flight Records
+ */
+
+export function useListFlightRecords<TData = Awaited<ReturnType<typeof listFlightRecords>>, TError = unknown>(
+ params?: ListFlightRecordsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listFlightRecords>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListFlightRecordsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getGetHistoryCoverageUrl = (params: GetHistoryCoverageParams,) => {
   const normalizedParams = new URLSearchParams();
@@ -2022,6 +2189,108 @@ export const useSetPreference = <TError = unknown,
       > => {
       return useMutation(getSetPreferenceMutationOptions(options), queryClient);
     }
+
+export const getListDatasetsUrl = () => {
+
+
+
+
+  return `/api/v1/reference/datasets`
+}
+
+/**
+ * Loaded reference datasets with their licenses: the attribution page.
+ * @summary List Datasets
+ */
+export const listDatasets = async ( options?: Parameters<typeof apiFetch>[1]): Promise<DatasetOut[]> => {
+
+  return apiFetch<DatasetOut[]>(getListDatasetsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListDatasetsQueryKey = () => {
+    return [
+    `/api/v1/reference/datasets`
+    ] as const;
+    }
+
+
+export const getListDatasetsQueryOptions = <TData = Awaited<ReturnType<typeof listDatasets>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listDatasets>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListDatasetsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listDatasets>>> = ({ signal }) => listDatasets({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listDatasets>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListDatasetsQueryResult = NonNullable<Awaited<ReturnType<typeof listDatasets>>>
+export type ListDatasetsQueryError = unknown
+
+
+export function useListDatasets<TData = Awaited<ReturnType<typeof listDatasets>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listDatasets>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listDatasets>>,
+          TError,
+          Awaited<ReturnType<typeof listDatasets>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListDatasets<TData = Awaited<ReturnType<typeof listDatasets>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listDatasets>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listDatasets>>,
+          TError,
+          Awaited<ReturnType<typeof listDatasets>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListDatasets<TData = Awaited<ReturnType<typeof listDatasets>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listDatasets>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List Datasets
+ */
+
+export function useListDatasets<TData = Awaited<ReturnType<typeof listDatasets>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listDatasets>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListDatasetsQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getListDeviceTokensUrl = () => {
 
