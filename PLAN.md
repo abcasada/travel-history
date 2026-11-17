@@ -141,8 +141,10 @@ Other guides: [backups to the NAS](docs/backup-nas.md), [restore](docs/restore.m
 - D-78 Base images pinned to exact version + digest (≥ 14 days old)
 - D-79 `./dev test-quick` skips `slow` tests; `./dev test` runs all
 - D-80 MIT license
-- D-81 Trips API: 404 for invisible, 403 for forbidden; removing a participant clears their leg overrides; sharing settings to core editors only; reference guards (pending Adam)
+- D-81 Trips API: 404 for invisible, 403 for forbidden; removing a participant clears their leg overrides; sharing settings to core editors only; reference guards
 - D-82 Tracker ingestion: plain views, strict whole-request validation, flags in `extra`, per-token + per-address limits, Member-only point inserts with the owner's live token, tokens stripped from requests and logs
+- D-83 History tiles under RLS: InitPlan `is_family()` + Morton `tile_key` index
+- D-84 Bulk storage temporarily on the SSD (`var/bulk`) until the HDD is replaced
 
 ## 25. Open questions (for Adam, answer whenever — nothing is blocked on these)
 
@@ -157,11 +159,11 @@ Other guides: [backups to the NAS](docs/backup-nas.md), [restore](docs/restore.m
 | Q-7 | For participants without accounts (e.g. kids), who decides whether their name/legs appear on public pages? | **Answered 2026-11-10:** the managing user decides. |
 | Q-8 | PWA install/service-worker testing needs HTTPS. Over plain LAN HTTP it won't install. Options: (a) SSH port-forward to `localhost`, (b) a dev hostname through the tunnel behind Cloudflare Access (that's exposure → your call), (c) a local CA. | **Answered 2026-11-10:** (a) SSH port-forward to localhost. |
 | Q-9 | OpenRouteService's terms prohibit transmitting personal data. OK to send only user-drawn waypoints (outside NA / Valhalla down), or skip ORS and use only the FOSSGIS fallback there? | **Answered 2026-11-10:** user-drawn waypoints only, no identity. No ORS key yet; Valhalla only with the ORS fallback stubbed until a key is added. |
-| Q-10 | Email: Resend (recommended) or SMTP2GO? Is Cloudflare Email Routing active on adamcasada.com (so I can double-check the SPF/DMARC records)? | Resend; existing apex SPF untouched. |
+| Q-10 | Email: Resend (recommended) or SMTP2GO? Is Cloudflare Email Routing active on adamcasada.com (so I can double-check the SPF/DMARC records)? | **Answered 2026-11-17:** Resend. |
 | Q-11 | Defaults OK? Privacy-zone radius 1 km; public pages show dates only; home addresses private by default. | **Still open (2026-11-10):** 1 km is the default for now, but Adam may revisit the radius soon; keep it a single setting that is easy to change. Dates-only and private home addresses assumed yes. |
-| Q-12 | Switch the secret scanner from gitleaks (now security-patches-only) to its successor Betterleaks? | Keep gitleaks for now. |
+| Q-12 | Switch the secret scanner from gitleaks (now security-patches-only) to its successor Betterleaks? | **Answered 2026-11-17:** keep gitleaks; item 41 (the security review) tries Betterleaks. |
 | Q-13 | Any intention to publish the source? (Would decide a license, e.g. MIT or AGPL.) | **Answered 2026-11-10:** MIT license (D-80). |
 | Q-14 | Should family members be able to see each other's **vehicles' ownership history** (who owned it when), or only the vehicle and current owner? | **Answered 2026-11-10:** full history visible to family unless hidden. |
 | Q-15 | The server's LAN address is DHCP-assigned. A DHCP reservation on the EdgeRouter would keep the dev binding stable (router change → yours). | **Resolved 2026-11-10:** the server already has a fixed address outside the router's DHCP range. |
-| Q-16 | A participant contributed their own leg (e.g. a separate flight home) and is later removed from the trip. Should that leg keep sharing the trip with them, and who may delete it? | Today: no. Visibility counts trip-level participants and per-leg includes only, so the removed person loses access to a "participants" trip; their leg stays, and nobody can delete it short of deleting the trip. Recommended: keep the visibility rule, and let the owner delete contributions by people no longer on the trip (item 13 / T34). |
-| Q-17 | GPSLogger's setup link (`gpslogger://properties/<https URL>`) downloads a settings file from a web address. Serving one would mean handing the token to anyone with that address (even short-lived, it passes through any proxy's logs). OK to skip it? | Skipped: the token page lists GPSLogger's fields to copy and shows a QR code of the token alone; OwnTracks, Overland and Colota get real setup links. Colota (recommended on Android) covers the convenience. |
+| Q-16 | A participant contributed their own leg (e.g. a separate flight home) and is later removed from the trip. Should that leg keep sharing the trip with them, and who may delete it? | **Answered 2026-11-17:** the trip owner may delete a removed participant's leg (item 13 builds this). |
+| Q-17 | GPSLogger's setup link (`gpslogger://properties/<https URL>`) downloads a settings file from a web address. Serving one would mean handing the token to anyone with that address (even short-lived, it passes through any proxy's logs). OK to skip it? | **Answered 2026-11-17:** yes, no hosted GPSLogger profile; copyable fields plus a token QR. |
