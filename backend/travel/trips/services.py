@@ -9,6 +9,8 @@ as a TripError (never a partial write): every write runs in its own savepoint.
 from __future__ import annotations
 
 import datetime as dt
+import math
+import re
 import zoneinfo
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -16,7 +18,9 @@ from dataclasses import dataclass
 from functools import cache
 from typing import Any
 
+from django.contrib.gis.geos import Point, Polygon
 from django.db import DatabaseError, IntegrityError, connection, transaction
+from django.db.backends.postgresql.psycopg_any import DateTimeTZRange
 from django.db.models import Exists, Max, OuterRef, Q, QuerySet
 from django.utils import timezone
 
@@ -24,9 +28,22 @@ from travel.accounts.models import Person, UserDirectory
 from travel.core import policy
 from travel.core.choices import Visibility
 from travel.geo.models import AircraftType, Airline, Airport
+from travel.media.models import Media
 from travel.vehicles.models import Vehicle
 
-from .models import Leg, LegParticipantOverride, Purpose, Trip, TripParticipant
+from .models import (
+    Leg,
+    LegParticipantOverride,
+    Place,
+    Purpose,
+    Stop,
+    Tag,
+    TrackContribution,
+    Trip,
+    TripNote,
+    TripParticipant,
+    TripTag,
+)
 
 
 class TripError(Exception):
@@ -194,6 +211,50 @@ def touch(trip: Trip) -> None:
     Trip.objects.filter(pk=trip.pk).update(edited_in_app_at=now, updated_at=now)
 
 
+def parse_bbox(value: str) -> list[Polygon]:
+    """`minLon,minLat,maxLon,maxLat` in WGS84. A box across the antimeridian (minLon > maxLon)
+    becomes two boxes."""
+    try:
+        west, south, east, north = (float(part) for part in value.split(","))
+    except ValueError:
+        raise invalid("bbox must be minLon,minLat,maxLon,maxLat") from None
+    if not all(math.isfinite(v) for v in (west, south, east, north)):
+        raise invalid("bbox must be minLon,minLat,maxLon,maxLat")
+    if not (-180 <= west <= 180 and -180 <= east <= 180 and -90 <= south <= north <= 90):
+        raise invalid("bbox is outside -180..180, -90..90 or has minLat > maxLat")
+    boxes = [(west, south, east, north)]
+    if west > east:
+        boxes = [(west, south, 180.0, north), (-180.0, south, east, north)]
+    polygons = []
+    for box in boxes:
+        polygon = Polygon.from_bbox(box)
+        polygon.srid = 4326
+        polygons.append(polygon)
+    return polygons
+
+
+def _in_boxes(boxes: list[Polygon]) -> Q:
+    """Trips with something inside the boxes: a leg's current route, a leg's airport, or a
+    stop's place. Each lookup runs under row-level security like the trip itself."""
+    on_leg = Q()
+    at_stop = Q()
+    for box in boxes:
+        on_leg |= Q(current_route__geom__intersects=box)
+        on_leg |= Q(origin_airport__point__intersects=box)
+        on_leg |= Q(destination_airport__point__intersects=box)
+        at_stop |= Q(place__point__intersects=box)
+    return Q(Exists(Leg.objects.filter(on_leg, trip=OuterRef("pk")))) | Q(
+        Exists(Stop.objects.filter(at_stop, trip=OuterRef("pk")))
+    )
+
+
+def visible_vehicle_ids(user, vehicle_ids: list[int]) -> list[int]:
+    """The ones the user can see. A filter on a hidden vehicle must not reveal which visible
+    trips use it (the leg shows no vehicle to them), so it matches nothing, like a missing id."""
+    vehicles = Vehicle.objects.filter(pk__in=vehicle_ids)
+    return [v.pk for v in vehicles if policy.can_view_vehicle(user, v)]
+
+
 def filter_trips(
     qs: QuerySet[Trip],
     *,
@@ -203,8 +264,15 @@ def filter_trips(
     status: str | None = None,
     person_id: int | None = None,
     text: str | None = None,
+    purpose_ids: list[int] | None = None,
+    tag_ids: list[int] | None = None,
+    vehicle_ids: list[int] | None = None,
+    modes: list[str] | None = None,
+    bbox: str | None = None,
 ) -> QuerySet[Trip]:
-    """Narrow a queryset of trips the user can already see (policy.visible_trips)."""
+    """Narrow a queryset of trips the user can already see (policy.visible_trips). Each list
+    filter matches any of its values; different filters must all match. `vehicle_ids` must
+    already be limited to visible vehicles (visible_vehicle_ids); an empty list matches none."""
     if start is not None:
         qs = qs.filter(end_date__gte=start)
     if end is not None:
@@ -224,6 +292,16 @@ def filter_trips(
         )
     if text:
         qs = qs.filter(Q(title__icontains=text))
+    if purpose_ids:
+        qs = qs.filter(purpose_id__in=purpose_ids)
+    if tag_ids:
+        qs = qs.filter(Exists(TripTag.objects.filter(trip=OuterRef("pk"), tag_id__in=tag_ids)))
+    if vehicle_ids is not None:
+        qs = qs.filter(Exists(Leg.objects.filter(trip=OuterRef("pk"), vehicle_id__in=vehicle_ids)))
+    if modes:
+        qs = qs.filter(Exists(Leg.objects.filter(trip=OuterRef("pk"), mode__in=modes)))
+    if bbox:
+        qs = qs.filter(_in_boxes(parse_bbox(bbox)))
     return qs
 
 
@@ -431,3 +509,342 @@ def set_leg_participation(user, leg: Leg, person: Person, on_leg: bool) -> None:
             )
     if policy.can_edit_trip_core(user, leg.trip):
         touch(leg.trip)
+
+
+def remove_participant_if_present(trip: Trip, person: Person) -> bool:
+    try:
+        remove_participant(trip, person)
+    except TripError as error:
+        if error.status == 404:
+            return False
+        raise
+    return True
+
+
+# --- Leg order -------------------------------------------------------------------------------
+
+
+def reorder_legs(trip: Trip, leg_ids: list[int]) -> None:
+    """Renumber every leg of the trip in the given order (1, 2, ...). Contributed legs are
+    otherwise only their author's to change, so this goes through app.reorder_legs, which
+    checks the caller is a core editor and changes nothing but the order."""
+    current = set(Leg.objects.filter(trip=trip).values_list("pk", flat=True))
+    if len(leg_ids) != len(set(leg_ids)) or set(leg_ids) != current:
+        raise invalid("list every leg of the trip exactly once")
+    with guarded_write(), connection.cursor() as cursor:
+        cursor.execute("SELECT app.reorder_legs(%s, %s::bigint[])", [trip.pk, leg_ids])
+    touch(trip)
+
+
+# --- Contributions: shared helpers -----------------------------------------------------------
+
+
+def delete_row(model, pk: int) -> None:
+    """Delete one row the policy allowed; row-level security decides again (0 rows: refused)."""
+    with guarded_write():
+        deleted, _ = model.objects.filter(pk=pk).delete()
+    if not deleted:
+        raise TripError(403, "not allowed")
+
+
+def _save(obj) -> None:
+    with guarded_write():
+        obj.save()
+
+
+def _require(data: dict[str, Any], fields: set[str]) -> None:
+    for field in fields & data.keys():
+        if data[field] is None:
+            raise invalid(f"{field} cannot be null")
+
+
+# --- Tags ------------------------------------------------------------------------------------
+
+COLOR = re.compile(r"^(#[0-9a-fA-F]{6})?$")
+
+
+def _apply_tag(tag: Tag, data: dict[str, Any]) -> None:
+    _require(data, {"name", "color"})
+    if "name" in data:
+        tag.name = data["name"].strip()
+        if not tag.name:
+            raise invalid("name cannot be blank")
+    if "color" in data:
+        if not COLOR.match(data["color"]):
+            raise invalid("color must be #rrggbb or empty")
+        tag.color = data["color"]
+
+
+def create_tag(user, data: dict[str, Any]) -> Tag:
+    tag = Tag(owner_id=user.pk)
+    _apply_tag(tag, data)
+    _save(tag)
+    return tag
+
+
+def update_tag(tag: Tag, data: dict[str, Any]) -> Tag:
+    _apply_tag(tag, data)
+    _save(tag)
+    return tag
+
+
+def own_tag(user, *, tag_id: int | None = None, name: str | None = None) -> Tag:
+    """One of the user's own tags by id (422 for anyone else's, as for a missing one), or by
+    name, created if the user has none by that name yet (names are case-insensitive)."""
+    if tag_id is not None:
+        tag = Tag.objects.filter(pk=tag_id, owner_id=user.pk).first()
+        if tag is None:
+            raise invalid("unknown tag")
+        return tag
+    name = (name or "").strip()
+    if not name:
+        raise invalid("give a tag_id or a name")
+    existing = Tag.objects.filter(owner_id=user.pk, name__iexact=name).first()
+    return existing or create_tag(user, {"name": name})
+
+
+def tag_trip(user, trip: Trip, tag: Tag) -> TripTag:
+    if TripTag.objects.filter(trip=trip, tag=tag).exists():
+        raise TripError(409, "the trip already has this tag")
+    with guarded_write():
+        return TripTag.objects.create(trip=trip, tag=tag, author_id=user.pk)
+
+
+# --- Notes -----------------------------------------------------------------------------------
+
+
+def add_note(user, trip: Trip, data: dict[str, Any]) -> TripNote:
+    _require(data, {"body", "public_consent"})
+    note = TripNote(trip=trip, author_id=user.pk, **data)
+    _save(note)
+    return note
+
+
+def update_note(note: TripNote, data: dict[str, Any]) -> TripNote:
+    _require(data, {"body", "public_consent"})
+    for field, value in data.items():
+        setattr(note, field, value)
+    _save(note)
+    return note
+
+
+# --- GPS tracks ------------------------------------------------------------------------------
+
+MAX_TRACK = dt.timedelta(days=366)
+
+
+def _track_range(start: dt.datetime | None, end: dt.datetime | None) -> DateTimeTZRange:
+    if start is None or end is None:
+        raise invalid("a track needs start_utc and end_utc")
+    check_times(start, end)
+    if end == start:
+        raise invalid("end_utc must be after start_utc")
+    if end - start > MAX_TRACK:
+        raise invalid("a track spans at most 366 days")
+    return DateTimeTZRange(start, end, "[)")
+
+
+def add_track(user, trip: Trip, data: dict[str, Any]) -> TrackContribution:
+    """A time range of the author's own raw points (§5.3: trips reference raw data, never copy
+    it). The geometry is built later from those points (map matching, T22)."""
+    track = TrackContribution(
+        trip=trip,
+        author_id=user.pk,
+        time_range=_track_range(data.get("start_utc"), data.get("end_utc")),
+        public_consent=bool(data.get("public_consent") or False),
+    )
+    _save(track)
+    return track
+
+
+def update_track(track: TrackContribution, data: dict[str, Any]) -> TrackContribution:
+    _require(data, {"public_consent"})
+    if "start_utc" in data or "end_utc" in data:
+        if track.route_id is not None:
+            # Its route was built from the old range; saved routes are never recomputed (rule 5).
+            raise TripError(409, "this track already has a route; delete it and add a new one")
+        start = data.get("start_utc", track.time_range.lower)
+        end = data.get("end_utc", track.time_range.upper)
+        track.time_range = _track_range(start, end)
+    if "public_consent" in data:
+        track.public_consent = data["public_consent"]
+    _save(track)
+    return track
+
+
+# --- Stops -----------------------------------------------------------------------------------
+
+
+def _new_place(user, data: dict[str, Any]) -> Place:
+    place = Place(
+        owner_id=user.pk,
+        name=data.get("name") or "",
+        address=data.get("address") or "",
+        point=Point(data["lon"], data["lat"], srid=4326),
+        source=Place.Source.MANUAL,
+    )
+    _save(place)
+    return place
+
+
+def _apply_stop(user, stop: Stop, data: dict[str, Any]) -> None:
+    _require(data, {"kind"})
+    for field in {"kind", "arrive_utc", "depart_utc"} & data.keys():
+        setattr(stop, field, data[field])
+    if "tz" in data:
+        stop.tz = data["tz"] or ""
+    check_zone(stop.tz)
+    if stop.arrive_utc and stop.depart_utc and stop.depart_utc < stop.arrive_utc:
+        raise invalid("depart_utc is before arrive_utc")
+    if "leg_id" in data:
+        leg = None
+        if data["leg_id"] is not None:
+            leg = Leg.objects.filter(pk=data["leg_id"], trip_id=stop.trip_id).first()
+            if leg is None:
+                raise invalid("unknown leg")
+        stop.leg = leg
+    if data.get("place_id") is not None and data.get("place") is not None:
+        raise invalid("give either place_id or place")
+    if data.get("place_id") is not None:
+        place = _lookup(Place, data["place_id"], "place")
+        if not policy.can_use_place(user, stop.trip, place):
+            raise invalid("unknown place")  # someone else's place: same answer as missing
+        stop.place = place
+    elif data.get("place") is not None:
+        stop.place = _new_place(user, data["place"])
+    elif stop.place_id is None:
+        raise invalid("a stop needs a place_id or a new place")
+
+
+def create_stop(user, trip: Trip, data: dict[str, Any]) -> Stop:
+    stop = Stop(trip=trip, author_id=user.pk)
+    with guarded_write():
+        _apply_stop(user, stop, data)
+        stop.save()
+    touch(trip)
+    return stop
+
+
+def update_stop(user, stop: Stop, data: dict[str, Any]) -> Stop:
+    with guarded_write():
+        _apply_stop(user, stop, data)
+        stop.save()
+    touch(stop.trip)
+    return stop
+
+
+def delete_stop(stop: Stop) -> None:
+    """Legs and photos that pointed at the stop keep going without it (SET NULL)."""
+    delete_row(Stop, stop.pk)
+    touch(stop.trip)
+
+
+# --- Photos (metadata only; uploads and files are T31) ---------------------------------------
+
+
+def update_media(media: Media, data: dict[str, Any]) -> Media:
+    _require(data, {"caption", "public_consent"})
+    for field in {"caption", "public_consent"} & data.keys():
+        setattr(media, field, data[field])
+    if "leg_id" in data:
+        if (
+            data["leg_id"] is not None
+            and not Leg.objects.filter(pk=data["leg_id"], trip_id=media.trip_id).exists()
+        ):
+            raise invalid("unknown leg")
+        media.leg_id = data["leg_id"]
+    if "stop_id" in data:
+        if (
+            data["stop_id"] is not None
+            and not Stop.objects.filter(pk=data["stop_id"], trip_id=media.trip_id).exists()
+        ):
+            raise invalid("unknown stop")
+        media.stop_id = data["stop_id"]
+    _save(media)
+    return media
+
+
+# --- Bulk edit -------------------------------------------------------------------------------
+
+
+class BulkRefused(TripError):
+    """Some trips may not take the change: nothing was written."""
+
+    def __init__(self, refused: list[dict[str, Any]]):
+        super().__init__(403, "nothing was changed: some trips can't take this edit")
+        self.refused = refused
+
+
+def _bulk_refusal(user, trip: Trip, data: dict[str, Any], purpose, tags, adds) -> str | None:
+    changes_core = (
+        "purpose_id" in data
+        or data.get("visibility") is not None
+        or bool(data.get("add_person_ids"))
+        or bool(data.get("remove_person_ids"))
+    )
+    if changes_core and not policy.can_edit_trip_core(user, trip):
+        return "only the trip's owner (or the Admin) can change this"
+    if purpose is not None and not policy.can_set_trip_purpose(user, trip, purpose):
+        return "the purpose belongs to another user than the trip's owner"
+    visibility = data.get("visibility")
+    if visibility is not None and not policy.can_set_trip_visibility(user, trip, visibility):
+        return "you would no longer see this trip; only its owner can do that"
+    if any(not policy.can_add_participant(user, trip, person) for person in adds):
+        return "you cannot add this person"
+    if (data.get("add_tag_ids") or data.get("remove_tag_ids")) and not all(
+        policy.can_tag_trip(user, trip, tag) for tag in tags
+    ):
+        return "only the trip's owner and participants (Members) can tag it"
+    return None
+
+
+def bulk_edit(user, trips: list[Trip], data: dict[str, Any]) -> None:
+    """Purpose, visibility, participants and the user's own tags for many trips at once
+    (§17 `POST /trips/bulk`). All or nothing: if any trip may not take the change, nothing is
+    written and every refused trip is listed. Adding something already there, or removing
+    something absent, is not an error."""
+    purpose = None
+    if data.get("purpose_id") is not None:
+        purpose = _lookup(Purpose, data["purpose_id"], "purpose")
+    tag_ids = set(data.get("add_tag_ids") or []) | set(data.get("remove_tag_ids") or [])
+    tags = {t.pk: t for t in Tag.objects.filter(pk__in=tag_ids, owner_id=user.pk)}
+    if set(tags) != tag_ids:
+        raise invalid("unknown tag")
+    adds = [visible_person(user, pid) for pid in dict.fromkeys(data.get("add_person_ids") or [])]
+    removes = [
+        visible_person(user, pid) for pid in dict.fromkeys(data.get("remove_person_ids") or [])
+    ]
+    refused = []
+    for trip in trips:
+        reason = _bulk_refusal(user, trip, data, purpose, list(tags.values()), adds)
+        if reason:
+            refused.append({"trip_id": trip.pk, "reason": reason})
+    if refused:
+        raise BulkRefused(refused)
+    core = {k: data[k] for k in ("purpose_id", "visibility") if k in data}
+    if data.get("visibility") is None:
+        core.pop("visibility", None)
+    with transaction.atomic():  # one savepoint for all trips: a refusal undoes every change
+        for trip in trips:
+            try:
+                _bulk_apply(user, trip, data, core, adds, removes, tags)
+            except TripError as error:
+                raise TripError(error.status, f"trip {trip.pk}: {error.message}") from None
+
+
+def _bulk_apply(user, trip, data, core, adds, removes, tags) -> None:
+    if core:
+        update_trip(user, trip, dict(core))
+    on_trip = set(TripParticipant.objects.filter(trip=trip).values_list("person_id", flat=True))
+    for person in adds:
+        if person.pk not in on_trip:
+            add_participant(user, trip, person)
+    for person in removes:
+        remove_participant_if_present(trip, person)
+    tagged = set(TripTag.objects.filter(trip=trip).values_list("tag_id", flat=True))
+    for tag_id in data.get("add_tag_ids") or []:
+        if tag_id not in tagged:
+            tag_trip(user, trip, tags[tag_id])
+    for tag_id in data.get("remove_tag_ids") or []:
+        with guarded_write():
+            TripTag.objects.filter(trip=trip, tag_id=tag_id, author_id=user.pk).delete()

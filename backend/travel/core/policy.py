@@ -19,7 +19,7 @@ from travel.core.choices import Visibility
 if TYPE_CHECKING:
     from travel.accounts.models import DeviceToken, User
     from travel.history.models import HomePeriod
-    from travel.trips.models import Leg, Purpose, Trip
+    from travel.trips.models import Leg, Place, Purpose, Tag, Trip
     from travel.vehicles.models import Vehicle
 
 
@@ -42,17 +42,22 @@ def can_create(user) -> bool:
 # --- Trips ---------------------------------------------------------------------------------
 
 
-def is_trip_participant(user, trip: Trip) -> bool:
+def is_person_on_trip(trip: Trip, person_id: int | None) -> bool:
+    """An effective participant (§6.2): trip-level, or added to any leg by an include override."""
     from travel.trips.models import LegParticipantOverride, TripParticipant
 
-    if not is_family(user) or user.person_id is None:
+    if person_id is None:
         return False
     return (
-        TripParticipant.objects.filter(trip_id=trip.pk, person_id=user.person_id).exists()
+        TripParticipant.objects.filter(trip_id=trip.pk, person_id=person_id).exists()
         or LegParticipantOverride.objects.filter(
-            leg__trip_id=trip.pk, person_id=user.person_id, include=True
+            leg__trip_id=trip.pk, person_id=person_id, include=True
         ).exists()
     )
+
+
+def is_trip_participant(user, trip: Trip) -> bool:
+    return is_family(user) and is_person_on_trip(trip, user.person_id)
 
 
 def can_view_trip(user, trip: Trip) -> bool:
@@ -142,8 +147,38 @@ def can_contribute(user, trip: Trip) -> bool:
 
 
 def can_edit_contribution(user, obj) -> bool:
-    """Notes, photos, tags, tracks, contributed legs: only their author."""
-    return is_family(user) and obj.author_id == user.pk and can_view_trip(user, obj.trip)
+    """Notes, photos, own tags on a trip, GPS tracks: their author, while they may still
+    contribute to the trip - the same rule as a contributed leg (D-81, D-89)."""
+    return is_family(user) and obj.author_id == user.pk and can_contribute(user, obj.trip)
+
+
+def author_left_trip(trip: Trip, author_id: int) -> bool:
+    """The author of a contribution is no longer on the trip: not its owner, and their person
+    (if any) is no longer an effective participant (Q-16)."""
+    from travel.accounts.models import UserDirectory
+
+    if author_id == trip.owner_id:
+        return False
+    person_id = UserDirectory.objects.filter(pk=author_id).values_list("person_id", flat=True)
+    return not is_person_on_trip(trip, person_id.first())
+
+
+def can_delete_left_contribution(user, trip: Trip, author_id: int) -> bool:
+    """Q-16 (Adam, 2026-11-17): the trip owner may delete what a removed participant left on
+    the trip (legs, notes, tracks, tags, photos), so nothing is left that nobody may delete."""
+    return (
+        is_family(user)
+        and trip.owner_id == user.pk
+        and author_id != user.pk
+        and author_left_trip(trip, author_id)
+    )
+
+
+def can_delete_contribution(user, obj) -> bool:
+    """Its author while they may contribute; afterwards the trip owner (Q-16)."""
+    return can_edit_contribution(user, obj) or can_delete_left_contribution(
+        user, obj.trip, obj.author_id
+    )
 
 
 def new_leg_kind(user, trip: Trip) -> str | None:
@@ -163,9 +198,47 @@ def can_edit_leg(user, leg: Leg) -> bool:
 
 
 def can_delete_leg(user, leg: Leg) -> bool:
-    """Same as editing: a contributor's leg only by its author while they may still
-    contribute; core legs by core editors."""
-    return can_edit_leg(user, leg)
+    """As editing (a contributor's leg by its author while they may still contribute; core
+    legs by core editors), plus the trip owner for a leg whose author left the trip (Q-16)."""
+    if can_edit_leg(user, leg):
+        return True
+    return leg.is_contribution and can_delete_left_contribution(user, leg.trip, leg.author_id)
+
+
+def can_reorder_legs(user, trip: Trip) -> bool:
+    """The order of all legs, contributed ones included, is part of the trip's core."""
+    return can_edit_trip_core(user, trip)
+
+
+def can_edit_stops(user, trip: Trip) -> bool:
+    """Stops (lodging, destinations) are the trip's core itinerary (§6.4)."""
+    return can_edit_trip_core(user, trip)
+
+
+def can_use_place(user, trip: Trip, place: Place) -> bool:
+    """A stop's place: one the user owns, or one already on the same trip. A place can be a
+    home address, so a guessed id must not move it onto a trip others can read."""
+    from travel.trips.models import Stop
+
+    if not is_family(user) or not can_view_trip(user, trip):
+        return False
+    return place.owner_id == user.pk or Stop.objects.filter(trip_id=trip.pk, place=place).exists()
+
+
+def can_tag_trip(user, trip: Trip, tag: Tag) -> bool:
+    """Own tags only: tag definitions are per user (§6.3, 'Tags (definitions): own')."""
+    return can_contribute(user, trip) and tag.owner_id == user.pk
+
+
+def can_create_tag(user) -> bool:
+    """Tag definitions are per user; Viewers are read-only and have none to add."""
+    return can_create(user)
+
+
+def can_edit_tag(user, tag: Tag) -> bool:
+    """Rename, recolor or delete a tag definition: its owner only. Deleting it takes it off
+    every trip it is on (only the owner's own tags are ever on a trip under their name)."""
+    return is_family(user) and tag.owner_id == user.pk
 
 
 def can_set_leg_participation(user, leg: Leg, person: Person) -> bool:

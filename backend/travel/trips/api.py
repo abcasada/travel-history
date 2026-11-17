@@ -1,4 +1,6 @@
-"""Trips, legs and participants API (PLAN.md §17; work-order item 6, the core of T18).
+"""Trips API (PLAN.md §17): trips, legs and participants (work-order item 6, the core of T18);
+tags, stops, notes, photo metadata, GPS tracks, route versions, leg order, bulk edit and list
+filters (item 13, the rest of T18).
 
 Permission rules (PLAN.md §6.2-§6.3) are decided in travel.core.policy and enforced again by
 row-level security, which also limits every query below to rows the caller may see. A trip the
@@ -8,9 +10,11 @@ never email or OIDC identity (D-72, D-76).
 """
 
 import datetime as dt
+import json
 from typing import Any, Literal
 
 from django.http import HttpRequest
+from geojson_pydantic import MultiLineString
 from ninja import Field, Query, Router, Schema, Status
 from ninja.errors import HttpError
 from pydantic import AwareDatetime
@@ -18,11 +22,23 @@ from pydantic import AwareDatetime
 from travel.accounts.models import Person, UserDirectory
 from travel.core import policy
 from travel.core.choices import DatePrecision, TravelMode, Visibility
+from travel.media.models import Media
 from travel.vehicles.models import Vehicle
 
 from . import services
-from .models import CabinClass, Leg, Trip
-from .services import TripError
+from .models import (
+    CabinClass,
+    Leg,
+    Purpose,
+    Route,
+    Stop,
+    Tag,
+    TrackContribution,
+    Trip,
+    TripNote,
+    TripTag,
+)
+from .services import BulkRefused, TripError
 
 router = Router(tags=["trips"])
 
@@ -50,6 +66,17 @@ class PurposeRef(Schema):
 class VehicleRef(Schema):
     id: int
     label: str
+
+
+class TripTagOut(Schema):
+    """A tag on a trip. Tags are per user: the owner's are the trip's main tags (`by_owner`),
+    participants' own tags are shown with their author."""
+
+    id: int = Field(description="the tag's id")
+    name: str
+    color: str
+    author: UserRef
+    by_owner: bool
 
 
 class TripAccessOut(Schema):
@@ -87,6 +114,7 @@ class TripOut(Schema):
     owner: UserRef
     is_owner: bool
     cover_media_id: int | None
+    tags: list[TripTagOut]
     created_at: dt.datetime
     updated_at: dt.datetime
 
@@ -128,6 +156,9 @@ class LegOut(Schema):
     cabin_class: str
     participant_ids: list[int] = Field(description="people effectively on this leg")
     can_edit: bool
+    can_delete: bool = Field(
+        description="can_edit, or the trip owner for a leg whose author left the trip (Q-16)"
+    )
 
 
 class ParticipantOut(Schema):
@@ -139,6 +170,28 @@ class ParticipantOut(Schema):
     can_set_consent: bool
 
 
+class PlaceOut(Schema):
+    id: int
+    name: str
+    address: str
+    lon: float
+    lat: float
+    country_code: str
+
+
+class StopOut(Schema):
+    id: int
+    trip_id: int
+    leg_id: int | None
+    kind: str
+    arrive_utc: dt.datetime | None
+    depart_utc: dt.datetime | None
+    tz: str
+    place: PlaceOut
+    author: UserRef
+    can_edit: bool
+
+
 class TripDetailOut(TripOut):
     notes: str
     photo_limit_per_contributor: int
@@ -147,6 +200,95 @@ class TripDetailOut(TripOut):
     access: TripAccessOut
     participants: list[ParticipantOut]
     legs: list[LegOut]
+    stops: list[StopOut]
+
+
+class TagOut(Schema):
+    """One of the caller's own tag definitions."""
+
+    id: int
+    name: str
+    color: str
+    trip_count: int = Field(description="trips the caller has put this tag on and can see")
+
+
+class PurposeOut(Schema):
+    id: int
+    name: str
+    default_visibility: str
+    sort: int
+    archived: bool
+
+
+class TripTagDetailOut(TripTagOut):
+    can_remove: bool
+
+
+class ContributionOut(Schema):
+    id: int
+    trip_id: int
+    author: UserRef
+    public_consent: bool
+    created_at: dt.datetime
+    can_edit: bool = Field(description="the author, while they may still contribute")
+    can_delete: bool = Field(description="can_edit, or the trip owner once the author left")
+
+
+class NoteOut(ContributionOut):
+    body: str
+    updated_at: dt.datetime
+
+
+class TrackOut(ContributionOut):
+    start_utc: dt.datetime
+    end_utc: dt.datetime
+    route_id: int | None = Field(description="built later from the author's own points (T22)")
+
+
+class MediaOut(ContributionOut):
+    """Photo metadata. Files are served by the photo endpoints (T31), never by path."""
+
+    leg_id: int | None
+    stop_id: int | None
+    source: str
+    width: int | None
+    height: int | None
+    captured_at: dt.datetime | None
+    captured_tz: str
+    caption: str
+    public_selected: bool
+
+
+class RouteOut(Schema):
+    """One frozen version of a leg's route (never recomputed or changed, rule 5)."""
+
+    id: int
+    leg_id: int
+    version: int
+    kind: str
+    engine: str
+    engine_version: str
+    engine_data_date: dt.date | None
+    produced_at: dt.datetime
+    created_by: UserRef
+    length_m: float
+    note: str
+    is_current: bool
+
+
+class RouteDetailOut(RouteOut):
+    waypoints: list[dict[str, Any]] = Field(description="ordered control points {lon, lat, role}")
+    geometry: MultiLineString
+
+
+class BulkRefusalOut(Schema):
+    trip_id: int
+    reason: str
+
+
+class BulkRefusedOut(Schema):
+    detail: str
+    refused: list[BulkRefusalOut]
 
 
 # --- Input schemas ----------------------------------------------------------------------------
@@ -189,12 +331,25 @@ class TripPatchIn(Schema):
 
 
 class TripListIn(Schema):
+    """Each list filter (repeat the parameter) matches any of its values; different filters
+    must all match."""
+
     start: dt.date | None = Field(None, alias="from", description="trips ending on or after")
     end: dt.date | None = Field(None, alias="to", description="trips starting on or before")
     visibility: Visibility | None = None
     status: Trip.Status | None = None
     person: int | None = Field(None, description="trips this person is on")
     q: str | None = Field(None, max_length=200, description="text in the title")
+    purpose: list[int] | None = Field(None, description="purpose ids")
+    tag: list[int] | None = Field(None, description="tag ids (anyone's tag on the trip)")
+    vehicle: list[int] | None = Field(None, description="trips with a leg in this vehicle")
+    mode: list[TravelMode] | None = Field(None, description="trips with a leg of this mode")
+    bbox: str | None = Field(
+        None,
+        max_length=100,
+        description="minLon,minLat,maxLon,maxLat (WGS84; minLon > maxLon crosses the "
+        "antimeridian): a current route, airport or stop inside",
+    )
     limit: int = Field(100, ge=1, le=500)
     offset: int = Field(0, ge=0)
 
@@ -243,6 +398,97 @@ class LegParticipationIn(Schema):
     on_leg: bool
 
 
+class LegOrderIn(Schema):
+    leg_ids: list[int] = Field(max_length=1000, description="every leg of the trip, in order")
+
+
+class TagIn(Schema):
+    name: str = Field(min_length=1, max_length=64)
+    color: str = Field("", max_length=7, description="#rrggbb or empty")
+
+
+class TagPatchIn(Schema):
+    name: str | None = Field(None, min_length=1, max_length=64)
+    color: str | None = Field(None, max_length=7)
+
+
+class TripTagIn(Schema):
+    """One of the caller's own tags: by id, or by name (created if they have none by that name)."""
+
+    tag_id: int | None = None
+    name: str | None = Field(None, min_length=1, max_length=64)
+
+
+class NoteIn(Schema):
+    body: str = Field(min_length=1, max_length=20_000)
+    public_consent: bool = False
+
+
+class NotePatchIn(Schema):
+    body: str | None = Field(None, min_length=1, max_length=20_000)
+    public_consent: bool | None = None
+
+
+class TrackIn(Schema):
+    start_utc: AwareDatetime
+    end_utc: AwareDatetime
+    public_consent: bool = False
+
+
+class TrackPatchIn(Schema):
+    start_utc: AwareDatetime | None = None
+    end_utc: AwareDatetime | None = None
+    public_consent: bool | None = None
+
+
+class NewPlaceIn(Schema):
+    name: str = Field("", max_length=200)
+    address: str = Field("", max_length=300)
+    lon: float = Field(ge=-180, le=180)
+    lat: float = Field(ge=-90, le=90)
+
+
+class StopFieldsIn(Schema):
+    leg_id: int | None = None
+    arrive_utc: AwareDatetime | None = None
+    depart_utc: AwareDatetime | None = None
+    tz: str | None = Field(None, max_length=64, description="IANA zone name")
+    place_id: int | None = Field(
+        None, description="a place the caller owns, or already on the trip"
+    )
+    place: NewPlaceIn | None = Field(None, description="or a new place, owned by the caller")
+
+
+class StopIn(StopFieldsIn):
+    kind: Stop.Kind
+
+
+class StopPatchIn(StopFieldsIn):
+    """Only the fields sent are changed."""
+
+    kind: Stop.Kind | None = None
+
+
+class MediaPatchIn(Schema):
+    caption: str | None = Field(None, max_length=500)
+    public_consent: bool | None = None
+    leg_id: int | None = Field(None, description="a leg of the same trip")
+    stop_id: int | None = Field(None, description="a stop of the same trip")
+
+
+class BulkTripsIn(Schema):
+    """Fields left out are not changed; `purpose_id: null` clears the purpose. Tags are the
+    caller's own."""
+
+    trip_ids: list[int] = Field(min_length=1, max_length=500)
+    purpose_id: int | None = None
+    visibility: Visibility | None = None
+    add_tag_ids: list[int] = Field(default_factory=list, max_length=50)
+    remove_tag_ids: list[int] = Field(default_factory=list, max_length=50)
+    add_person_ids: list[int] = Field(default_factory=list, max_length=50)
+    remove_person_ids: list[int] = Field(default_factory=list, max_length=50)
+
+
 # --- Lookups (both layers: row-level security hides rows, policy agrees) ---------------------
 
 
@@ -284,7 +530,27 @@ def _directory(user_ids: set[int]) -> dict[int, dict]:
     return {uid: found.get(uid, {"id": uid, "display_name": ""}) for uid in user_ids}
 
 
-def _trip_summary(user, trip: Trip, owners: dict[int, dict]) -> dict:
+def _trip_tags(trips: list[Trip]) -> dict[int, list[dict]]:
+    """Tags per trip: the owner's (main tags) first, then participants' own, by name."""
+    owner_of = {t.pk: t.owner_id for t in trips}
+    rows = list(TripTag.objects.filter(trip_id__in=owner_of).select_related("tag"))
+    authors = _directory({r.author_id for r in rows})
+    rows.sort(key=lambda r: (r.author_id != owner_of[r.trip_id], r.tag.name.lower(), r.pk))
+    tags: dict[int, list[dict]] = {pk: [] for pk in owner_of}
+    for row in rows:
+        tags[row.trip_id].append(
+            {
+                "id": row.tag_id,
+                "name": row.tag.name,
+                "color": row.tag.color,
+                "author": authors[row.author_id],
+                "by_owner": row.author_id == owner_of[row.trip_id],
+            }
+        )
+    return tags
+
+
+def _trip_summary(user, trip: Trip, owners: dict[int, dict], tags: dict[int, list[dict]]) -> dict:
     purpose = trip.purpose  # row-level security leaves it None if the caller can't see it
     return {
         "id": trip.pk,
@@ -301,6 +567,7 @@ def _trip_summary(user, trip: Trip, owners: dict[int, dict]) -> dict:
         "owner": owners[trip.owner_id],
         "is_owner": trip.owner_id == user.pk,
         "cover_media_id": trip.cover_media_id,
+        "tags": tags.get(trip.pk, []),
         "created_at": trip.created_at,
         "updated_at": trip.updated_at,
     }
@@ -316,6 +583,43 @@ def _visible_vehicles(user, vehicle_ids: set[int]) -> dict[int, dict]:
 def _visible_people(user, person_ids: set[int]) -> dict[int, Person]:
     people = Person.objects.filter(pk__in=person_ids)
     return {p.pk: p for p in people if policy.can_view_person(user, p)}
+
+
+def _place(place) -> dict:
+    return {
+        "id": place.pk,
+        "name": place.name,
+        "address": place.address,
+        "lon": place.point.x,
+        "lat": place.point.y,
+        "country_code": place.country_code,
+    }
+
+
+def _stops(trip: Trip) -> list[Stop]:
+    stops = Stop.objects.filter(trip=trip).select_related("place")
+    return sorted(
+        stops, key=lambda s: (s.arrive_utc is None, s.arrive_utc or dt.datetime.min, s.pk)
+    )
+
+
+def _stop(stop: Stop, authors: dict[int, dict], can_edit: bool) -> dict:
+    return {
+        "id": stop.pk,
+        "trip_id": stop.trip_id,
+        "leg_id": stop.leg_id,
+        "kind": stop.kind,
+        "arrive_utc": stop.arrive_utc,
+        "depart_utc": stop.depart_utc,
+        "tz": stop.tz,
+        "place": _place(stop.place),
+        "author": authors[stop.author_id],
+        "can_edit": can_edit,
+    }
+
+
+def _stop_out(user, stop: Stop) -> dict:
+    return _stop(stop, _directory({stop.author_id}), policy.can_edit_stops(user, stop.trip))
 
 
 class _TripView:
@@ -369,6 +673,7 @@ class _TripView:
             "author": self.authors[leg.author_id],
             "participant_ids": sorted(p for p in self.part.legs[leg.pk] if p in self.people),
             "can_edit": policy.can_edit_leg(self.user, leg),
+            "can_delete": policy.can_delete_leg(self.user, leg),
         }
 
     def participants(self) -> list[dict]:
@@ -414,8 +719,11 @@ class _TripView:
                     "privacy_zone_radius_m",
                 )
             }
+        stops = _stops(trip)
+        stop_authors = _directory({stop.author_id for stop in stops})
+        can_edit_stops = policy.can_edit_stops(user, trip)
         return {
-            **_trip_summary(user, trip, _directory({trip.owner_id})),
+            **_trip_summary(user, trip, _directory({trip.owner_id}), _trip_tags([trip])),
             "notes": trip.notes,
             "photo_limit_per_contributor": trip.photo_limit_per_contributor,
             "edited_in_app_at": trip.edited_in_app_at,
@@ -428,6 +736,7 @@ class _TripView:
             },
             "participants": self.participants(),
             "legs": [self.leg(g) for g in self.legs],
+            "stops": [_stop(stop, stop_authors, can_edit_stops) for stop in stops],
         }
 
 
@@ -437,19 +746,31 @@ class _TripView:
 @router.get("/trips", response=TripPageOut, operation_id="listTrips")
 def list_trips(request, params: Query[TripListIn]):
     """Trips the caller can see (PLAN.md §6.2), newest first."""
-    qs = services.filter_trips(
-        policy.visible_trips(request.user).select_related("purpose"),
-        start=params.start,
-        end=params.end,
-        visibility=params.visibility,
-        status=params.status,
-        person_id=params.person,
-        text=params.q,
-    )
+    vehicles = None
+    if params.vehicle:
+        vehicles = services.visible_vehicle_ids(request.user, params.vehicle)
+    try:
+        qs = services.filter_trips(
+            policy.visible_trips(request.user).select_related("purpose"),
+            start=params.start,
+            end=params.end,
+            visibility=params.visibility,
+            status=params.status,
+            person_id=params.person,
+            text=params.q,
+            purpose_ids=params.purpose,
+            tag_ids=params.tag,
+            vehicle_ids=vehicles,
+            modes=params.mode,
+            bbox=params.bbox,
+        )
+    except TripError as error:
+        _fail(error)
     count = qs.count()
     page = list(qs.order_by("-start_date", "-pk")[params.offset : params.offset + params.limit])
     owners = _directory({t.owner_id for t in page})
-    return {"count": count, "items": [_trip_summary(request.user, t, owners) for t in page]}
+    tags = _trip_tags(page)
+    return {"count": count, "items": [_trip_summary(request.user, t, owners, tags) for t in page]}
 
 
 @router.post("/trips", response={201: TripDetailOut}, operation_id="createTrip")
@@ -653,3 +974,467 @@ def set_participant_consent(request, trip_id: int, person_id: int, payload: Cons
     except TripError as error:
         _fail(error)
     return _TripView(request.user, trip).participant(person.pk)
+
+
+# --- Leg order and bulk edit -----------------------------------------------------------------
+
+
+@router.post("/trips/{trip_id}/legs/order", response=list[LegOut], operation_id="reorderLegs")
+def reorder_legs(request, trip_id: int, payload: LegOrderIn):
+    """Put every leg of the trip, contributed ones included, in the given order (core editors)."""
+    trip = _trip(request, trip_id)
+    if not policy.can_reorder_legs(request.user, trip):
+        raise HttpError(403, "only the trip's owner (or the Admin) can reorder its legs")
+    try:
+        services.reorder_legs(trip, payload.leg_ids)
+    except TripError as error:
+        _fail(error)
+    view = _TripView(request.user, trip)
+    return [view.leg(g) for g in view.legs]
+
+
+@router.post(
+    "/trips/bulk",
+    response={200: TripPageOut, 403: BulkRefusedOut},
+    operation_id="bulkEditTrips",
+)
+def bulk_edit_trips(request, payload: BulkTripsIn):
+    """Purpose, visibility, participants and the caller's own tags for many trips. All or
+    nothing: if any trip may not take the change, 403 lists every refused trip and nothing is
+    written. A trip the caller can't see answers 404, as for one trip."""
+    ids = list(dict.fromkeys(payload.trip_ids))
+    trips = {t.pk: t for t in policy.visible_trips(request.user).filter(pk__in=ids)}
+    missing = [
+        pk for pk in ids if pk not in trips or not policy.can_view_trip(request.user, trips[pk])
+    ]
+    if missing:
+        raise HttpError(404, f"trips not found: {missing}")
+    try:
+        services.bulk_edit(request.user, [trips[pk] for pk in ids], _changes(payload))
+    except BulkRefused as error:
+        return Status(403, {"detail": error.message, "refused": error.refused})
+    except TripError as error:
+        _fail(error)
+    page = list(policy.visible_trips(request.user).select_related("purpose").filter(pk__in=ids))
+    page.sort(key=lambda t: ids.index(t.pk))
+    owners = _directory({t.owner_id for t in page})
+    tags = _trip_tags(page)
+    return {
+        "count": len(page),
+        "items": [_trip_summary(request.user, t, owners, tags) for t in page],
+    }
+
+
+# --- Route versions (read-only: saved routes are frozen, rule 5) -------------------------------
+
+
+def _route_row(route: Route, current_id: int | None, creators: dict[int, dict]) -> dict:
+    return {
+        **{
+            field: getattr(route, field)
+            for field in (
+                "id",
+                "leg_id",
+                "version",
+                "kind",
+                "engine",
+                "engine_version",
+                "engine_data_date",
+                "produced_at",
+                "length_m",
+                "note",
+            )
+        },
+        "created_by": creators[route.created_by_id],
+        "is_current": route.pk == current_id,
+    }
+
+
+@router.get("/legs/{leg_id}/routes", response=list[RouteOut], operation_id="listLegRoutes")
+def list_leg_routes(request, leg_id: int):
+    """Every saved version of the leg's route, newest first, without geometry."""
+    leg = _leg(request, leg_id)
+    routes = list(Route.objects.filter(leg=leg).defer("geom").order_by("-version"))
+    creators = _directory({r.created_by_id for r in routes})
+    return [_route_row(r, leg.current_route_id, creators) for r in routes]
+
+
+@router.get("/routes/{route_id}", response=RouteDetailOut, operation_id="getRoute")
+def get_route(request, route_id: int):
+    """One saved version with its geometry (GeoJSON, WGS84) and control points."""
+    route = Route.objects.select_related("leg", "leg__trip").filter(pk=route_id).first()
+    if route is None or not policy.can_view_trip(request.user, route.leg.trip):
+        raise HttpError(404, "route not found")
+    return {
+        **_route_row(route, route.leg.current_route_id, _directory({route.created_by_id})),
+        "waypoints": route.waypoints or [],
+        "geometry": json.loads(route.geom.geojson),
+    }
+
+
+# --- Tag definitions and purposes (the caller's own) -----------------------------------------
+
+
+def _own_tag(request, tag_id: int) -> Tag:
+    tag = Tag.objects.filter(pk=tag_id, owner_id=request.user.pk).first()
+    if tag is None or not policy.can_edit_tag(request.user, tag):
+        raise HttpError(404, "tag not found")
+    return tag
+
+
+def _tag_out(tag: Tag, count: int) -> dict:
+    return {"id": tag.pk, "name": tag.name, "color": tag.color, "trip_count": count}
+
+
+@router.get("/tags", response=list[TagOut], operation_id="listTags")
+def list_tags(request):
+    """The caller's own tag definitions (other people's tags show only on trips)."""
+    tags = list(Tag.objects.filter(owner_id=request.user.pk).order_by("name", "pk"))
+    counts: dict[int, int] = {}
+    for tag_id in TripTag.objects.filter(tag__in=tags).values_list("tag_id", flat=True):
+        counts[tag_id] = counts.get(tag_id, 0) + 1
+    tags.sort(key=lambda t: (t.name.lower(), t.pk))
+    return [_tag_out(t, counts.get(t.pk, 0)) for t in tags]
+
+
+@router.post("/tags", response={201: TagOut}, operation_id="createTag")
+def create_tag(request, payload: TagIn):
+    if not policy.can_create_tag(request.user):
+        raise HttpError(403, "your role cannot create tags")
+    try:
+        tag = services.create_tag(request.user, _changes(payload) | {"name": payload.name})
+    except TripError as error:
+        _fail(error)
+    return Status(201, _tag_out(tag, 0))
+
+
+@router.patch("/tags/{tag_id}", response=TagOut, operation_id="updateTag")
+def update_tag(request, tag_id: int, payload: TagPatchIn):
+    tag = _own_tag(request, tag_id)
+    try:
+        services.update_tag(tag, _changes(payload))
+    except TripError as error:
+        _fail(error)
+    return _tag_out(tag, TripTag.objects.filter(tag=tag).count())
+
+
+@router.delete("/tags/{tag_id}", response={204: None}, operation_id="deleteTag")
+def delete_tag(request, tag_id: int):
+    """Deletes the definition and takes it off every trip it is on."""
+    tag = _own_tag(request, tag_id)
+    try:
+        services.delete_row(Tag, tag.pk)
+    except TripError as error:
+        _fail(error)
+    return Status(204, None)
+
+
+@router.get("/purposes", response=list[PurposeOut], operation_id="listPurposes")
+def list_purposes(request):
+    """The caller's own purposes (a trip takes only its owner's)."""
+    rows = Purpose.objects.filter(owner_id=request.user.pk).order_by("sort", "name", "pk")
+    return [
+        {f: getattr(p, f) for f in ("id", "name", "default_visibility", "sort", "archived")}
+        for p in rows
+    ]
+
+
+# --- Tags on a trip --------------------------------------------------------------------------
+
+
+def _trip_tag_rows(user, trip: Trip) -> list[dict]:
+    rows = {(r.tag_id): r for r in TripTag.objects.filter(trip=trip)}
+    out = []
+    for tag in _trip_tags([trip])[trip.pk]:
+        row = rows[tag["id"]]
+        row.trip = trip
+        out.append({**tag, "can_remove": policy.can_delete_contribution(user, row)})
+    return out
+
+
+@router.get("/trips/{trip_id}/tags", response=list[TripTagDetailOut], operation_id="listTripTags")
+def list_trip_tags(request, trip_id: int):
+    trip = _trip(request, trip_id)
+    return _trip_tag_rows(request.user, trip)
+
+
+@router.post(
+    "/trips/{trip_id}/tags", response={201: list[TripTagDetailOut]}, operation_id="addTripTag"
+)
+def add_trip_tag(request, trip_id: int, payload: TripTagIn):
+    """The owner and participants (Members) put their own tags on a trip; returns its tags."""
+    trip = _trip(request, trip_id)
+    if not policy.can_contribute(request.user, trip):
+        raise HttpError(403, "only the trip's owner and participants can tag it")
+    try:
+        tag = services.own_tag(request.user, tag_id=payload.tag_id, name=payload.name)
+        if not policy.can_tag_trip(request.user, trip, tag):
+            raise HttpError(403, "you cannot tag this trip")
+        services.tag_trip(request.user, trip, tag)
+    except TripError as error:
+        _fail(error)
+    return Status(201, _trip_tag_rows(request.user, trip))
+
+
+@router.delete("/trips/{trip_id}/tags/{tag_id}", response={204: None}, operation_id="removeTripTag")
+def remove_trip_tag(request, trip_id: int, tag_id: int):
+    """Its author while they may still contribute; the trip owner once the author left (Q-16)."""
+    trip = _trip(request, trip_id)
+    row = TripTag.objects.filter(trip=trip, tag_id=tag_id).first()
+    if row is None:
+        raise HttpError(404, "the trip has no such tag")
+    row.trip = trip
+    if not policy.can_delete_contribution(request.user, row):
+        raise HttpError(403, "only the person who added this tag can remove it")
+    try:
+        services.delete_row(TripTag, row.pk)
+    except TripError as error:
+        _fail(error)
+    return Status(204, None)
+
+
+# --- Stops (core itinerary) ------------------------------------------------------------------
+
+
+def _stop_for(request, stop_id: int) -> Stop:
+    stop = Stop.objects.select_related("trip", "place").filter(pk=stop_id).first()
+    if stop is None or not policy.can_view_trip(request.user, stop.trip):
+        raise HttpError(404, "stop not found")
+    return stop
+
+
+@router.get("/trips/{trip_id}/stops", response=list[StopOut], operation_id="listStops")
+def list_stops(request, trip_id: int):
+    trip = _trip(request, trip_id)
+    stops = _stops(trip)
+    authors = _directory({s.author_id for s in stops})
+    can_edit = policy.can_edit_stops(request.user, trip)
+    return [_stop(s, authors, can_edit) for s in stops]
+
+
+@router.post("/trips/{trip_id}/stops", response={201: StopOut}, operation_id="createStop")
+def create_stop(request, trip_id: int, payload: StopIn):
+    """Lodging, destinations and visits, at a place the caller owns or one already on the trip,
+    or a new place (owned by the caller). Core editors only."""
+    trip = _trip(request, trip_id)
+    if not policy.can_edit_stops(request.user, trip):
+        raise HttpError(403, "only the trip's owner (or the Admin) can add stops")
+    try:
+        stop = services.create_stop(request.user, trip, _changes(payload) | {"kind": payload.kind})
+    except TripError as error:
+        _fail(error)
+    return Status(201, _stop_out(request.user, _stop_for(request, stop.pk)))
+
+
+@router.patch("/stops/{stop_id}", response=StopOut, operation_id="updateStop")
+def update_stop(request, stop_id: int, payload: StopPatchIn):
+    stop = _stop_for(request, stop_id)
+    if not policy.can_edit_stops(request.user, stop.trip):
+        raise HttpError(403, "only the trip's owner (or the Admin) can edit stops")
+    try:
+        services.update_stop(request.user, stop, _changes(payload))
+    except TripError as error:
+        _fail(error)
+    return _stop_out(request.user, _stop_for(request, stop.pk))
+
+
+@router.delete("/stops/{stop_id}", response={204: None}, operation_id="deleteStop")
+def delete_stop(request, stop_id: int):
+    stop = _stop_for(request, stop_id)
+    if not policy.can_edit_stops(request.user, stop.trip):
+        raise HttpError(403, "only the trip's owner (or the Admin) can delete stops")
+    try:
+        services.delete_stop(stop)
+    except TripError as error:
+        _fail(error)
+    return Status(204, None)
+
+
+# --- Contributions: notes, GPS tracks, photo metadata ----------------------------------------
+
+
+def _contribution(request, model, pk: int, what: str, **filters):
+    obj = model.objects.select_related("trip").filter(pk=pk, **filters).first()
+    if obj is None or obj.trip is None or not policy.can_view_trip(request.user, obj.trip):
+        raise HttpError(404, f"{what} not found")
+    return obj
+
+
+def _contribution_fields(user, obj, authors: dict[int, dict]) -> dict:
+    return {
+        "id": obj.pk,
+        "trip_id": obj.trip_id,
+        "author": authors[obj.author_id],
+        "public_consent": obj.public_consent,
+        "created_at": obj.created_at,
+        "can_edit": policy.can_edit_contribution(user, obj),
+        "can_delete": policy.can_delete_contribution(user, obj),
+    }
+
+
+def _note(user, note: TripNote, authors: dict[int, dict]) -> dict:
+    return {
+        **_contribution_fields(user, note, authors),
+        "body": note.body,
+        "updated_at": note.updated_at,
+    }
+
+
+def _track(user, track: TrackContribution, authors: dict[int, dict]) -> dict:
+    return {
+        **_contribution_fields(user, track, authors),
+        "start_utc": track.time_range.lower,
+        "end_utc": track.time_range.upper,
+        "route_id": track.route_id,
+    }
+
+
+def _media(user, media: Media, authors: dict[int, dict]) -> dict:
+    return {
+        **_contribution_fields(user, media, authors),
+        **{
+            field: getattr(media, field)
+            for field in (
+                "leg_id",
+                "stop_id",
+                "source",
+                "width",
+                "height",
+                "captured_at",
+                "captured_tz",
+                "caption",
+                "public_selected",
+            )
+        },
+    }
+
+
+def _listed(user, trip: Trip, rows: list, present) -> list[dict]:
+    authors = _directory({r.author_id for r in rows})
+    for row in rows:
+        row.trip = trip
+    return [present(user, row, authors) for row in rows]
+
+
+def _one(user, obj, present) -> dict:
+    return present(user, obj, _directory({obj.author_id}))
+
+
+def _refuse_unless(allowed: bool, message: str) -> None:
+    if not allowed:
+        raise HttpError(403, message)
+
+
+@router.get("/trips/{trip_id}/notes", response=list[NoteOut], operation_id="listNotes")
+def list_notes(request, trip_id: int):
+    trip = _trip(request, trip_id)
+    rows = list(TripNote.objects.filter(trip=trip).order_by("created_at", "pk"))
+    return _listed(request.user, trip, rows, _note)
+
+
+@router.post("/trips/{trip_id}/notes", response={201: NoteOut}, operation_id="addNote")
+def add_note(request, trip_id: int, payload: NoteIn):
+    """The owner and participants (Members) add notes; Viewers are read-only (Q-6)."""
+    trip = _trip(request, trip_id)
+    _refuse_unless(policy.can_contribute(request.user, trip), "you cannot add notes to this trip")
+    try:
+        note = services.add_note(request.user, trip, payload.model_dump())
+    except TripError as error:
+        _fail(error)
+    return Status(201, _one(request.user, note, _note))
+
+
+@router.patch("/notes/{note_id}", response=NoteOut, operation_id="updateNote")
+def update_note(request, note_id: int, payload: NotePatchIn):
+    note = _contribution(request, TripNote, note_id, "note")
+    _refuse_unless(policy.can_edit_contribution(request.user, note), "only its author edits it")
+    try:
+        services.update_note(note, _changes(payload))
+    except TripError as error:
+        _fail(error)
+    return _one(request.user, note, _note)
+
+
+@router.delete("/notes/{note_id}", response={204: None}, operation_id="deleteNote")
+def delete_note(request, note_id: int):
+    note = _contribution(request, TripNote, note_id, "note")
+    _refuse_unless(policy.can_delete_contribution(request.user, note), "you cannot delete it")
+    try:
+        services.delete_row(TripNote, note.pk)
+    except TripError as error:
+        _fail(error)
+    return Status(204, None)
+
+
+@router.get("/trips/{trip_id}/tracks", response=list[TrackOut], operation_id="listTracks")
+def list_tracks(request, trip_id: int):
+    trip = _trip(request, trip_id)
+    rows = list(TrackContribution.objects.filter(trip=trip).order_by("time_range", "pk"))
+    return _listed(request.user, trip, rows, _track)
+
+
+@router.post("/trips/{trip_id}/tracks", response={201: TrackOut}, operation_id="addTrack")
+def add_track(request, trip_id: int, payload: TrackIn):
+    """Attach a time range of the caller's own location history to the trip (the owner and
+    participants). Others see the route built from it, never the raw points."""
+    trip = _trip(request, trip_id)
+    _refuse_unless(policy.can_contribute(request.user, trip), "you cannot add tracks to this trip")
+    try:
+        track = services.add_track(request.user, trip, payload.model_dump())
+    except TripError as error:
+        _fail(error)
+    return Status(201, _one(request.user, track, _track))
+
+
+@router.patch("/tracks/{track_id}", response=TrackOut, operation_id="updateTrack")
+def update_track(request, track_id: int, payload: TrackPatchIn):
+    track = _contribution(request, TrackContribution, track_id, "track")
+    _refuse_unless(policy.can_edit_contribution(request.user, track), "only its author edits it")
+    try:
+        services.update_track(track, _changes(payload))
+    except TripError as error:
+        _fail(error)
+    return _one(request.user, track, _track)
+
+
+@router.delete("/tracks/{track_id}", response={204: None}, operation_id="deleteTrack")
+def delete_track(request, track_id: int):
+    track = _contribution(request, TrackContribution, track_id, "track")
+    _refuse_unless(policy.can_delete_contribution(request.user, track), "you cannot delete it")
+    try:
+        services.delete_row(TrackContribution, track.pk)
+    except TripError as error:
+        _fail(error)
+    return Status(204, None)
+
+
+@router.get("/trips/{trip_id}/media", response=list[MediaOut], operation_id="listTripMedia")
+def list_trip_media(request, trip_id: int):
+    """Photo metadata for the trip (uploads and image files come with T31)."""
+    trip = _trip(request, trip_id)
+    rows = list(Media.objects.filter(trip=trip).order_by("captured_at", "created_at", "pk"))
+    return _listed(request.user, trip, rows, _media)
+
+
+@router.patch("/media/{media_id}", response=MediaOut, operation_id="updateMedia")
+def update_media(request, media_id: int, payload: MediaPatchIn):
+    media = _contribution(request, Media, media_id, "photo", trip__isnull=False)
+    _refuse_unless(policy.can_edit_contribution(request.user, media), "only its author edits it")
+    try:
+        services.update_media(media, _changes(payload))
+    except TripError as error:
+        _fail(error)
+    return _one(request.user, media, _media)
+
+
+@router.delete("/media/{media_id}", response={204: None}, operation_id="deleteMedia")
+def delete_media(request, media_id: int):
+    """Removes the photo from the trip. Its image files are cleaned up by the photo store's
+    orphan sweep (T31)."""
+    media = _contribution(request, Media, media_id, "photo", trip__isnull=False)
+    _refuse_unless(policy.can_delete_contribution(request.user, media), "you cannot delete it")
+    try:
+        services.delete_row(Media, media.pk)
+    except TripError as error:
+        _fail(error)
+    return Status(204, None)
