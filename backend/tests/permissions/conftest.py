@@ -2,7 +2,8 @@
 
 admin   Admin; manages `kid` (a person without an account)
 alice   Member; owns one trip per visibility, vehicles, raw history, home periods
-bob     Member; participant on all of alice's trips; adds contributions
+bob     Member; participant on all of alice's trips; adds contributions (on the family trip:
+        a leg, a note, a photo, a tag, a GPS track)
 carol   Member; family, not a participant anywhere
 victor  Viewer; participant on alice's family trip (viewers still cannot contribute)
 ivan    Member, deactivated
@@ -14,7 +15,9 @@ import sys
 from types import SimpleNamespace
 
 import pytest
+from django.contrib.gis.geos import Point
 from django.db import connection, transaction
+from django.db.backends.postgresql.psycopg_any import DateTimeTZRange
 from django.utils import timezone
 
 from tests.factories import (
@@ -36,9 +39,12 @@ from travel.media.models import Media
 from travel.trips.models import (
     Leg,
     LegParticipantOverride,
+    Place,
     Purpose,
     Route,
+    Stop,
     Tag,
+    TrackContribution,
     Trip,
     TripNote,
     TripParticipant,
@@ -103,6 +109,27 @@ def build_family() -> SimpleNamespace:
         f.bob_tag = Tag.objects.create(owner=f.bob, name="bob-tag")
         f.alice_tag = Tag.objects.create(owner=f.alice, name="alice-tag")
         f.bob_triptag = TripTag.objects.create(trip=fam, tag=f.bob_tag, author=f.bob)
+        f.bob_track = TrackContribution.objects.create(
+            trip=fam,
+            author=f.bob,
+            time_range=DateTimeTZRange(
+                dt.datetime(2024, 5, 1, 14, tzinfo=dt.UTC),
+                dt.datetime(2024, 5, 1, 18, tzinfo=dt.UTC),
+            ),
+        )
+        # Stops: one on the family trip (its place is then visible with the trip), and a place
+        # of Alice's on no trip at all (only she sees it; it could be a home address).
+        f.family_stop = Stop.objects.create(
+            trip=fam,
+            place=Place.objects.create(
+                owner=f.alice, name="Synthetic Inn", point=Point(-97.3375, 37.6922, srid=4326)
+            ),
+            kind="lodging",
+            author=f.alice,
+        )
+        f.alice_private_place = Place.objects.create(
+            owner=f.alice, name="Alice's private place", point=Point(-95.689, 39.0473, srid=4326)
+        )
 
         f.vehicle = Vehicle.objects.create(nickname="Alice's car", created_by=f.alice)
         VehicleOwnership.objects.create(
@@ -212,7 +239,8 @@ def _row_counts():
     tables = (
         Trip, TripParticipant, TripNote, Leg, LegParticipantOverride, Route, LocationPoint,
         TimelineSegment, RawFile, HomePeriod, Vehicle, VehiclePrivate, Person, User,
-        DeviceToken, AccessRequest, Purpose, Media, TripTag, FlightRecord,
+        DeviceToken, AccessRequest, Purpose, Media, TripTag, FlightRecord, Tag,
+        TrackContribution, Stop, Place,
     )  # fmt: skip
     # One round trip per case: SELECT (SELECT count(*) FROM a), (SELECT count(*) FROM b), ...
     # Table names come from model metadata, never from input.

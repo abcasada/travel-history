@@ -12,7 +12,8 @@ import datetime as dt
 
 import pytest
 from django.contrib.auth.models import AnonymousUser
-from django.db import DatabaseError, transaction
+from django.db import DatabaseError, connection, transaction
+from django.db.backends.postgresql.psycopg_any import DateTimeTZRange
 
 from tests.helpers import as_owner
 from travel.accounts.models import AccessRequest, DeviceToken, Person, User, UserDirectory
@@ -20,13 +21,19 @@ from travel.core import policy
 from travel.core.rls import set_context
 from travel.flights.models import FlightRecord
 from travel.history.models import HomePeriod, LocationPoint, RawFile, TimelineSegment
+from travel.media.models import Media
 from travel.trips.models import (
     Leg,
     LegParticipantOverride,
+    Place,
     Route,
+    Stop,
+    Tag,
+    TrackContribution,
     Trip,
     TripNote,
     TripParticipant,
+    TripTag,
 )
 from travel.vehicles.models import Vehicle, VehiclePrivate
 
@@ -188,6 +195,160 @@ def _trips_api_actions():
         "set_cover_other_trips_photo:family": (
             lambda f, a: updates(Trip, f.trips[fam].pk, cover_media=f.alice_private_photo),
             None,
+        ),
+    }
+
+
+def without_bob(f, probe):
+    """Run probe after Alice removed Bob from the family trip (Q-16), in a savepoint that is
+    always rolled back. Bob still sees the trip (family visibility) and his contributions."""
+
+    def run():
+        with as_owner():
+            TripParticipant.objects.filter(pk=f.bob_participation_pk).delete()
+        return probe()
+
+    return _rolled_back(run)
+
+
+def _new_place(f, a):
+    return Place.objects.create(owner_id=uid(f, a), name="new", point=f.alice_point.geom)
+
+
+def _reorder(f, leg_ids):
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT app.reorder_legs(%s, %s::bigint[])", [f.trips["family"].pk, leg_ids])
+    return True
+
+
+def _contribution_actions():
+    """What item 13 adds: contributions (notes, tracks, own tags, photos) follow the leg rule -
+    their author changes them only while still able to contribute - and the trip owner may
+    delete what someone who left the trip contributed (Q-16). Plus stops and leg order."""
+    fam = "family"
+    return {
+        "edit_bobs_note_after_removal": (
+            lambda f, a: without_bob(f, lambda: updates(TripNote, f.bob_note.pk, body="x")),
+            lambda f, u: without_bob(f, lambda: policy.can_edit_contribution(u, f.bob_note)),
+        ),
+        "delete_bobs_note_after_removal": (
+            lambda f, a: without_bob(f, lambda: deletes(TripNote, f.bob_note.pk)),
+            lambda f, u: without_bob(f, lambda: policy.can_delete_contribution(u, f.bob_note)),
+        ),
+        "edit_bobs_track": (
+            lambda f, a: updates(TrackContribution, f.bob_track.pk, public_consent=True),
+            lambda f, u: policy.can_edit_contribution(u, f.bob_track),
+        ),
+        "delete_bobs_track": (
+            lambda f, a: deletes(TrackContribution, f.bob_track.pk),
+            lambda f, u: policy.can_delete_contribution(u, f.bob_track),
+        ),
+        "edit_bobs_track_after_removal": (
+            lambda f, a: without_bob(
+                f, lambda: updates(TrackContribution, f.bob_track.pk, public_consent=True)
+            ),
+            lambda f, u: without_bob(f, lambda: policy.can_edit_contribution(u, f.bob_track)),
+        ),
+        "delete_bobs_track_after_removal": (
+            lambda f, a: without_bob(f, lambda: deletes(TrackContribution, f.bob_track.pk)),
+            lambda f, u: without_bob(f, lambda: policy.can_delete_contribution(u, f.bob_track)),
+        ),
+        "edit_bobs_leg_after_removal": (
+            lambda f, a: without_bob(f, lambda: updates(Leg, f.bob_leg.pk, mode="bus")),
+            lambda f, u: without_bob(f, lambda: policy.can_edit_leg(u, f.bob_leg)),
+        ),
+        "delete_bobs_leg_after_removal": (
+            lambda f, a: without_bob(f, lambda: deletes(Leg, f.bob_leg.pk)),
+            lambda f, u: without_bob(f, lambda: policy.can_delete_leg(u, f.bob_leg)),
+        ),
+        "remove_bobs_tag": (
+            lambda f, a: deletes(TripTag, f.bob_triptag.pk),
+            lambda f, u: policy.can_delete_contribution(u, f.bob_triptag),
+        ),
+        "remove_bobs_tag_after_removal": (
+            lambda f, a: without_bob(f, lambda: deletes(TripTag, f.bob_triptag.pk)),
+            lambda f, u: without_bob(f, lambda: policy.can_delete_contribution(u, f.bob_triptag)),
+        ),
+        "edit_bobs_photo": (
+            lambda f, a: updates(Media, f.bob_photo.pk, caption="x"),
+            lambda f, u: policy.can_edit_contribution(u, f.bob_photo),
+        ),
+        "delete_bobs_photo_after_removal": (
+            lambda f, a: without_bob(f, lambda: deletes(Media, f.bob_photo.pk)),
+            lambda f, u: without_bob(f, lambda: policy.can_delete_contribution(u, f.bob_photo)),
+        ),
+        "add_track:family": (
+            lambda f, a: inserts(
+                lambda: TrackContribution.objects.create(
+                    trip=f.trips[fam],
+                    author_id=uid(f, a),
+                    time_range=DateTimeTZRange(f.now - dt.timedelta(hours=1), f.now),
+                )
+            ),
+            lambda f, u: policy.can_contribute(u, f.trips[fam]),
+        ),
+        "tag_family_trip_with_own_tag": (
+            lambda f, a: inserts(
+                lambda: TripTag.objects.create(
+                    trip=f.trips[fam],
+                    tag=Tag.objects.create(owner_id=uid(f, a), name="mine"),
+                    author_id=uid(f, a),
+                )
+            ),
+            lambda f, u: policy.can_create_tag(u) and policy.can_contribute(u, f.trips[fam]),
+        ),
+        "tag_family_trip_with_alices_tag": (
+            lambda f, a: inserts(
+                lambda: TripTag.objects.create(
+                    trip=f.trips[fam], tag=f.alice_tag, author_id=uid(f, a)
+                )
+            ),
+            lambda f, u: policy.can_tag_trip(u, f.trips[fam], f.alice_tag),
+        ),
+        "add_stop_at_new_place:family": (
+            lambda f, a: inserts(
+                lambda: Stop.objects.create(
+                    trip=f.trips[fam], place=_new_place(f, a), kind="visit", author_id=uid(f, a)
+                )
+            ),
+            lambda f, u: policy.can_create(u) and policy.can_edit_stops(u, f.trips[fam]),
+        ),
+        # A place of Alice's on no trip (it could be her home): only she may put it on a trip.
+        "add_stop_at_alices_private_place:family": (
+            lambda f, a: inserts(
+                lambda: Stop.objects.create(
+                    trip=f.trips[fam],
+                    place=f.alice_private_place,
+                    kind="visit",
+                    author_id=uid(f, a),
+                )
+            ),
+            lambda f, u: (
+                policy.can_edit_stops(u, f.trips[fam])
+                and policy.can_use_place(u, f.trips[fam], f.alice_private_place)
+            ),
+        ),
+        "add_stop_at_the_trips_place:family": (
+            lambda f, a: inserts(
+                lambda: Stop.objects.create(
+                    trip=f.trips[fam],
+                    place_id=f.family_stop.place_id,
+                    kind="visit",
+                    author_id=uid(f, a),
+                )
+            ),
+            lambda f, u: (
+                policy.can_edit_stops(u, f.trips[fam])
+                and policy.can_use_place(u, f.trips[fam], f.family_stop.place)
+            ),
+        ),
+        "edit_family_stop": (
+            lambda f, a: updates(Stop, f.family_stop.pk, kind="destination"),
+            lambda f, u: policy.can_edit_stops(u, f.trips[fam]),
+        ),
+        "reorder_legs:family": (
+            lambda f, a: _rolled_back(lambda: _reorder(f, [f.bob_leg.pk, f.core_leg.pk])),
+            lambda f, u: policy.can_reorder_legs(u, f.trips[fam]),
         ),
     }
 
@@ -485,6 +646,7 @@ ACTIONS = {
     "view_kid": (lambda f, a: sees(Person, f.kid.pk), None),
     "view_alices_private_person": (lambda f, a: sees(Person, f.alices_private_person.pk), None),
     **_trips_api_actions(),
+    **_contribution_actions(),
 }
 
 T, F = True, False
@@ -566,6 +728,27 @@ MATRIX = {
     "set_foreign_purpose:family":           (F, F, F, F, F, F, F),
     "set_cover_own_photo:family":           (T, T, F, F, F, F, F),
     "set_cover_other_trips_photo:family":   (F, F, F, F, F, F, F),
+    # Rest of the trips API (work-order item 13): contributions, Q-16, stops, leg order
+    "edit_bobs_note_after_removal":             (F, F, F, F, F, F, F),
+    "delete_bobs_note_after_removal":           (F, T, F, F, F, F, F),
+    "edit_bobs_track":                          (F, F, T, F, F, F, F),
+    "delete_bobs_track":                        (F, F, T, F, F, F, F),
+    "edit_bobs_track_after_removal":            (F, F, F, F, F, F, F),
+    "delete_bobs_track_after_removal":          (F, T, F, F, F, F, F),
+    "edit_bobs_leg_after_removal":              (F, F, F, F, F, F, F),
+    "delete_bobs_leg_after_removal":            (F, T, F, F, F, F, F),
+    "remove_bobs_tag":                          (F, F, T, F, F, F, F),
+    "remove_bobs_tag_after_removal":            (F, T, F, F, F, F, F),
+    "edit_bobs_photo":                          (F, F, T, F, F, F, F),
+    "delete_bobs_photo_after_removal":          (F, T, F, F, F, F, F),
+    "add_track:family":                         (F, T, T, F, F, F, F),
+    "tag_family_trip_with_own_tag":             (F, T, T, F, F, F, F),
+    "tag_family_trip_with_alices_tag":          (F, T, F, F, F, F, F),
+    "add_stop_at_new_place:family":             (T, T, F, F, F, F, F),
+    "add_stop_at_alices_private_place:family":  (F, T, F, F, F, F, F),
+    "add_stop_at_the_trips_place:family":       (T, T, F, F, F, F, F),
+    "edit_family_stop":                         (T, T, F, F, F, F, F),
+    "reorder_legs:family":                      (T, T, F, F, F, F, F),
 }  # fmt: skip
 
 CASES = [

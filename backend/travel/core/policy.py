@@ -176,6 +176,8 @@ def can_delete_left_contribution(user, trip: Trip, author_id: int) -> bool:
 
 def can_delete_contribution(user, obj) -> bool:
     """Its author while they may contribute; afterwards the trip owner (Q-16)."""
+    if not is_family(user):
+        return False
     return can_edit_contribution(user, obj) or can_delete_left_contribution(
         user, obj.trip, obj.author_id
     )
@@ -200,6 +202,8 @@ def can_edit_leg(user, leg: Leg) -> bool:
 def can_delete_leg(user, leg: Leg) -> bool:
     """As editing (a contributor's leg by its author while they may still contribute; core
     legs by core editors), plus the trip owner for a leg whose author left the trip (Q-16)."""
+    if not is_family(user):
+        return False
     if can_edit_leg(user, leg):
         return True
     return leg.is_contribution and can_delete_left_contribution(user, leg.trip, leg.author_id)
