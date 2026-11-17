@@ -159,6 +159,7 @@ case "$cmd" in
     "$0" manage e2e_cleanup "$(sha256sum e2e/fixtures/timeline-synthetic.json | cut -d' ' -f1)"
     exit "$status"
     ;;
+  import-scale-test) scripts/import-scale-test.sh "$@" ;;
   help|*)
     cat <<'HELP'
 ./dev setup               first-time setup: git hooks, .env with generated secrets, bulk dirs, networks
@@ -173,6 +174,7 @@ case "$cmd" in
 ./dev npm <args>          npm inside the Node container (frontend/)
 ./dev backup-now          run one encrypted backup into the outbox (needs AGE_RECIPIENT in .env)
 ./dev restore-test        backup -> restore into a scratch DB -> verify (throwaway key)
+./dev import-scale-test [size_mb|cleanup]  realistic-size Timeline import on the dev stack (default 1024 MB; deletes its data after)
 ./dev e2e [base-url]      browser smoke test (sign-in, notice, map, both shells; screenshots in e2e/out/)
 ./dev tracker deploy      build + (re)start the internet-facing tracker endpoint (127.0.0.1:8783), then smoke-test it
 ./dev tracker stop|logs|ps   stop it / follow its log / show it (./dev up and ./dev down leave it alone)
