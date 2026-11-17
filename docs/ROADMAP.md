@@ -4,7 +4,7 @@ Only the orchestrator and the planner edit this file. Status values: todo · in 
 
 ## Work order
 
-> **Execution order override (2026-11-18, Adam: "start viewing everything so I can explore, on the soon side"):** after item 10, run **13 → 20 → 21** (the rest of the trips API, then the catalog UI), then continue with 11, 12, 14… in order. Item numbers stay the same. Review pause B (after 21) now comes before pause A (after 12). Item 4 (the real import) jumps the queue as soon as AGE_RECIPIENT and the export are both present. Item 8's post-"go" step runs as soon as Adam says "go".
+> **Execution order override (2026-11-18, Adam: "start viewing everything so I can explore, on the soon side"):** after item 10, run **13 → 20 → 21** (the rest of the trips API, then the catalog UI), then continue with 11, 12, 14… in order. Item numbers stay the same. Review pause B (after 21) now comes before pause A (after 12). Item 4 (the real import) jumps the queue as soon as AGE_RECIPIENT and the export are both present. **Item 8: Adam said "go" on 2026-11-18.** Its last step (the outside test, then phone setup) runs right after item 10, then 13 → 20 → 21. Adam makes the Cloudflare tunnel change himself per docs/tracking/exposure.md, so check it's in place before dispatching.
 Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhigh. Task IDs (T1…T46) and finding numbers (#1…#16) are from the 2026-10-21 audit; their descriptions and dependencies are in the Task reference below. Each item is one dispatch unless noted.
 
 1. **[M] Stage 0 housekeeping** (details below). Skip it if already done.
@@ -69,7 +69,7 @@ Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhi
    - Show me the proxy change and the exact DNS record, and apply the change only after I reply "go". I add the DNS record myself.
    - Test from outside the LAN with a test token, then revoke it.
    - Walk me through setting up my phone with the setup guide and QR code. ← the bake-off starts
-   - Status: blocked on Adam's "go" (prepared and verified 2026-11-17; checklist in docs/tracking/exposure.md)
+   - Status: approved, "go" 2026-11-18. Outside test and phone setup run after item 10; Adam makes the tunnel change himself.
 9. **[H] T8:** nightly jobs that cover all users under RLS.
    - Status: done (2026-11-18)
 10. **[M] T12 + T13:** flight datasets, the import template, and the conversion. Use my spreadsheet if it's present; otherwise synthetic data.
@@ -248,3 +248,4 @@ Nature: mech = mechanical, mod = moderate, hard. Size is S/M/L/XL with approxima
 - 2026-11-18: item 5a done and verified (`./dev test-quick` 1375 + 31 passed, now about 3.3 min). Whole-history tiles take 50–274 ms; the cost is +37 % import time and +36 % point storage (about 9.3 GB at 20 M points). D-86 is waiting for Adam. Item 8 still waits for "go", so item 9 was dispatched.
 - 2026-11-18: item 9 done and verified (`./dev test-quick` 1394 + 31 passed). D-87 (the per-user job runner) is waiting for Adam. Item 10 dispatched with synthetic flights.
 - 2026-11-18: reordered at Adam's request: items 13, 20 and 21 run right after item 10, so he can add and browse trips sooner. T19 depends only on T18, so no dependency is broken. Item 4 jumps the queue when its prerequisites arrive.
+- 2026-11-18: Adam approved item 8 ("go"). Its last step runs right after item 10.
