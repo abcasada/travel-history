@@ -21,15 +21,39 @@ like "PLAN.md §N" still resolve; the section map in PLAN.md says which file hol
     contiguous key range; bigint comparisons are leakproof. Ranges are bound as constants, not
     joined from an array, so the planner estimates them from statistics.
   - *Points layer `points`:* below z14, and in tiles with over 10,000 points above it, points are
-    counted into a 128 × 128 grid per tile (`n` per cell). Below z14 a cell is exactly a zoom
-    z+7 tile, so cells are grouped by key prefix (`tile_key >> shift`), integer work off the
-    index; dense z14+ tiles use the same grid computed from coordinates. Otherwise one feature
-    per point with `ts` (epoch s) and `src`. Each tile also draws a 4-cell margin from its
-    neighbours (read from their adjacent quarter-tiles) so circles aren't cut at tile edges.
+    counted into grid cells (`n` per cell). Below z14 a cell is exactly a zoom z+7 tile; a dense
+    tile at z14+ gets zoom-20 cells (the key's resolution: 64 a side at z14, 16 at z16, 4 at
+    z18). A cell is a key prefix, so counts are integer work without touching geometry.
+    Otherwise one feature per point with `ts` (epoch s) and `src`. Each tile also draws a 4-cell
+    margin from its neighbours (read from their adjacent quarter-tiles) so circles aren't cut at
+    tile edges.
+  - *Point roll-up (work-order item 5a, history migration 0010):* cell counts come from
+    `history_pointrollup`, not from the points: per owner, cell zoom (8, 10, …, 20; a tile uses
+    the first level at or below its cell zoom and groups by prefix), grain (UTC day, or UTC year
+    with `period` = 1 January), source and cell, the number of points. A date range is split
+    into whole UTC years (year rows), whole UTC days (day rows) and the partial days at its ends
+    (raw points by key range), so the result is exactly what counting the points would give
+    (tests compare both at every zoom band and range shape). Statement-level AFTER INSERT/DELETE
+    triggers on `history_locationpoint` (transition tables) keep it equal to the points in the
+    same transaction: an insert adds what was really inserted (`ON CONFLICT DO NOTHING`
+    duplicates aren't in the transition table), a delete subtracts and removes emptied rows.
+    Points are append-only and a re-import never deletes (rule 6), so imports, re-imports,
+    tracker ingestion and purges all stay consistent without application code. Upserts run in
+    key order (no lock-order deadlocks between writers of one owner), and tracker and import
+    points never share a row (the source is in the key). RLS like the points: `own_all` for
+    every command, the triggers run as the caller. Not mirrored: TRUNCATE (test teardown only).
   - *Segments layer `segments`* (`/history/segments/tiles/…`, z5–18): current versions only,
-    simplified to ~1 px, newest 3,000 per tile (`X-Tile-Truncated` when capped), with `kind`,
-    `activity`, `semantic`, `t0`/`t1`. Segment tiles still scan the user's segments (no key yet);
-    fine at tens of thousands of segments.
+    simplified to ~1 px, with `id`, `kind`, `activity`, `semantic`, `t0`/`t1`. Segments carry a
+    generated quadtree key `seg_key` (history migration 0011): the smallest tile (zoom ≤ 20)
+    holding the whole bounding box, as its zoom-20 Morton prefix `<< 5 | zoom`, with a partial
+    (owner, seg_key) index on current versions. Quadtree tiles are nested or disjoint, so a
+    segment can touch a map tile (or its margin pieces) only if its key lies in a piece's key
+    range or equals one of the pieces' ancestors' keys; both are leakproof bigint conditions
+    under RLS. Over 3,000 segments in a tile, nothing is dropped any more: geometries are
+    snapped to a 64 × 64 lattice per tile (4 px), and those that coincide (same shape, kind and
+    activity) merge into one feature with `n` and the span `t0`/`t1` (`X-Tile-Aggregated: 1`).
+    Only if even the merged features exceed 10,000 are the least travelled left out
+    (`X-Tile-Truncated: 1`).
   - *Bounds:* zoom 0–18 (404 otherwise), x/y inside the grid, a 10 s statement timeout per tile
     query (→ 503 + `Retry-After`, in a savepoint so the request's RLS transaction survives), JIT
     off for these queries (compiling cost 0.5–1 s). Worst case ≤ 136² cells per points tile.

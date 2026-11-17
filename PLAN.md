@@ -148,6 +148,7 @@ Other guides: [backups to the NAS](docs/backup-nas.md), [restore](docs/restore.m
 - D-83 History tiles under RLS: InitPlan `is_family()` + Morton `tile_key` index
 - D-84 Bulk storage temporarily on the SSD (`var/bulk`) until the HDD is replaced
 - D-85 Tracker exposure: tracker-only `ingest` service on `127.0.0.1:8783` behind the tunnel; app-level public-host guard (404 except ingest paths; DEBUG answers nothing); production settings enforced at startup
+- D-86 History map at scale: trigger-maintained per-day/per-year point roll-up (RLS), quadtree `seg_key` for segments, dense segment tiles merged instead of truncated (pending Adam)
 
 ## 25. Open questions (for Adam, answer whenever — nothing is blocked on these)
 
