@@ -403,16 +403,18 @@ WHERE f.geom IS NOT NULL
 """
 )
 
-# Too many segments for one tile: every geometry is snapped to a SEGMENT_LATTICE x
-# SEGMENT_LATTICE lattice over the tile, and segments that end up identical (same shape, kind
-# and activity) become one feature with their number `n` and time span. Nothing is dropped
-# unless even the merged features exceed MAX_SEGMENT_FEATURES (then the most travelled stay).
+# Too many segments for one tile: every geometry is simplified to the lattice spacing and
+# snapped to a SEGMENT_LATTICE x SEGMENT_LATTICE lattice over the tile, and segments that end up
+# identical (same shape, kind and activity) become one feature with their number `n` and time
+# span. Nothing is dropped unless even the merged features exceed MAX_SEGMENT_FEATURES (then the
+# most travelled stay).
 _MERGED_SEGMENTS = (
     _ENVELOPE  # noqa: S608
     + """
 , snapped AS (
   SELECT ST_AsMVTGeom(
-           ST_SnapToGrid(ST_Transform(s.geom, 3857), q.x0, q.y0, q.snap, q.snap),
+           ST_SnapToGrid(ST_Simplify(ST_Transform(s.geom, 3857), q.snap), q.x0, q.y0, q.snap,
+                         q.snap),
            q.tile, %(extent)s, %(buffer)s, true) AS geom,
          s.kind, s.activity_type, s.start_utc, s.end_utc
     FROM (SELECT q.*, q.px * %(extent)s / %(lattice)s AS snap FROM q) q {segments}
