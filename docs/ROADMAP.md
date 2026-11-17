@@ -4,7 +4,9 @@ Only the orchestrator and the planner edit this file. Status values: todo · in 
 
 ## Work order
 
-> **Execution order override (2026-11-18, Adam: "start viewing everything so I can explore, on the soon side"):** after item 10, run **13 → 20 → 21** (the rest of the trips API, then the catalog UI), then continue with 11, 12, 14… in order. Item numbers stay the same. Review pause B (after 21) now comes before pause A (after 12). Item 4 (the real import) jumps the queue as soon as AGE_RECIPIENT and the export are both present. **Item 8: Adam said "go" on 2026-11-18.** Its last step (the outside test, then phone setup) runs right after item 10, then 13 → 20 → 21. Adam makes the Cloudflare tunnel change himself per docs/tracking/exposure.md, so check it's in place before dispatching.
+> **Execution order (2026-11-19, Adam):** 20 → 21 → 17 → 25 → 26, then 11, 12, 14… Item 4 (real Timeline import) jumps the queue as soon as AGE_RECIPIENT and the export are both present. Item 25 reads the ORS key from `ORS_API_KEY` in `.env` (Adam is getting a key) and must work worldwide through ORS while Valhalla covers only Kansas. Location tracking (item 8 onwards) is on hold.
+>
+> **Earlier override (2026-11-18, Adam: "start viewing everything so I can explore, on the soon side"):** after item 10, run **13 → 20 → 21** (the rest of the trips API, then the catalog UI), then continue with 11, 12, 14… in order. Item numbers stay the same. Review pause B (after 21) now comes before pause A (after 12). Item 4 (the real import) jumps the queue as soon as AGE_RECIPIENT and the export are both present. **Item 8: Adam said "go" on 2026-11-18.** Its last step (the outside test, then phone setup) runs right after item 10, then 13 → 20 → 21. Adam makes the Cloudflare tunnel change himself per docs/tracking/exposure.md, so check it's in place before dispatching.
 Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhigh. Task IDs (T1…T46) and finding numbers (#1…#16) are from the 2026-10-21 audit; their descriptions and dependencies are in the Task reference below. Each item is one dispatch unless noted.
 
 1. **[M] Stage 0 housekeeping** (details below). Skip it if already done.
@@ -69,7 +71,7 @@ Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhi
    - Show me the proxy change and the exact DNS record, and apply the change only after I reply "go". I add the DNS record myself.
    - Test from outside the LAN with a test token, then revoke it.
    - Walk me through setting up my phone with the setup guide and QR code. ← the bake-off starts
-   - Status: approved, "go" 2026-11-18. Outside test and phone setup run after item 10; Adam makes the tunnel change himself.
+   - Status: on hold (Adam, 2026-11-19). The route is live and the outside test passed, including revocation. Colota's posts are refused (400 "_type missing": Colota apparently isn't sending OwnTracks format; Adam hasn't checked its Request format setting). The ingest service is stopped. To resume: check Colota's format, fix the parser if needed, run `./dev tracker deploy`, and fix the smoke test's expectations for Cloudflare's robots.txt and 404s.
 9. **[H] T8:** nightly jobs that cover all users under RLS.
    - Status: done (2026-11-18)
 10. **[M] T12 + T13:** flight datasets, the import template, and the conversion. Use my spreadsheet if it's present; otherwise synthetic data.
@@ -80,7 +82,7 @@ Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhi
     - Status: todo
     - **→ Review pause A:** history, flights, and tracking are live. I'll try them.
 13. **[H] The rest of T18:** tags, stops, notes, media, tracks, the routes listing, bulk edit, duplicates/join/merge, leg reorder and list filters. Make sure a removed participant can no longer edit or delete their notes and tracks, matching the leg rule from item 6. Apply Adam's answer to Q-16.
-    - Status: in progress (dispatched 2026-11-19)
+    - Status: done (2026-11-19)
 14. **[M] T26:** places.
     - Status: todo
 15. **[H] T9:** home-period detection.
@@ -94,7 +96,7 @@ Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhi
 19. **[H] T20:** the review queue.
     - Status: todo
 20. **[H] T19 session 1:** catalog UI architecture plus `docs/design/frontend-patterns.md`.
-    - Status: todo
+    - Status: in progress (dispatched 2026-11-19)
 21. **[M] The rest of T19,** following the patterns doc (2 dispatches).
     - Status: todo
     - **→ Review pause B:** the desktop catalog UI.
@@ -252,3 +254,4 @@ Nature: mech = mechanical, mod = moderate, hard. Size is S/M/L/XL with approxima
 - 2026-11-19: item 10 done and verified (`./dev test-quick` 1523 + 32 passed; the dev stack was restarted to pick up new packages). D-88 is waiting for Adam. The tunnel route isn't in place yet (travel.adamcasada.com answers 404 from Cloudflare), so item 8's last step waits for Adam's dashboard change and item 13 runs now.
 - 2026-11-19: tunnel route live (Adam). The outside smoke test passed except two Cloudflare-side items: its managed /robots.txt answers 200, and Cloudflare's own 404s carry no app headers because the path rule never forwards those paths. Fix the smoke script's expectations in a later fix item. At Adam's request, added trips.adamcasada.com as a second public host (`.env` TRAVEL_PUBLIC_HOSTS; ingest recreated; it answers like travel.*). Adam adds its tunnel route. TRACKER_BASE_URL stays travel.*. Before go-live (T38), pick one canonical host for the web app (Authentik redirect URIs, one login) and redirect the other.
 - Item 4 note: the synthetic-data wipe must keep the phone's tracker points and tokens (stored under dev-admin until Authentik is live).
+- 2026-11-19: item 13 done and verified (`./dev test-quick` 2044 + 32 passed; matrix 665 cases). D-89 is waiting for Adam. Reordered at Adam's request so manual trips with road routes come sooner: 20 → 21 → 17 → 25 → 26. Tracking is on hold and the ingest service is stopped.
