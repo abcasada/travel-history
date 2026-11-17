@@ -77,7 +77,7 @@ NEIGHBOUR_DEPTH = 2  # the margin is read from neighbours' adjacent quarter-tile
 
 # The roll-up's cell zooms and grains (history migration 0010 must list the same).
 ROLLUP_LEVELS = (8, 10, 12, 14, 16, 18, 20)
-GRAIN_DAY, GRAIN_YEAR = 1, 2
+GRAIN_DAY, GRAIN_YEAR, GRAIN_HOUR = 1, 2, 3  # hour rows: level 0, cell = UTC hour
 USE_ROLLUP = True  # tests switch it off to compare against counting raw points
 
 
@@ -583,25 +583,41 @@ def coverage(first: dt.date, last: dt.date, zone: ZoneInfo) -> Coverage:
     }
     lo, hi = _run(
         """
-        SELECT least((SELECT min(ts) FROM history_locationpoint),
-                     (SELECT min(start_utc) FROM history_timelinesegment WHERE is_current)),
-               greatest((SELECT max(ts) FROM history_locationpoint),
-                        (SELECT max(end_utc) FROM history_timelinesegment WHERE is_current))
+        SELECT least((SELECT min(ts) FROM history_locationpoint), s.lo),
+               greatest((SELECT max(ts) FROM history_locationpoint), s.hi)
+          FROM (SELECT min(start_utc) AS lo, max(end_utc) AS hi
+                  FROM history_timelinesegment WHERE is_current) s
         """,
         {},
     )
-    points = dict(
-        _run(
-            """
+    days = [first + dt.timedelta(days=i) for i in range((last - first).days + 2)]
+    if USE_ROLLUP and all(
+        local_midnight(d, zone).utcoffset().total_seconds() % 3600 == 0 for d in days
+    ):
+        # Every local day is whole UTC hours: sum the roll-up's hourly counts (migration 0013).
+        params["first_utc"] = params["start"].astimezone(dt.UTC).date()
+        params["last_utc"] = (
+            (params["end"] - dt.timedelta(microseconds=1)).astimezone(dt.UTC).date()
+        )
+        points_sql = """
+            SELECT (h.at AT TIME ZONE %(tz)s)::date, sum(h.n)
+              FROM (SELECT (r.period + make_interval(hours => r.cell::int)) AT TIME ZONE 'UTC'
+                             AS at,
+                           r.n
+                      FROM history_pointrollup r
+                     WHERE r.level = 0 AND r.grain = 3
+                       AND r.period >= %(first_utc)s AND r.period <= %(last_utc)s) h
+             WHERE h.at >= %(start)s AND h.at < %(end)s
+             GROUP BY 1
+        """
+    else:
+        points_sql = """
             SELECT (p.ts AT TIME ZONE %(tz)s)::date, count(*)
               FROM history_locationpoint p
              WHERE p.ts >= %(start)s AND p.ts < %(end)s
              GROUP BY 1
-            """,
-            params,
-            many=True,
-        )
-    )
+        """
+    points = dict(_run(points_sql, params, many=True))
     # A segment counts on every local day it touches (an overnight stay covers two days).
     segments = dict(
         _run(

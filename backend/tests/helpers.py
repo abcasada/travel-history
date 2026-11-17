@@ -68,6 +68,12 @@ def rollup_mismatches(owner_ids=None, using: str = "default") -> list[tuple]:
                CROSS JOIN unnest(%(grains)s::smallint[]) g(grain)
                WHERE %(owners)s::bigint[] IS NULL OR p.owner_id = ANY(%(owners)s::bigint[])
                GROUP BY 1, 2, 3, 4, 5, 6
+              UNION ALL  -- hourly counts for the coverage strip (migration 0013)
+              SELECT p.owner_id, 0, 3, (p.ts AT TIME ZONE 'UTC')::date, p.source,
+                     extract(hour FROM p.ts AT TIME ZONE 'UTC')::bigint, count(*)
+                FROM history_locationpoint p
+               WHERE %(owners)s::bigint[] IS NULL OR p.owner_id = ANY(%(owners)s::bigint[])
+               GROUP BY 1, 2, 3, 4, 5, 6
             ), rolled AS (
               SELECT owner_id, level, grain, period, source, cell, n FROM history_pointrollup
                WHERE %(owners)s::bigint[] IS NULL OR owner_id = ANY(%(owners)s::bigint[])

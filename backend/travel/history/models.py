@@ -187,11 +187,13 @@ class PointRollup(models.Model):
 
     `cell` is the point's `tile_key` cut to `level` (cell = tile_key >> 2 * (20 - level)), so it
     is a Web Mercator tile at that zoom. `period` is the UTC day (grain DAY) or 1 January of the
-    UTC year (grain YEAR)."""
+    UTC year (grain YEAR). Rows with grain HOUR (level 0) count points per UTC hour instead
+    (`cell` = the hour) for the coverage strip."""
 
     class Grain(models.IntegerChoices):
         DAY = 1, "Day"
         YEAR = 2, "Year"
+        HOUR = 3, "Hour"  # level 0 only, cell = UTC hour of `period` (migration 0013)
 
     id = models.BigAutoField(primary_key=True)
     owner = models.ForeignKey(User, on_delete=models.DB_CASCADE, related_name="+", db_index=False)

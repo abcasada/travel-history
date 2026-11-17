@@ -575,8 +575,8 @@ def test_rollup_levels_match_the_migration(member):
             [member.user.pk],
         )
         levels, grains = cursor.fetchone()
-    assert tuple(levels) == tiles.ROLLUP_LEVELS
-    assert grains == [tiles.GRAIN_DAY, tiles.GRAIN_YEAR]
+    assert tuple(levels) == (0, *tiles.ROLLUP_LEVELS)  # level 0: the hourly rows
+    assert grains == [tiles.GRAIN_DAY, tiles.GRAIN_YEAR, tiles.GRAIN_HOUR]
 
 
 def d(*args):
@@ -662,3 +662,15 @@ def test_margin_cells_are_the_drawn_ring():
     assert len(cells) == (tiles.GRID + 2 * depth) ** 2 - tiles.GRID**2
     assert tiles._margin_cells(0, 0, 0, 7) == (tiles.MARGIN_CELLS, [])  # nothing beyond the world
     assert tiles._margin_cells(18, 5, 5, 20)[0] == 0  # 1024-unit cells: centres beyond the buffer
+
+
+@pytest.mark.parametrize("tz", ["America/Chicago", "Asia/Kolkata", "Australia/Lord_Howe", "UTC"])
+def test_coverage_from_hourly_rollup_equals_counting_points(scattered, monkeypatch, tz):
+    """Whole-hour zones sum the roll-up's hourly rows; half-hour zones (Kolkata, Lord Howe's
+    30-minute DST) count points. Either way the days and counts are what counting gives."""
+    zone = tiles.ZoneInfo(tz)
+    with rls_context(scattered.user.pk):
+        rolled = tiles.coverage(dt.date(2024, 11, 1), dt.date(2025, 11, 30), zone)
+        monkeypatch.setattr(tiles, "USE_ROLLUP", False)
+        assert tiles.coverage(dt.date(2024, 11, 1), dt.date(2025, 11, 30), zone) == rolled
+    assert sum(d.points for d in rolled.days) > 100
