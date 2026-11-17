@@ -61,15 +61,21 @@ like "PLAN.md §N" still resolve; the section map in PLAN.md says which file hol
     `rev=` (latest import) to bust its cache after an import.
   - *Coverage strip:* `GET /history/coverage?from=&to=&tz=` counts points and current segments
     per local day (a segment counts on every day it touches), ≤ 400 days per request, plus the
-    user's first and last day with data.
-  - *Timings* (synthetic: one user, 300k points on a year-long random walk + 50k points of
+    user's first and last day with data. Point counts come from the roll-up's hourly rows
+    (grain 3, level 0, `cell` = UTC hour; history migration 0013) whenever every local midnight
+    in the range falls on a whole UTC hour, and from the points otherwise (zones such as
+    +05:30, or Lord Howe's 30-minute DST); tests check both give the same days and counts.
+  - *Cell placement:* only the tile's own cells (one key prefix) and the drawn margin cells (a
+    key list) are placed, straight in tile coordinates for `ST_AsMVT`; the neighbours' wider key
+    ranges cost no geometry work. `app.morton_compact()` is an inlinable SQL lookup-table
+    expression (history migration 0012; it was PL/pgSQL at ~1 µs a call).
+  - *Timings, milestone 2.3* (synthetic: one user, 300k points on a year-long random walk + 50k points of
     another user at the same place; 1,666 path segments; current Xeon host, dev DB, warm):
     z2 204 ms · z6 252 ms · z10 98 ms (98 KiB, before gzip) · z13 34 ms · z16 19 ms ·
     z6 one month 60 ms · segments z5 38 ms (84 KiB) / z9 18 ms / z13 14 ms · coverage, one
-    year 285 ms. Low zooms without a date filter read every point of the user (~0.7 µs/point),
-    so a multi-million-point history will approach the timeout at z0–6; the planned fix is a
-    per-day grid roll-up maintained by imports and ingestion (deferred; measure with the T5
-    large-import test or the real export first).
+    year 285 ms. Low zooms without a date filter read every point of the user (~0.7 µs/point);
+    at 3.6 M points that was 1–2 s a tile (item 3), hence the roll-up above. Before/after
+    numbers at 3.6 M points are in resource-budget.md §21.1.
 - **Trips as vector tiles:** `GET /api/v1/tiles/trips/{z}/{x}/{y}.mvt` reads
   `route_simplified` for the matching zoom bucket (precomputed with `ST_SimplifyPreserveTopology`
   at 4 tolerances when a route version is created), filtered by RLS visibility.
