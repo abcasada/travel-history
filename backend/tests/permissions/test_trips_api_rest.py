@@ -43,6 +43,11 @@ ALL_200 = (200, 200, 200, 200, 200, *R)
 TRACK = {"start_utc": "2024-05-02T10:00:00Z", "end_utc": "2024-05-02T12:00:00Z"}
 INN = {"name": "Synthetic Motel", "lon": -97.3, "lat": 37.7}
 
+
+def trip_ids(f, *visibilities: str) -> list[int]:
+    return [f.trips[vis].pk for vis in visibilities]
+
+
 # name -> (method, path(f), body(f) or None, expected status per actor in ACTORS order)
 CASES = {
     # --- reads
@@ -69,7 +74,7 @@ CASES = {
     "get_route": ("GET", lambda f: f"{API}/routes/{f.route.pk}", None, ALL_200),
     # --- tag definitions (own only)
     "create_tag": (
-        "POST", lambda f: f"{API}/tags", lambda f: {"name": "new-tag"}, (201, 201, 201, 201, 403, *R)
+        "POST", lambda f: f"{API}/tags", lambda f: {"name": "new"}, (201, 201, 201, 201, 403, *R)
     ),
     "create_tag_named_like_alices": (
         "POST",
@@ -238,13 +243,13 @@ CASES = {
     "bulk_visibility": (
         "POST",
         lambda f: f"{API}/trips/bulk",
-        lambda f: {"trip_ids": [f.trips["family"].pk, f.trips["public"].pk], "visibility": "family"},
+        lambda f: {"trip_ids": trip_ids(f, "family", "public"), "visibility": "family"},
         (200, 200, 403, 403, 403, *R),
     ),
     "bulk_including_a_private_trip": (
         "POST",
         lambda f: f"{API}/trips/bulk",
-        lambda f: {"trip_ids": [f.trips["private"].pk, f.trips["family"].pk], "visibility": "family"},
+        lambda f: {"trip_ids": trip_ids(f, "private", "family"), "visibility": "family"},
         (404, 200, 404, 404, 404, *R),
     ),
     "bulk_bobs_tag": (
