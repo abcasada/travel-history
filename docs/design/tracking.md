@@ -73,6 +73,20 @@ at least as reliable (bake-off below).
 - **Responses** are exactly `[]` (OwnTracks) or `{"result":"ok"}` (Overland) with
   `Cache-Control: no-store`; errors are `{"detail", "errors"?}`.
 
+**Exposure before go-live (work-order item 8, D-73, D-85; [guide](../tracking/exposure.md)).**
+The endpoints are reachable from the internet at `https://travel.adamcasada.com` through the
+shared Cloudflare Tunnel; Cloudflare terminates TLS and so sees tokens and payloads in transit.
+The tunnel points at the `ingest` service (`compose.yaml`, profile `tracker`,
+`127.0.0.1:8783`): the production image with forced production settings (DEBUG off, HTTPS-only
+redirect, HSTS, secure cookies; `settings.py` refuses to start it otherwise) that answers only
+the two ingest paths whatever the Host header says. Every backend service also guards the
+public host names (`TRAVEL_PUBLIC_HOSTS`, `travel/core/exposure.py`): with
+`TRAVEL_PUBLIC_SCOPE=tracker` (default) only the ingest paths answer there, every other path
+404s, and a DEBUG server answers 404 to all of them. `ingest` takes client addresses from
+`CF-Connecting-IP`. The route needs **Disable Chunked Encoding** (cloudflared otherwise sends
+chunked bodies, which the endpoints refuse with 411). `./dev tracker deploy` rebuilds,
+restarts and smoke-tests it (`scripts/tracker-smoke.sh`); `./dev up`/`down` leave it alone.
+
 ### 9.2 Trackers and setup guides (`docs/tracking/`)
 
 Guides: [docs/tracking/](../tracking/README.md). Tokens are made on the SPA's **Location

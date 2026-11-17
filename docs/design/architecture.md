@@ -13,7 +13,7 @@ flowchart LR
     AND["Android companion<br/>(phase 9)"]
     ANON["Anonymous visitor<br/>(public trips)"]
   end
-  CF["Cloudflare edge + Tunnel<br/>(after go-live only)"]
+  CF["Cloudflare edge + Tunnel<br/>(tracker paths → ingest service until go-live)"]
   LAN["LAN / WireGuard<br/>(dev access)"]
   subgraph travel-history compose project
     WEB["web<br/>Django + gunicorn<br/>API · SPA · public renderer · MVT"]

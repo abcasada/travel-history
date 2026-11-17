@@ -56,7 +56,7 @@ Trackers only work if the phone lets them run in the background:
 | 429 / "too many requests" | More than 120 requests a minute from one token (or 600 from one network). The app retries later by itself; if it happens often, send less often or use batches (Overland, Colota). |
 | 400 with a field name | The app sent a field or value this server doesn't accept (for example after an app update added a field). The app keeps the points and retries; tell the server's operator, who will see the field name in the log. |
 | 413 | The request was larger than 5 MB or had more than 1,000 points. Lower the app's batch size. |
-| 415 / 411 | The app didn't send JSON with a length (GPSLogger: check the Content-Type header). |
+| 415 / 411 | The app didn't send JSON with a length (GPSLogger: check the Content-Type header). A 411 for every app at once means the tunnel route lost its **Disable Chunked Encoding** setting ([exposure.md](exposure.md)). |
 
 ## For the operator
 
@@ -68,4 +68,7 @@ Trackers only work if the phone lets them run in the background:
   token in a header: a token in the URL is visible to any proxy in between.
 - Settings (`.env`): `TRACKER_BASE_URL` (the address phones use; empty = the address the
   browser used when the token was created), `TRACKER_RATE_PER_TOKEN`, `TRACKER_RATE_PER_IP`.
-  Behind a proxy, set `RATELIMIT_CLIENT_IP_HEADER`, or every phone shares one per-address limit.
+  Behind a proxy, set `RATELIMIT_CLIENT_IP_HEADER`, or every phone shares one per-address limit
+  (the internet-facing `ingest` service sets it to `CF-Connecting-IP` itself).
+- Reaching the endpoints from outside the LAN (the tunnel route, DNS, the outside test,
+  rollback and phone setup): [exposure.md](exposure.md).

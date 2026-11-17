@@ -40,7 +40,7 @@ Status markers: ✅ done · 🔄 in progress · ⏳ not started · ⛔ blocked o
 | 2.1 Uploads + raw store ✅ 2026-10-20 | Resumable chunked upload API; raw file stored zstd, 0440, checksum-verified; identical re-upload detected by hash; per-user quota; `./dev restore-test` verifies raw-file checksums end to end (verified live: upload → worker → archive → backup → restore → checksum) |
 | 2.2 Timeline import + diff ✅ 2026-10-21 | Streaming parse (memory bounded: peak memory stays flat as files grow — tested 20k vs 80k points); diff per §8.3; versions kept; absent ≠ deleted; in-app edits win; review flags; import summary page. iOS marked unverified until a real sample is checked (verified in the browser: upload → worker → summary) |
 | 2.3 Raw-history map ✅ 2026-11-11 | MVT endpoint (own points only, RLS), date filter, segment overlay, coverage strip (points + segments tiles with grid aggregation and bounds, coverage API, both shells; permission tests at API and RLS level; timings in §14; verified in headless Chrome in both shells) |
-| 2.4 Tracker ingestion ✅ 2026-11-16 (local; exposure is item 8) | OwnTracks + Overland endpoints with device tokens (create/revoke/rate-limit); setup pages with QR/deep links; Colota evaluated; battery notes (strict validation, size caps, plausibility flags, no-data responses, token-free logs; tests at API, RLS and log level; guides in docs/tracking/) |
+| 2.4 Tracker ingestion ✅ 2026-11-16 (local; exposure is item 8: prepared 2026-11-17, `ingest` service + guard + guide, waiting for Adam's "go") | OwnTracks + Overland endpoints with device tokens (create/revoke/rate-limit); setup pages with QR/deep links; Colota evaluated; battery notes (strict validation, size caps, plausibility flags, no-data responses, token-free logs; tests at API, RLS and log level; guides in docs/tracking/) |
 | 2.5 Home periods | Suggestions per §10.1 (synthetic multi-year fixture with two moves and a long stay detects all three), manual entry, gap/overlap validation |
 | 2.6 Coverage + bake-off | Daily coverage per user and source; comparison of trips detected by each source; bake-off page |
 
@@ -98,7 +98,7 @@ Status markers: ✅ done · 🔄 in progress · ⏳ not started · ⛔ blocked o
 | 8.3 Duplicates | Overlap check offers "join existing trip"; merge tool (earlier creator stays owner) |
 | 8.4 Transfers | Bulk transfer of trips/vehicles to a new member; shared trips stay with Adam |
 | 8.5 Public | Snapshot builder, public renderer on `travel_public`, privacy zones, consent, leak tests, rate limits, profiles |
-| 8.6 Go-live checklist | Written for Adam: Authentik + 2FA, SMTP account + DNS, Turnstile keys, tunnel hostname, removing the LAN binding |
+| 8.6 Go-live checklist | Written for Adam: Authentik + 2FA, SMTP account + DNS, Turnstile keys, tunnel hostname (move the route from the tracker-only `ingest` service on 8783 to `web` on 8780, `TRAVEL_PUBLIC_SCOPE=all`, `DJANGO_BEHIND_TLS_PROXY=true`, `RATELIMIT_CLIENT_IP_HEADER=CF-Connecting-IP`; docs/tracking/exposure.md), removing the LAN binding |
 
 ### Phase 9 — Android companion ⏳ (against the mock OIDC provider until Authentik is live)
 

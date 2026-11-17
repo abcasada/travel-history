@@ -15,16 +15,19 @@ Inspected 2026-10-19 (`lscpu`, `free`, `lsblk`, `docker info`, `docker ps`):
 | HDD | 931 GB at `/storage/hdd1` (empty apart from `media/`, `shares/`, `backups/`) | Bulk storage: raw imports, photos, backup outbox. **2026-11-11: went emergency read-only with I/O errors (Hitachi HUA721010); Adam to check or replace it.** It was unmounted 2026-11-14; until it's replaced, `/bulk` lives on the SSD (D-84). |
 | OS / Docker | Ubuntu 26.04.1 LTS, kernel 7.0, Docker 29.8, Compose v5.6 | No `make`, `node`, `pre-commit` on the host — all tooling runs in containers via `./dev`. |
 | Other apps | bible app, gas-gauge reader, pinpoint challenge, weather, flight-pricing, Home Assistant image | All bind `127.0.0.1:<port>`; each has its own compose project. |
-| Public ingress | **Cloudflare Tunnel**, no local reverse proxy or TLS | A shared, dashboard-managed `cloudflared` (host networking, `~/apps/cloudflared`) plus one app that runs its own tunnel container. TLS terminates at Cloudflare. |
+| Public ingress | **Cloudflare Tunnel**, no local reverse proxy or TLS | A shared, dashboard-managed `cloudflared` (host networking, `~/infra/cloudflared`; checked 2026-11-17: no app runs its own tunnel container any more). TLS terminates at Cloudflare. |
 
 **Migration note.** The prompt says the server may be moving to a Ryzen 5 3600 / 32 GB machine. On
 the current host the full North America Valhalla build is impossible (RAM and SSD), and the
 app's 60 GB SSD budget does not fit in the 28 GB free. Development uses small data and a
 Kansas extract, which fit. The design targets the Ryzen host (§21).
 
-**How the app fits the existing ingress.** It follows the house pattern: the `web` container
-publishes `127.0.0.1:8780`, and later a public hostname `travel.adamcasada.com → http://localhost:8780`
-is added to the shared dashboard-managed tunnel (a change to shared infrastructure, so it waits
-for approval; see the go-live checklist in §23, phase 8). Until Authentik with 2FA is live the
-app is **also** bound to the server's LAN address (`TRAVEL_LAN_BIND`, set in `.env`) so it is
+**How the app fits the existing ingress.** It follows the house pattern (the shared tunnel lives
+in `~/infra/cloudflared`; routes are listed in `~/infra/TUNNELS.md`): the `web` container
+publishes `127.0.0.1:8780`, and at go-live the public hostname `travel.adamcasada.com →
+http://localhost:8780` is pointed at it (see the go-live checklist in §23, phase 8). Before
+go-live, the same hostname routes only the tracker paths to the `ingest` service on
+`127.0.0.1:8783` (work-order item 8, D-85, [exposure guide](../tracking/exposure.md)); adding
+the route is a shared-infrastructure change that Adam makes after approving it. Until
+Authentik with 2FA is live the app is **also** bound to the server's LAN address (`TRAVEL_LAN_BIND`, set in `.env`) so it is
 reachable only from the LAN and over WireGuard. No router port forwards are involved.

@@ -5,9 +5,11 @@
 > This index plus the files it links are the source of truth for design and progress. Keep them
 > current (CLAUDE.md requires it). Read the index every session; open design docs on demand.
 
-**Status (2026-11-16):** Phase 1 complete; phase 2 (Timeline and tracking) in progress —
-milestones 2.1–2.4 done (2.4 tracker ingestion built and tested locally; exposure is work-order
-item 8). Phase 4: the trips API core (T18 core) is done. Work now follows the
+**Status (2026-11-17):** Phase 1 complete; phase 2 (Timeline and tracking) in progress —
+milestones 2.1–2.4 done (2.4 tracker ingestion built and tested locally). Work-order item 8
+(tracker exposure) is prepared: the `ingest` service runs on `127.0.0.1:8783` with the exposure
+guard and production settings; the tunnel route waits for Adam's "go"
+([docs/tracking/exposure.md](docs/tracking/exposure.md)). Phase 4: the trips API core (T18 core) is done. Work now follows the
 orchestrated work order in [docs/ROADMAP.md](docs/ROADMAP.md) (process:
 [docs/ORCHESTRATION.md](docs/ORCHESTRATION.md)).
 
@@ -145,6 +147,7 @@ Other guides: [backups to the NAS](docs/backup-nas.md), [restore](docs/restore.m
 - D-82 Tracker ingestion: plain views, strict whole-request validation, flags in `extra`, per-token + per-address limits, Member-only point inserts with the owner's live token, tokens stripped from requests and logs
 - D-83 History tiles under RLS: InitPlan `is_family()` + Morton `tile_key` index
 - D-84 Bulk storage temporarily on the SSD (`var/bulk`) until the HDD is replaced
+- D-85 Tracker exposure: tracker-only `ingest` service on `127.0.0.1:8783` behind the tunnel; app-level public-host guard (404 except ingest paths; DEBUG answers nothing); production settings enforced at startup
 
 ## 25. Open questions (for Adam, answer whenever — nothing is blocked on these)
 
