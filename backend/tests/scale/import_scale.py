@@ -371,11 +371,14 @@ def _time_tiles(client: _Client, first_day: str) -> dict:
                     "aggregated": headers.get("X-Tile-Aggregated"),
                     "truncated": headers.get("X-Tile-Truncated"),
                 }
-    status, _, data, elapsed = client.request(
-        "GET", f"/api/v1/history/coverage?from={year}-01-01&to={year}-12-31&tz=America/Chicago"
-    )
+    runs = []
+    for _ in range(3):  # first (cold-ish) and two warm, like the tiles
+        status, _, data, elapsed = client.request(
+            "GET", f"/api/v1/history/coverage?from={year}-01-01&to={year}-12-31&tz=America/Chicago"
+        )
+        runs.append(round(elapsed * 1000, 1))
     days = len(json.loads(data)["days"]) if status == 200 else None
-    out["coverage one year"] = {"status": status, "ms": round(elapsed * 1000, 1), "days": days}
+    out["coverage one year"] = {"status": status, "ms": runs, "days": days}
     return out
 
 

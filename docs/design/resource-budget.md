@@ -68,3 +68,37 @@ Coverage strip for one year: 1,037 ms (365 days). All tiles stayed under the 10 
 timeout, but whole-history point tiles take 1–2 s each (≈ 5 s cold at z16), so a map view of
 ~12 tiles is slow. This is the input for item 5a's per-day grid roll-up. Segment tiles are fine
 at this volume but are always truncated over the home area.
+
+**After work-order item 5a (2026-11-17, same test and data, D-86).** Point tiles and the
+coverage strip read the trigger-maintained roll-up (`history_pointrollup`, history migrations
+0010 and 0013); segments are found by `seg_key` (0011) and dense segment tiles are merged instead
+of truncated. ms over HTTP through runserver (~55–65 ms of that is runserver), first then warm:
+
+| Tile | z0 | z3 | z6 | z10 | z13 | z16 | z18 |
+|---|---|---|---|---|---|---|---|
+| points, all history: before | 2145 / 923 / 926 | 1564 / 1479 / 1547 | 1786 / 1769 / 1785 | 1352 / 1296 / 1322 | — | 4839 / 1668 / 2001 | — |
+| points, all history: after | 199 / 50 / 50 | 894 / 62 / 63 | 783 / 94 / 83 | 757 / 128 / 129 | 755 / 274 / 265 | **76** / 73 / 84 | 57 / 56 / 61 |
+| points, one year: before | 416 / 359 / 347 | 400 / 425 / 403 | 460 / 442 / 428 | 379 / 400 / 416 | — | 616 / 633 / 1120 | — |
+| points, one year: after | 415 / 57 / 55 | 134 / 94 / 71 | 67 / 84 / 79 | 83 / 91 / 93 | 132 / 132 / 171 | 76 / 80 / 61 | 56 / 77 / 56 |
+| segments, all history: before | — | — | 683 / 161 / 170 (cut at 3,000) | 176 / 167 / 173 (cut) | — | 162 / 153 / 151 (cut) | — |
+| segments, all history: after | — | — | 1058 / 318 / 342 (merged, 1 KiB) | 426 / 421 / 408 (merged, 93 KiB) | 577 / 518 / 471 (merged; cut at 10,000 features) | 329 / 344 / 330 (merged, 216 KiB) | — |
+| segments, one year: after | — | — | 146 / 149 / 129 (merged) | 146 / 163 / 167 (merged) | 195 / 186 / 185 | 169 / 151 / 164 | — |
+
+- Targets: whole-history point tiles under 300 ms warm at every zoom (worst z13, 265–274 ms,
+  273 KiB: about 18,000 cells of 37 m over the dense home area) — **met**; z16 under 1 s cold
+  (76 ms) — **met**. The first request at each zoom after the import is 0.2–0.9 s while the
+  roll-up's pages are read from disk.
+- Coverage strip, one year: before 1,037 ms; after 411 ms on that first, cold request over HTTP
+  (the run timed it once) and 85 ms warm in-process (~145 ms over HTTP), from the hourly
+  roll-up rows. The script now times it three times.
+- Segment tiles no longer drop segments: dense tiles merge coinciding (simplified, 4-px-snapped)
+  lines with a count `n`. They take 0.3–0.5 s over the dense home area for the whole history
+  (they used to stop at the newest 3,000). Only the whole-history z13 tile still exceeds 10,000
+  merged features in this synthetic data (each path vertex is jittered ±22 m, so tracks rarely
+  coincide at 76 m spacing); it keeps the most travelled.
+- Cost: the import took 1,330 s instead of 972 s (+37 %, the triggers' upserts; worker memory
+  unchanged, peak RSS 271 MiB). The roll-up holds 2.33 M rows (1.79 M day, 0.47 M year, 68 k
+  hour) in 429 MB (heap 191, indexes 238), 36 % on top of the points' 1,197 MB: about 465 B per
+  point all-in, so 20 M points ≈ 9.3 GB, still inside the 60 GB SSD budget. If space gets tight,
+  the cheapest cut is the surrogate `id` column and its index (a composite primary key), or
+  coarser time buckets than days at zoom 18–20. Cleanup through the delete trigger left no rows.
