@@ -1,0 +1,14 @@
+# Bundled airport code overrides (PLAN.md §12.2), reloaded by `load_flight_reference`.
+# Public facts only. `ident` is the OurAirports ident. valid_from/valid_to are inclusive dates
+# for which `code` meant this airport; `last_service` (closed airports) is the last day with
+# scheduled service and is copied into the airport's closed_on. Sources: facts register §26.
+code,ident,valid_from,valid_to,last_service,note
+DEN,US-12484,,1995-02-27,1995-02-27,Denver Stapleton; replaced by Denver International on 1995-02-28
+DEN,KDEN,1995-02-28,,,Denver International opened 1995-02-28
+HKG,HK-0099,,1998-07-05,1998-07-05,Hong Kong Kai Tak; replaced by Chek Lap Kok on 1998-07-06
+HKG,VHHH,1998-07-06,,,Hong Kong Chek Lap Kok opened 1998-07-06
+MUC,DE-0901,,1992-05-16,1992-05-16,Munich-Riem; replaced by Munich Franz Josef Strauss on 1992-05-17
+MUC,EDDM,1992-05-17,,,Munich Franz Josef Strauss opened 1992-05-17
+TXL,DE-0876,,2020-11-08,2020-11-08,Berlin Tegel; last scheduled flight 2020-11-08
+BER,EDDB,2020-10-31,,,Berlin Brandenburg opened 2020-10-31 (BER was a city code before)
+FBU,NO-0099,,1998-10-07,1998-10-07,Oslo Fornebu; replaced by Gardermoen on 1998-10-08

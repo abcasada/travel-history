@@ -9,7 +9,7 @@ class Airport(models.Model):
     """OurAirports `airports.csv` row, including closed airports."""
 
     ourairports_id = models.IntegerField(unique=True, null=True, blank=True)
-    ident = models.CharField(max_length=16)
+    ident = models.CharField(max_length=16, db_index=True)
     type = models.CharField(max_length=32)
     name = models.CharField(max_length=200)
     point = gis.PointField(srid=4326)
@@ -36,6 +36,7 @@ class AirportCodeHistory(models.Model):
 
     class Source(models.TextChoices):
         KEYWORDS = "keywords", "OurAirports keywords"
+        BUNDLED = "bundled", "Bundled override"  # geo/data/airport_code_overrides.csv
         MANUAL = "manual", "Manual override"
 
     code = models.CharField(max_length=4, db_index=True)
@@ -136,12 +137,34 @@ class GeoNamesPlace(models.Model):
         return self.name
 
 
+class AirlineCodeHistory(models.Model):
+    """Which airline an IATA code meant at a given date, for codes that were reused (Pan Am's
+    and TWA's codes, PLAN.md §12.2). Manual overrides only: OpenFlights has no dates."""
+
+    code = models.CharField(max_length=3, db_index=True)
+    airline = models.ForeignKey(Airline, on_delete=models.DB_CASCADE, related_name="code_history")
+    valid_from = models.DateField(null=True, blank=True)
+    valid_to = models.DateField(null=True, blank=True)
+    note = models.CharField(max_length=255, blank=True)
+
+    def __str__(self) -> str:
+        return f"{self.code} → {self.airline_id}"
+
+
 class DatasetVersion(models.Model):
+    """The loaded version of each reference dataset, shown on the attribution page."""
+
     name = models.CharField(max_length=64, unique=True)
+    title = models.CharField(max_length=100, blank=True)
     source_url = models.URLField(max_length=500)
+    homepage_url = models.URLField(max_length=500, blank=True)
     version = models.CharField(max_length=64, blank=True)
+    source_commit = models.CharField(max_length=40, blank=True)
+    source_date = models.DateField(null=True, blank=True)
     checksum = models.CharField(max_length=64, blank=True)
     license = models.CharField(max_length=100)
+    license_url = models.URLField(max_length=500, blank=True)
+    attribution = models.CharField(max_length=255, blank=True)
     row_count = models.IntegerField(default=0)
     loaded_at = models.DateTimeField(auto_now=True)
 

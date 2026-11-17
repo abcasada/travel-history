@@ -1,0 +1,6 @@
+# Bundled airline code overrides (PLAN.md §12.2): IATA codes reused by a later airline.
+# `openflights_id` is the OpenFlights airline id; dates are inclusive. Public facts only.
+code,openflights_id,valid_from,valid_to,note
+PA,3886,,1991-12-04,Pan American World Airways ceased operations 1991-12-04
+TW,5098,,2001-12-01,Trans World Airlines ceased operations 2001-12-01 (merged into American)
+TW,16624,2010-01-01,,T'way Air (South Korea) uses TW from its 2010 start
