@@ -9,7 +9,7 @@ import pytest
 from django.contrib.gis.geos import LineString, Point
 
 from tests.factories import UserFactory
-from tests.helpers import as_owner
+from tests.helpers import as_owner, rollup_mismatches
 from tests.synth import timeline as synth
 from travel.core.rls import rls_context
 from travel.history import importers, rawstore
@@ -118,6 +118,7 @@ def test_import_never_touches_other_users_data(user, tmp_path):
     with as_owner():
         assert TimelineSegment.objects.filter(owner=other).count() == 10
         assert TimelineSegment.objects.filter(owner=user).count() == 10
+    assert rollup_mismatches() == []  # the map roll-up follows the points (rule 6)
 
 
 # --- Re-imports ---------------------------------------------------------------------------------
@@ -132,6 +133,7 @@ def test_identical_content_in_a_new_file_is_skipped(user, tmp_path):
     assert segments["new"] == segments["changed"] == 0
     assert batch.summary["points"][PointSource.GOOGLE_PATH]["duplicates"] == 3
     assert len(current(user)) == 10
+    assert rollup_mismatches() == []  # the map roll-up follows the points (rule 6)
 
 
 def test_edited_visit_becomes_a_new_version_and_the_old_is_kept(user, tmp_path):
@@ -157,6 +159,7 @@ def test_absent_segments_are_not_deleted(user, tmp_path):
     assert batch.summary["segments"]["identical"] == 3
     assert batch.summary["segments"]["absent_kept"] >= 1
     assert len(current(user)) == 10
+    assert rollup_mismatches() == []  # the map roll-up follows the points (rule 6)
 
 
 def test_split_visit_supersedes_once_and_adds_a_new_lineage(user, tmp_path):

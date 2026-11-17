@@ -16,7 +16,7 @@ from django.db import connections
 from django.test import Client
 
 from tests.factories import DENVER, TOPEKA, WICHITA, UserFactory, device_token
-from tests.helpers import as_owner
+from tests.helpers import as_owner, rollup_mismatches
 from travel.accounts.models import DeviceToken, Role
 from travel.history.models import LocationPoint
 from travel.tracking import tokens
@@ -170,6 +170,7 @@ def test_duplicates_are_dropped_quietly(client, alice):
     with as_owner():
         token.refresh_from_db()
     assert token.points_received == 1
+    assert rollup_mismatches() == []
 
 
 @pytest.mark.parametrize("kind", ["lwt", "card", "cmd", "transition", "waypoint", "status"])
@@ -273,6 +274,7 @@ def test_a_token_writes_only_into_its_owners_history(client, alice, bob):
     assert [p.owner_id for p in points(bob_token)] == [bob.pk]
     assert [p.device_id for p in points(owner=alice)] == [alice_token.pk]
     assert [p.device_id for p in points(owner=bob)] == [bob_token.pk]
+    assert rollup_mismatches() == []
 
 
 def test_responses_carry_no_data(client, alice):

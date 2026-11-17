@@ -52,7 +52,7 @@ object under §6.2. "Participant" means a Member whose person participates in th
 | Which legs *I* was on (own overrides) | own person | own person | own person | ❌ | ❌ | ❌ |
 | Who was on a leg (anyone's overrides) | vis (people they can see) | ✅ (people they can see) | ❌ | ❌ | ❌ | ❌ |
 | Public consent for my name/notes/photos/legs | own | own | own | ❌ | own | ❌ |
-| Raw history (points, segments, imports, coverage; also the history map's tiles and coverage strip) | own only | own only | own only | own only | ❌ (no imports) | ❌ |
+| Raw history (points and their map roll-up, segments, imports, coverage; also the history map's tiles and coverage strip) | own only | own only | own only | own only | ❌ (no imports) | ❌ |
 | Home periods | own; family-shared ones read-only | own; shared read-only | — | shared read-only | shared read-only | ❌ |
 | Tags (definitions) | own | own | own | own | ❌ | ❌ |
 | Person: create | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
@@ -82,6 +82,11 @@ Notes:
   filter by owner); `tests/permissions/test_history_tiles.py` checks every actor through the API
   and by calling the builders as `travel_app` under each RLS context, with another user's points
   in the same aggregated cell. A Viewer gets empty tiles (Viewers have no raw history).
+  Aggregated cells are summed from `history_pointrollup` (work-order item 5a), which is raw
+  history too: owner column, `own_all` policy for every command (`owner = app.user_id()` and the
+  family check), written only by triggers on the points as the caller. The same test file checks,
+  as `travel_app`, that each actor reads only their own roll-up rows and cells (whole history and
+  date windows, every zoom band), and that one user can't insert, change or delete another's.
 - Device tokens and tracker ingestion (work-order item 7, D-82; [tracking.md](tracking.md) §9.1):
   - Nobody sees another user's tokens, not even the Admin. A token is shown once, at creation;
     only its SHA-256 is stored. Revoking is final (a trigger refuses un-revoking and any change
@@ -126,7 +131,7 @@ schema and fails if any user-owned table lacks RLS or a policy for each command.
 
 | Table group | SELECT | INSERT | UPDATE | DELETE |
 |---|---|---|---|---|
-| `location_point`, `timeline_segment`, `raw_file`, `import_batch`, `coverage_report`, `detection_run`, `rejected_candidate`, `device_token`, `push_subscription`, `integration_setting`, `user_preference`, `tag` | `owner = app.user_id()`; `device_token` also by hash in the `ingest` context | same; points: Admin/Member only, and a named device must be the owner's unrevoked token | same (points/raw files: never, trigger; tokens: name and counters only, revocation final) | owner (points: purge only) |
+| `location_point`, `point_rollup`, `timeline_segment`, `raw_file`, `import_batch`, `coverage_report`, `detection_run`, `rejected_candidate`, `device_token`, `push_subscription`, `integration_setting`, `user_preference`, `tag` | `owner = app.user_id()`; `device_token` also by hash in the `ingest` context | same; points: Admin/Member only, and a named device must be the owner's unrevoked token | same (points/raw files: never, trigger; tokens: name and counters only, revocation final) | owner (points: purge only) |
 | `trip` | `app.can_view_trip(id)` | `owner = me AND app.can_create()` | `app.can_edit_trip_core(id)` | `owner = me` |
 | `leg`, `route` | `app.can_view_trip(trip)` | core editor, or contributor with `author = me` | core editor on core legs, author on own (while they may contribute) | same as update |
 | `trip_participant` | view trip | core editor, and the person is visible to them | core editor; own `public_consent` via function; the person stays visible | core editor |

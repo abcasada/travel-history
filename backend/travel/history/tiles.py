@@ -9,8 +9,10 @@ history, so a bug here cannot widen it. Callers check `policy.can_access_raw_his
 Bounds (so one request can't tie up the database or the browser):
 - zoom 0..MAX_ZOOM only; x/y must lie inside the zoom level's grid;
 - below POINTS_MIN_ZOOM, and above it whenever a tile holds more than MAX_POINTS_PER_TILE points,
-  points are counted into a GRID x GRID grid per tile (one feature per occupied cell, so at most
-  (GRID + 2*MARGIN_CELLS)^2 features however much history there is);
+  points are counted into a grid of at most GRID x GRID cells per tile (one feature per occupied
+  cell, so at most (GRID + 2*MARGIN_CELLS)^2 features however much history there is). The counts
+  come from the per-day/per-year roll-up (`history_pointrollup`, history migration 0010), with raw
+  points only for the partial UTC days at the ends of a date range;
 - segment tiles start at SEGMENTS_MIN_ZOOM and hold at most MAX_SEGMENTS_PER_TILE features
   (newest first), simplified to about a pixel;
 - every tile query runs under a statement timeout (TileTimeout -> HTTP 503);
@@ -69,7 +71,11 @@ def check_tile(z: int, x: int, y: int, min_zoom: int = 0) -> None:
 
 KEY_ZOOM = 20  # app.tile_key(): the point's tile at this zoom, x/y bits interleaved
 NEIGHBOUR_DEPTH = 2  # the margin is read from neighbours' adjacent quarter-tiles
-KEY_CELLS_MAX_ZOOM = KEY_ZOOM - GRID_BITS  # up to here a grid cell is a key prefix
+
+# The roll-up's cell zooms and grains (history migration 0010 must list the same).
+ROLLUP_LEVELS = (8, 10, 12, 14, 16, 18, 20)
+GRAIN_DAY, GRAIN_YEAR = 1, 2
+USE_ROLLUP = True  # tests switch it off to compare against counting raw points
 
 
 def _spread(v: int) -> int:
@@ -160,24 +166,18 @@ def _point_join(ranges: list[tuple[int, int]], params: dict) -> str:
     return f"JOIN history_locationpoint p ON {keys} AND p.geom && q.outer4326"
 
 
-def _key_condition(ranges: list[tuple[int, int]], params: dict) -> str:
+def _key_condition(
+    ranges: list[tuple[int, int]], params: dict, column: str = "p.tile_key", shift: int = 0
+) -> str:
+    """`column` inside any of the key ranges, cut by `shift` bits (the ranges are aligned to a
+    zoom at or below the column's, so the cut is exact). Bound values, one name per range."""
     terms = []
-    for i, (lo, hi) in enumerate(ranges):
-        params[f"lo{i}"], params[f"hi{i}"] = lo, hi
-        terms.append(f"(p.tile_key >= %(lo{i})s AND p.tile_key < %(hi{i})s)")
+    for lo, hi in ranges:
+        i = len(params)
+        params[f"k{i}"], params[f"k{i + 1}"] = lo >> shift, hi >> shift
+        terms.append(f"({column} >= %(k{i})s AND {column} < %(k{i + 1})s)")
     return "(" + " OR ".join(terms) + ")"
 
-
-_COUNT_POINTS = (
-    _ENVELOPE  # noqa: S608
-    + """
-SELECT count(*) FROM (
-  SELECT 1 FROM q {points}
-   WHERE true {filters}
-   LIMIT %(cap)s
-) s
-"""
-)
 
 _POINTS = (
     _ENVELOPE  # noqa: S608
@@ -193,48 +193,16 @@ SELECT ST_AsMVT(f, 'points', %(extent)s, 'geom') FROM (
 """
 )
 
-# Cells are aligned to the tile corner and the cell size divides the tile width, so every tile
-# at a zoom level shares one global grid: a cell in the margin is the same cell (and count) its
-# neighbouring tile draws.
+# Grid cells are map tiles `grid_bits` zoom levels below the tile (at most zoom KEY_ZOOM), so a
+# cell is a key prefix: counts are summed by prefix from the roll-up (and raw points' keys),
+# without touching geometry. Cells are aligned to one global grid per zoom level, so a cell in a
+# tile's margin is the same cell (and count) the neighbouring tile draws.
 _CELLS = (
     _ENVELOPE  # noqa: S608
     + """
 , cells AS (
-  SELECT floor((m.mx - q.x0) / q.cell) AS cx,
-         floor((m.my - q.y0) / q.cell) AS cy,
-         count(*) AS n
-    FROM q {points}
-    -- Web Mercator by hand: plain arithmetic is several times cheaper per point than
-    -- ST_Transform, and the cell only needs to be right to a fraction of a pixel.
-    CROSS JOIN LATERAL (
-      SELECT 6378137 * radians(ST_X(p.geom)) AS mx,
-             6378137 * ln(tan(pi() / 4 + radians(
-               least(greatest(ST_Y(p.geom), -85.0511287798), 85.0511287798)) / 2)) AS my
-    ) m
-   WHERE true {filters}
-   GROUP BY 1, 2
-)
-SELECT ST_AsMVT(f, 'points', %(extent)s, 'geom') FROM (
-  SELECT ST_AsMVTGeom(
-           ST_Point(q.x0 + (c.cx + 0.5) * q.cell, q.y0 + (c.cy + 0.5) * q.cell, 3857),
-           q.tile, %(extent)s, %(buffer)s, true) AS geom,
-         c.n
-    FROM cells c, q
-) f
--- A cell a rounding error beyond the margin is clipped to NULL by ST_AsMVTGeom (and skipped).
-"""
-)
-
-# Below POINTS_MIN_ZOOM a grid cell (1/GRID of the tile) is exactly the tile GRID_BITS zoom
-# levels further down, so points are grouped by their key's leading bits: integer work straight
-# off the (owner_id, tile_key) index, without touching the geometry. Same cells as _CELLS.
-_KEY_CELLS = (
-    _ENVELOPE  # noqa: S608
-    + """
-, cells AS (
-  SELECT p.tile_key >> %(shift)s AS c, count(*) AS n
-    FROM history_locationpoint p
-   WHERE {keys} {filters}
+  SELECT u.c >> %(regroup)s AS c, sum(u.n)::bigint AS n
+    FROM ({parts}) u
    GROUP BY 1
 )
 SELECT ST_AsMVT(f, 'points', %(extent)s, 'geom') FROM (
@@ -245,8 +213,113 @@ SELECT ST_AsMVT(f, 'points', %(extent)s, 'geom') FROM (
          c.n
     FROM cells c, q
 ) f
+-- A cell a rounding error beyond the margin is clipped to NULL by ST_AsMVTGeom (and skipped).
 """
 )
+
+
+@dataclass(frozen=True)
+class TimeParts:
+    """[start, end) split for the roll-up: whole UTC years (`years`, a [lo, hi) range of
+    1 January dates, None = unbounded), whole UTC days (`days`), and the partial days at the ends,
+    read from raw points (`raw`). None as a whole means no year part."""
+
+    years: tuple[dt.date | None, dt.date | None] | None
+    days: list[tuple[dt.date, dt.date]]
+    raw: list[tuple[dt.datetime | None, dt.datetime | None]]
+
+
+def _midnight(day: dt.date) -> dt.datetime:
+    return dt.datetime.combine(day, dt.time(), tzinfo=dt.UTC)
+
+
+def split_range(start: dt.datetime | None, end: dt.datetime | None) -> TimeParts:
+    if not USE_ROLLUP:
+        return TimeParts(None, [], [(start, end)])
+    d_lo = d_hi = None
+    if start is not None:
+        utc = start.astimezone(dt.UTC)
+        d_lo = utc.date() + dt.timedelta(days=0 if utc == _midnight(utc.date()) else 1)
+    if end is not None:
+        d_hi = end.astimezone(dt.UTC).date()
+    if d_lo is not None and d_hi is not None and d_lo >= d_hi:
+        return TimeParts(None, [], [(start, end)])
+    raw: list[tuple[dt.datetime | None, dt.datetime | None]] = []
+    if start is not None and d_lo is not None and start < _midnight(d_lo):
+        raw.append((start, _midnight(d_lo)))
+    if end is not None and d_hi is not None and _midnight(d_hi) < end:
+        raw.append((_midnight(d_hi), end))
+    y_lo = None if d_lo is None else dt.date(d_lo.year + (d_lo.timetuple().tm_yday > 1), 1, 1)
+    y_hi = None if d_hi is None else dt.date(d_hi.year, 1, 1)
+    if y_lo is not None and y_hi is not None and y_lo >= y_hi:
+        assert d_lo is not None and d_hi is not None
+        return TimeParts(None, [(d_lo, d_hi)], raw)
+    days = []
+    if d_lo is not None and y_lo is not None and d_lo < y_lo:
+        days.append((d_lo, y_lo))
+    if d_hi is not None and y_hi is not None and y_hi < d_hi:
+        days.append((y_hi, d_hi))
+    return TimeParts((y_lo, y_hi), days, raw)
+
+
+# Pieces of `_count_parts`: fixed SQL with integer constants and bound-parameter conditions.
+_ROLLUP_PART = (
+    "SELECT r.cell AS c, r.n FROM history_pointrollup r"
+    " WHERE r.level = {level} AND r.grain = {grain} AND {cells}{more}"
+)
+_RAW_PART = (
+    "SELECT p.tile_key >> {shift} AS c, count(*) AS n FROM history_locationpoint p"
+    " WHERE {keys}{more} GROUP BY 1"
+)
+
+
+def _count_parts(
+    level: int,
+    ranges: list[tuple[int, int]],
+    start: dt.datetime | None,
+    end: dt.datetime | None,
+    sources: Sequence[str] | None,
+    params: dict,
+) -> str:
+    """A UNION ALL of (c, n) rows - c a cell at `level`, n its count - for the caller's points
+    inside the key ranges and [start, end): roll-up rows for whole years and days, raw points
+    for the rest. RLS on both tables limits it to the caller's own history."""
+    parts = split_range(start, end)
+    source = ""
+    if sources:
+        params["sources"] = list(sources)
+        source = " AND {alias}.source = ANY(%(sources)s)"
+
+    def bound(column: str, op: str, value) -> str:
+        if value is None:
+            return ""
+        name = f"t{len(params)}"
+        params[name] = value
+        return f" AND {column} {op} %({name})s"
+
+    selects = []
+    shift = 2 * (KEY_ZOOM - level)
+    periods = [(GRAIN_DAY, lo, hi) for lo, hi in parts.days]
+    if parts.years is not None:
+        periods.insert(0, (GRAIN_YEAR, *parts.years))
+    for grain, lo, hi in periods:
+        cells = _key_condition(ranges, params, "r.cell", shift)
+        conditions = bound("r.period", ">=", lo) + bound("r.period", "<", hi)
+        selects.append(
+            _ROLLUP_PART.format(
+                level=int(level), grain=int(grain), cells=cells, more=conditions + source
+            ).replace("{alias}", "r")
+        )
+    for lo, hi in parts.raw:
+        keys = _key_condition(ranges, params)
+        conditions = bound("p.ts", ">=", lo) + bound("p.ts", "<", hi)
+        selects.append(
+            _RAW_PART.format(shift=int(shift), keys=keys, more=conditions + source).replace(
+                "{alias}", "p"
+            )
+        )
+    return "\n   UNION ALL ".join(selects)
+
 
 _SEGMENTS = (
     _ENVELOPE  # noqa: S608
@@ -323,22 +396,25 @@ def points_tile(
     """The caller's location points in one tile: single points (n=1, ts, src) when zoomed in
     and sparse enough, otherwise grid cells (n = number of points in the cell)."""
     check_tile(z, x, y)
-    filters, params = _filters("p", start, end, sources)
-    params |= _base_params(z, x, y)
-    ranges = key_ranges(z, x, y)
-    sql = {"filters": filters, "points": _point_join(ranges, params)}
+    params = _base_params(z, x, y)
     if z >= POINTS_MIN_ZOOM:
-        params["cap"] = MAX_POINTS_PER_TILE + 1
-        (count,) = _run(_COUNT_POINTS.format(**sql), params)
+        count_params: dict = {}
+        parts = _count_parts(KEY_ZOOM, [key_range(z, x, y)], start, end, sources, count_params)
+        (count,) = _run(f"SELECT coalesce(sum(u.n), 0) FROM ({parts}) u", count_params)  # noqa: S608
         if count <= MAX_POINTS_PER_TILE:
-            (data,) = _run(_POINTS.format(**sql), params)
+            filters, filter_params = _filters("p", start, end, sources)
+            params |= filter_params
+            sql = _POINTS.format(points=_point_join(key_ranges(z, x, y), params), filters=filters)
+            (data,) = _run(sql, params)
             return Tile(bytes(data or b""), aggregated=False)
-    if z <= KEY_CELLS_MAX_ZOOM:
-        params["shift"] = 2 * (KEY_ZOOM - z - GRID_BITS)
-        sql["keys"] = _key_condition(ranges, params)
-        (data,) = _run(_KEY_CELLS.format(**sql), params)
-    else:  # a dense tile at zoom 14+: cells finer than the key's resolution
-        (data,) = _run(_CELLS.format(**sql), params)
+    # Cells GRID_BITS zoom levels down, but no finer than the keys: a dense tile at zoom 14+
+    # gets 2^(20 - z) cells a side (64 at z14, 16 at z16) instead of GRID.
+    cell_zoom = min(z + GRID_BITS, KEY_ZOOM)
+    level = next(level for level in ROLLUP_LEVELS if level >= cell_zoom)
+    params["grid"] = 2 ** (cell_zoom - z)
+    params["regroup"] = 2 * (level - cell_zoom)
+    parts = _count_parts(level, key_ranges(z, x, y), start, end, sources, params)
+    (data,) = _run(_CELLS.format(parts=parts), params)
     return Tile(bytes(data or b""), aggregated=True)
 
 

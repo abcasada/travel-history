@@ -177,6 +177,45 @@ class LocationPoint(models.Model):
         return f"point {self.pk} @ {self.ts:%Y-%m-%d %H:%M}"
 
 
+class PointRollup(models.Model):
+    """How many of an owner's points fall in each map cell per UTC day and per UTC year
+    (history migration 0010; PLAN.md §14). Derived data: database triggers on
+    `history_locationpoint` keep it equal to the raw points in the same transaction (an insert
+    adds, a delete subtracts, a row reaching zero is removed), so imports, re-imports, tracker
+    ingestion and deletions all keep it current without application code. Low-zoom and dense
+    map tiles read it instead of millions of points (travel/history/tiles.py).
+
+    `cell` is the point's `tile_key` cut to `level` (cell = tile_key >> 2 * (20 - level)), so it
+    is a Web Mercator tile at that zoom. `period` is the UTC day (grain DAY) or 1 January of the
+    UTC year (grain YEAR)."""
+
+    class Grain(models.IntegerChoices):
+        DAY = 1, "Day"
+        YEAR = 2, "Year"
+
+    id = models.BigAutoField(primary_key=True)
+    owner = models.ForeignKey(User, on_delete=models.DB_CASCADE, related_name="+", db_index=False)
+    level = models.SmallIntegerField()
+    grain = models.SmallIntegerField(choices=Grain.choices)
+    period = models.DateField()
+    source = models.CharField(max_length=16, choices=PointSource.choices)
+    cell = models.BigIntegerField()
+    n = models.IntegerField()
+
+    class Meta:
+        constraints = [
+            # Also the tile index: owner and level, grain, then a contiguous cell range.
+            models.UniqueConstraint(
+                fields=["owner", "level", "grain", "cell", "period", "source"],
+                name="pointrollup_key",
+            ),
+            models.CheckConstraint(condition=Q(n__gt=0), name="pointrollup_positive"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.n} points in cell {self.level}/{self.cell} on {self.period}"
+
+
 class TimelineSegment(models.Model):
     """One version of a Google Timeline segment. Versions are append-only; only `is_current` and
     `superseded_by` may change (trigger). A lineage groups versions of the same real segment."""

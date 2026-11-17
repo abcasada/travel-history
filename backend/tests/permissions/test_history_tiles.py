@@ -13,9 +13,10 @@ from django.utils import timezone
 
 from tests import mvt
 from tests.factories import WICHITA, LocationPointFactory, TimelineSegmentFactory
-from tests.helpers import as_owner
+from tests.helpers import as_owner, rollup_mismatches
 from travel.core.rls import rls_context
 from travel.history import tiles
+from travel.history.models import LocationPoint
 
 pytestmark = [pytest.mark.django_db]
 
@@ -155,3 +156,89 @@ def test_dense_tile_never_mixes_owners_in_a_cell(history):
     layer = mvt.decode(tile.data)["points"]
     assert tile.aggregated
     assert [f.properties["n"] for f in layer.features] == [ALICE_POINTS]
+
+
+# --- The point roll-up (history migration 0010): same rules as the points -------------------
+
+# Date ranges for the aggregated tiles: whole history (roll-up years), and a window with partial
+# days at both ends (raw points for the edges, roll-up days in between).
+WINDOWS = {"all": None, "partial days": (dt.timedelta(days=-3, hours=-5), dt.timedelta(hours=7))}
+
+
+@pytest.mark.parametrize("window", sorted(WINDOWS))
+@pytest.mark.parametrize("z", [0, 9, 13, 16])
+@pytest.mark.parametrize("actor", [*sorted(VISIBLE), "ivan", None])
+def test_rls_aggregated_cells_count_only_own_points(history, monkeypatch, actor, z, window):
+    """Aggregated cells are summed from the roll-up (and raw points at the window's edges) as
+    travel_app: another user's points at the same place and time never add to a cell."""
+    monkeypatch.setattr(tiles, "MAX_POINTS_PER_TILE", 0)  # aggregate at z16 too
+    start = end = None
+    if WINDOWS[window]:
+        base = timezone.now().replace(microsecond=0) - dt.timedelta(days=2)
+        start, end = (base + offset for offset in WINDOWS[window])
+    user_id = getattr(history, actor).pk if actor else None
+    with rls_context(user_id):
+        tile = tiles.points_tile(*tile_of(WICHITA, z), start=start, end=end)
+    layer = mvt.decode(tile.data).get("points")
+    cells = [f.properties["n"] for f in layer.features] if layer else []
+    expected = 0
+    if actor in VISIBLE:
+        with as_owner():
+            own = LocationPoint.objects.filter(owner=getattr(history, actor))
+            if start is not None:
+                own = own.filter(ts__gte=start, ts__lt=end)
+            expected = own.count()
+    assert expected == (VISIBLE.get(actor, 0) if window == "all" else expected)
+    assert cells == ([expected] if expected else [])
+    assert tile.aggregated or not expected
+
+
+@pytest.mark.parametrize("actor", [*sorted(VISIBLE), "ivan", None])
+def test_rls_rollup_rows_are_own_only(history, actor):
+    from django.db import connection
+
+    user_id = getattr(history, actor).pk if actor else None
+    with rls_context(user_id), connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT owner_id, sum(n) FROM history_pointrollup WHERE level = 20 AND grain = %s"
+            " GROUP BY 1",
+            [tiles.GRAIN_YEAR],
+        )
+        rows = dict(cursor.fetchall())
+    assert rows == ({user_id: VISIBLE[actor]} if VISIBLE.get(actor) else {})
+
+
+def test_rls_rollup_of_another_user_cannot_be_written(history):
+    """As travel_app, Alice can neither add to, change nor delete Bob's roll-up rows."""
+    from django.db import DatabaseError, connection, transaction
+
+    with as_owner(), connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT id, n FROM history_pointrollup WHERE owner_id = %s ORDER BY id",
+            [history.bob.pk],
+        )
+        before = cursor.fetchall()
+    assert before
+    with rls_context(history.alice.pk), connection.cursor() as cursor:
+        with pytest.raises(DatabaseError, match="row-level security"), transaction.atomic():
+            cursor.execute(
+                "INSERT INTO history_pointrollup (owner_id, level, grain, period, source, cell, n)"
+                " VALUES (%s, 20, 1, '2025-01-01', 'owntracks', 1, 5)",
+                [history.bob.pk],
+            )
+        cursor.execute(
+            "UPDATE history_pointrollup SET n = n + 1 WHERE owner_id = %s", [history.bob.pk]
+        )
+        assert cursor.rowcount == 0
+        cursor.execute("DELETE FROM history_pointrollup WHERE owner_id = %s", [history.bob.pk])
+        assert cursor.rowcount == 0
+        # Deleting her own points (the trigger path) leaves Bob's roll-up alone too.
+        cursor.execute("DELETE FROM history_locationpoint")
+        assert cursor.rowcount == ALICE_POINTS
+    with as_owner(), connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT id, n FROM history_pointrollup WHERE owner_id = %s ORDER BY id",
+            [history.bob.pk],
+        )
+        assert cursor.fetchall() == before
+    assert rollup_mismatches() == []

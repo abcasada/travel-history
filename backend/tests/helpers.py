@@ -46,3 +46,41 @@ def sample_paths(resolver=None, prefix=""):
                     start = path.index(converter)
                     path = path[:start] + sample + path[path.index(">", start) + 1 :]
             yield path
+
+
+def rollup_mismatches(owner_ids=None, using: str = "default") -> list[tuple]:
+    """Rows where `history_pointrollup` differs from counting the raw points again (history
+    migration 0010), as (owner, level, grain, period, source, cell, rollup n, raw n). Run as the
+    owner role, so every user's rows are compared. Empty when the roll-up is consistent."""
+    from travel.history import tiles
+
+    levels = "{" + ",".join(str(level) for level in tiles.ROLLUP_LEVELS) + "}"
+    with as_owner(using), connections[using].cursor() as cursor:
+        cursor.execute(
+            """
+            WITH raw AS (
+              SELECT p.owner_id, l.level, g.grain,
+                     CASE g.grain WHEN %(day)s THEN (p.ts AT TIME ZONE 'UTC')::date
+                          ELSE date_trunc('year', p.ts AT TIME ZONE 'UTC')::date END AS period,
+                     p.source, p.tile_key >> (2 * (20 - l.level)) AS cell, count(*) AS n
+                FROM history_locationpoint p
+               CROSS JOIN unnest(%(levels)s::smallint[]) l(level)
+               CROSS JOIN unnest(%(grains)s::smallint[]) g(grain)
+               WHERE %(owners)s::bigint[] IS NULL OR p.owner_id = ANY(%(owners)s::bigint[])
+               GROUP BY 1, 2, 3, 4, 5, 6
+            ), rolled AS (
+              SELECT owner_id, level, grain, period, source, cell, n FROM history_pointrollup
+               WHERE %(owners)s::bigint[] IS NULL OR owner_id = ANY(%(owners)s::bigint[])
+            )
+            SELECT owner_id, level, grain, period, source, cell, r.n, raw.n
+              FROM rolled r FULL JOIN raw USING (owner_id, level, grain, period, source, cell)
+             WHERE r.n IS DISTINCT FROM raw.n
+            """,
+            {
+                "day": tiles.GRAIN_DAY,
+                "levels": levels,
+                "grains": [tiles.GRAIN_DAY, tiles.GRAIN_YEAR],
+                "owners": list(owner_ids) if owner_ids is not None else None,
+            },
+        )
+        return cursor.fetchall()

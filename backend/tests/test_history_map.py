@@ -13,7 +13,7 @@ from django.db import connection
 
 from tests import mvt
 from tests.factories import WICHITA, LocationPointFactory, TimelineSegmentFactory, UserFactory
-from tests.helpers import as_owner
+from tests.helpers import as_owner, rollup_mismatches
 from tests.permissions.test_history_tiles import point_count, segment_ids, tile_of
 from travel.core.rls import get_context, rls_context
 from travel.history import tiles
@@ -393,29 +393,152 @@ def test_point_keys_match_tile_ranges(member):
                 assert lo <= key < hi, (point.coords, z)
 
 
-@pytest.mark.parametrize("z", [4, 9, 13])
-def test_key_cells_match_geometric_cells(member, monkeypatch, z):
-    """Grouping by key prefix (zoom <= 13) yields exactly the cells and counts that the
-    geometric grid (used for dense tiles at zoom 14+) does."""
-    rng = random.Random(z)  # noqa: S311 - synthetic test data
+# --- Roll-up (history migration 0010) --------------------------------------------------------
+
+RANGES = {
+    "all": (None, None),
+    "local days": (
+        dt.datetime(2024, 12, 31, 6, tzinfo=UTC),  # midnight in Kansas: partial UTC days
+        dt.datetime(2026, 2, 3, 6, tzinfo=UTC),
+    ),
+    "whole years": (dt.datetime(2025, 1, 1, tzinfo=UTC), dt.datetime(2026, 1, 1, tzinfo=UTC)),
+    "within a day": (DAY1 - dt.timedelta(hours=2), DAY1 + dt.timedelta(hours=3)),
+    "from only": (DAY1 + dt.timedelta(minutes=7), None),
+    "to only": (None, DAY2 + dt.timedelta(days=200, minutes=1)),
+}
+
+
+@pytest.fixture
+def scattered(member):
+    """600 points over three years, two sources and a few hundred kilometres."""
+    rng = random.Random(5)  # noqa: S311 - synthetic test data
     with as_owner():
-        for i in range(300):
-            where = Point(
-                WICHITA.x + rng.uniform(-0.3, 0.3) * 2 ** (6 - z),
-                WICHITA.y + rng.uniform(-0.3, 0.3) * 2 ** (6 - z),
-                srid=4326,
+        for i in range(600):
+            LocationPointFactory(
+                owner=member.user,
+                ts=DAY1 + dt.timedelta(days=rng.uniform(-400, 400), seconds=i),
+                source=rng.choice([PointSource.OWNTRACKS, PointSource.GOOGLE_RAW]),
+                geom=Point(
+                    WICHITA.x + rng.gauss(0, 0.5) * rng.choice([0.001, 0.05, 1]),
+                    WICHITA.y + rng.gauss(0, 0.5) * rng.choice([0.001, 0.05, 1]),
+                    srid=4326,
+                ),
             )
-            LocationPointFactory(owner=member.user, ts=DAY1 + dt.timedelta(seconds=i), geom=where)
+    return member
 
-    def cells():
-        with rls_context(member.user.pk):
-            layer = mvt.decode(tiles.points_tile(*tile_of(WICHITA, z)).data)["points"]
-        return sorted((f.points()[0], f.properties["n"]) for f in layer.features)
 
-    by_key = cells()
-    monkeypatch.setattr(tiles, "KEY_CELLS_MAX_ZOOM", -1)
-    assert by_key == cells()
-    assert sum(n for _, n in by_key) > 0
+@pytest.mark.parametrize("label", sorted(RANGES))
+@pytest.mark.parametrize("z", [0, 5, 9, 13, 16])
+def test_rollup_cells_equal_counting_raw_points(scattered, monkeypatch, label, z):
+    """Whatever the zoom and date range, the roll-up (plus raw points for partial days) gives
+    exactly the cells and counts that counting the raw points does."""
+    monkeypatch.setattr(tiles, "MAX_POINTS_PER_TILE", 0)  # z16 aggregates too
+    start, end = RANGES[label]
+
+    def cells(sources=None):
+        with rls_context(scattered.user.pk):
+            tile = tiles.points_tile(*tile_of(WICHITA, z), start=start, end=end, sources=sources)
+        layer = mvt.decode(tile.data).get("points")
+        return sorted((f.points()[0], f.properties["n"]) for f in layer.features) if layer else []
+
+    rolled, rolled_source = cells(), cells(["google_raw"])
+    monkeypatch.setattr(tiles, "USE_ROLLUP", False)
+    assert rolled == cells()
+    assert rolled_source == cells(["google_raw"])
+    if label == "all":
+        assert sum(n for _, n in rolled) > 0
+
+
+def test_rollup_follows_inserts_duplicates_and_deletes(member):
+    """The triggers keep the roll-up equal to the raw points as travel_app: a re-sent batch adds
+    nothing, deleting points subtracts them, and emptied rows disappear."""
+    sql = """
+        INSERT INTO history_locationpoint (owner_id, ts, geom, source, received_at)
+        SELECT %s, timestamptz '2025-03-01 00:00Z' + make_interval(mins => g * 37),
+               ST_SetSRID(ST_Point(%s + g * 0.003, %s), 4326), 'owntracks', now()
+          FROM generate_series(1, 200) g
+        ON CONFLICT ON CONSTRAINT point_dedupe DO NOTHING
+    """
+    args = [member.user.pk, WICHITA.x, WICHITA.y]
+    with rls_context(member.user.pk), connection.cursor() as cursor:
+        cursor.execute(sql, args)
+        assert cursor.rowcount == 200
+        cursor.execute(sql, args)  # the same batch again: all duplicates
+        assert cursor.rowcount == 0
+        assert rollup_mismatches([member.user.pk]) == []
+        cursor.execute(
+            "SELECT sum(n) FROM history_pointrollup WHERE level = 20 AND grain = %s",
+            [tiles.GRAIN_YEAR],
+        )
+        assert cursor.fetchone()[0] == 200
+        cursor.execute("DELETE FROM history_locationpoint WHERE ts < '2025-03-02'")
+        assert cursor.rowcount > 0
+        assert rollup_mismatches([member.user.pk]) == []
+        cursor.execute("DELETE FROM history_locationpoint")
+        cursor.execute("SELECT count(*) FROM history_pointrollup")
+        assert cursor.fetchone()[0] == 0
+
+
+def test_rollup_levels_match_the_migration(member):
+    add_points(member.user, DAY1)
+    with as_owner(), connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT array_agg(DISTINCT level ORDER BY level), array_agg(DISTINCT grain ORDER BY"
+            " grain) FROM history_pointrollup WHERE owner_id = %s",
+            [member.user.pk],
+        )
+        levels, grains = cursor.fetchone()
+    assert tuple(levels) == tiles.ROLLUP_LEVELS
+    assert grains == [tiles.GRAIN_DAY, tiles.GRAIN_YEAR]
+
+
+def d(*args):
+    return dt.date(*args)
+
+
+def t(*args):
+    return dt.datetime(*args, tzinfo=UTC)
+
+
+@pytest.mark.parametrize(
+    ("start", "end", "years", "days", "raw"),
+    [
+        (None, None, (None, None), [], []),
+        (t(2025, 1, 1), t(2026, 1, 1), (d(2025, 1, 1), d(2026, 1, 1)), [], []),
+        (
+            t(2024, 12, 31, 6),
+            t(2026, 2, 3, 6),
+            (d(2025, 1, 1), d(2026, 1, 1)),
+            [(d(2026, 1, 1), d(2026, 2, 3))],
+            [(t(2024, 12, 31, 6), t(2025, 1, 1)), (t(2026, 2, 3), t(2026, 2, 3, 6))],
+        ),
+        (
+            t(2025, 3, 1, 6),
+            t(2025, 4, 1, 6),
+            None,
+            [(d(2025, 3, 2), d(2025, 4, 1))],
+            [(t(2025, 3, 1, 6), t(2025, 3, 2)), (t(2025, 4, 1), t(2025, 4, 1, 6))],
+        ),
+        (t(2025, 3, 1, 6), t(2025, 3, 1, 9), None, [], [(t(2025, 3, 1, 6), t(2025, 3, 1, 9))]),
+        (t(2025, 3, 1, 6), t(2025, 3, 2, 3), None, [], [(t(2025, 3, 1, 6), t(2025, 3, 2, 3))]),
+        (
+            t(2025, 6, 1),
+            None,
+            (d(2026, 1, 1), None),
+            [(d(2025, 6, 1), d(2026, 1, 1))],
+            [],
+        ),
+        (
+            None,
+            t(2025, 6, 1, 12),
+            (None, d(2025, 1, 1)),
+            [(d(2025, 1, 1), d(2025, 6, 1))],
+            [(t(2025, 6, 1), t(2025, 6, 1, 12))],
+        ),
+    ],
+)
+def test_split_range(start, end, years, days, raw):
+    assert tiles.split_range(start, end) == tiles.TimeParts(years, days, raw)
 
 
 def test_key_ranges_cover_the_margin():
