@@ -33,7 +33,7 @@ Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhi
 2. **[X] T4 + T2:** account privacy, and the database-backed rate limiter. Tests must cover concurrent requests.
    - Status: done (2026-11-11)
 3. **[M] T5:** a 500 MB–1 GB synthetic import test. Record time, peak memory, and database growth. If it's over budget or fails: ESCALATE.
-   - Status: in progress (dispatched 2026-11-17; /bulk on the SSD, D-84)
+   - Status: done (2026-11-17). 1 GB passes: worker peak 272 MiB of 1,536; import 16 min; +1.24 GB DB, about 347 B/point. Re-run with `./dev import-scale-test`.
 4. **[M] T11 + real import:**
    - Wipe the synthetic data, after confirming the target is the dev database and holds only synthetic data.
    - Import my real export and verify the counts.
@@ -48,7 +48,7 @@ Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhi
      - make the e2e upload check verify its own upload, not an earlier one.
 
      Run after item 3 has measured tile timings at 500 MB–1 GB. Then run `./dev restore-test` once the disk is fixed, to confirm the generated `tile_key` column restores.
-     - Status: todo (waits on item 3)
+     - Status: in progress (dispatched 2026-11-17)
 6. **[X] T18 core:** the permission-critical trips API, with endpoint tests for every role and visibility rule.
    - Status: done (2026-11-11)
 7. **[X] T7:** tracker endpoints, built and tested locally.
@@ -242,3 +242,4 @@ Nature: mech = mechanical, mod = moderate, hard. Size is S/M/L/XL with approxima
 - 2026-11-16: item 7 done and verified (pushed, tree clean, `./dev test-quick` 1245 + 31 passed; builder-xhigh at xhigh). It was interrupted by the usage limit and resumed. D-82 and Q-17 are waiting for Adam.
 - 2026-11-17: Adam approved D-81, D-82, D-83 (item 5 tiles), the D-76 directory fields, Q-10, Q-12, Q-16 and Q-17. Item 3 is unblocked by D-84 (bulk on the SSD while the HDD is replaced). Item 8 is dispatched to prepare only.
 - 2026-11-17: item 8 prepared and verified (pushed, tree clean, `./dev test-quick` 1260 + 31 passed; the ingest service on 127.0.0.1:8783 returns 404 off the ingest paths and sends HSTS and security headers). Waiting for Adam's "go". Item 3 dispatched meanwhile.
+- 2026-11-17: item 3 done and verified (`./dev test-quick` 1260 + 31 passed). The builder lost Bash access at its last step, so the orchestrator committed its docs. Finding #4 is closed. The tiles confirm item 5a is needed: whole-history point tiles take 1–2 s at 3.6 M points. Point storage is about 347 B per point, so 20 M points would be about 7 GB against a 5 GB budget; the budget note is in resource-budget.md §21.1. Item 5a dispatched.
