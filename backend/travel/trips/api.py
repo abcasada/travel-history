@@ -785,6 +785,39 @@ def create_trip(request, payload: TripIn):
     return Status(201, _TripView(request.user, trip).detail())
 
 
+# Registered before /trips/{trip_id}, which would otherwise match "bulk".
+@router.post(
+    "/trips/bulk",
+    response={200: TripPageOut, 403: BulkRefusedOut},
+    operation_id="bulkEditTrips",
+)
+def bulk_edit_trips(request, payload: BulkTripsIn):
+    """Purpose, visibility, participants and the caller's own tags for many trips. All or
+    nothing: if any trip may not take the change, 403 lists every refused trip and nothing is
+    written. A trip the caller can't see answers 404, as for one trip."""
+    ids = list(dict.fromkeys(payload.trip_ids))
+    trips = {t.pk: t for t in policy.visible_trips(request.user).filter(pk__in=ids)}
+    missing = [
+        pk for pk in ids if pk not in trips or not policy.can_view_trip(request.user, trips[pk])
+    ]
+    if missing:
+        raise HttpError(404, f"trips not found: {missing}")
+    try:
+        services.bulk_edit(request.user, [trips[pk] for pk in ids], _changes(payload))
+    except BulkRefused as error:
+        return Status(403, {"detail": error.message, "refused": error.refused})
+    except TripError as error:
+        _fail(error)
+    page = list(policy.visible_trips(request.user).select_related("purpose").filter(pk__in=ids))
+    page.sort(key=lambda t: ids.index(t.pk))
+    owners = _directory({t.owner_id for t in page})
+    tags = _trip_tags(page)
+    return {
+        "count": len(page),
+        "items": [_trip_summary(request.user, t, owners, tags) for t in page],
+    }
+
+
 @router.get("/trips/{trip_id}", response=TripDetailOut, operation_id="getTrip")
 def get_trip(request, trip_id: int):
     return _TripView(request.user, _trip(request, trip_id)).detail()
@@ -991,38 +1024,6 @@ def reorder_legs(request, trip_id: int, payload: LegOrderIn):
         _fail(error)
     view = _TripView(request.user, trip)
     return [view.leg(g) for g in view.legs]
-
-
-@router.post(
-    "/trips/bulk",
-    response={200: TripPageOut, 403: BulkRefusedOut},
-    operation_id="bulkEditTrips",
-)
-def bulk_edit_trips(request, payload: BulkTripsIn):
-    """Purpose, visibility, participants and the caller's own tags for many trips. All or
-    nothing: if any trip may not take the change, 403 lists every refused trip and nothing is
-    written. A trip the caller can't see answers 404, as for one trip."""
-    ids = list(dict.fromkeys(payload.trip_ids))
-    trips = {t.pk: t for t in policy.visible_trips(request.user).filter(pk__in=ids)}
-    missing = [
-        pk for pk in ids if pk not in trips or not policy.can_view_trip(request.user, trips[pk])
-    ]
-    if missing:
-        raise HttpError(404, f"trips not found: {missing}")
-    try:
-        services.bulk_edit(request.user, [trips[pk] for pk in ids], _changes(payload))
-    except BulkRefused as error:
-        return Status(403, {"detail": error.message, "refused": error.refused})
-    except TripError as error:
-        _fail(error)
-    page = list(policy.visible_trips(request.user).select_related("purpose").filter(pk__in=ids))
-    page.sort(key=lambda t: ids.index(t.pk))
-    owners = _directory({t.owner_id for t in page})
-    tags = _trip_tags(page)
-    return {
-        "count": len(page),
-        "items": [_trip_summary(request.user, t, owners, tags) for t in page],
-    }
 
 
 # --- Route versions (read-only: saved routes are frozen, rule 5) -------------------------------
