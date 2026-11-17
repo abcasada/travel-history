@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     "travel.trips",
     "travel.vehicles",
     "travel.history",
+    "travel.flights",
     "travel.media",
     "travel.public",
     "travel.tracking",
