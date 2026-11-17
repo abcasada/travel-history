@@ -40,12 +40,19 @@ def _bytes_in_use(owner_id: int) -> int:
     return (stored or 0) + (pending or 0)
 
 
-def _drop_stale_sessions(owner_id: int) -> None:
+def drop_stale_sessions(owner_id: int) -> int:
+    """Abort the owner's uploads that got no chunk for `STALE_AFTER` and delete their part
+    files. Runs when the owner starts a new upload and nightly for everyone (job
+    `stale_uploads`, travel/core/jobs.py), always as the owner under RLS."""
     cutoff = timezone.now() - STALE_AFTER
-    for session in UploadSession.objects.filter(
-        owner_id=owner_id, status=UploadSession.Status.OPEN, updated_at__lt=cutoff
-    ):
+    stale = list(
+        UploadSession.objects.filter(
+            owner_id=owner_id, status=UploadSession.Status.OPEN, updated_at__lt=cutoff
+        )
+    )
+    for session in stale:
         abort(session)
+    return len(stale)
 
 
 def create_session(
@@ -63,7 +70,7 @@ def create_session(
         raise UploadError(422, "empty file")
     if size > settings.TRAVEL_UPLOAD_MAX_BYTES:
         raise UploadError(413, "file is larger than the upload limit")
-    _drop_stale_sessions(owner_id)
+    drop_stale_sessions(owner_id)
     if _bytes_in_use(owner_id) + size > settings.TRAVEL_USER_QUOTA_BYTES:
         raise UploadError(413, "storage quota exceeded")
     session = UploadSession.objects.create(

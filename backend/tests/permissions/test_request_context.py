@@ -1,6 +1,7 @@
 """The request middleware sets the RLS context from the session (and clears it otherwise)."""
 
 import pytest
+from django.db import DataError, connection
 
 from tests.helpers import as_owner
 from travel.accounts.models import User
@@ -50,6 +51,20 @@ def test_nested_rls_context_restores_previous_user(family):
         assert not Trip.objects.filter(pk=family.trips["private"].pk).exists()
     assert get_context() == (family.alice.pk, "")
     assert Trip.objects.filter(pk=family.trips["private"].pk).exists()
+
+
+@pytest.mark.parametrize("statement", [None, "SELECT 1 / 0"])
+def test_nested_rls_context_restores_previous_user_after_an_error(family, statement):
+    """A failing block rolls back to its savepoint, which also undoes its context; the error
+    that escapes is the block's own (D-87: the per-user job runner logs its class)."""
+    set_context(family.alice.pk)
+    expected = ValueError if statement is None else DataError
+    with pytest.raises(expected), rls_context(family.bob.pk):
+        if statement is None:
+            raise ValueError("boom")
+        with connection.cursor() as cursor:
+            cursor.execute(statement)
+    assert get_context() == (family.alice.pk, "")
 
 
 def test_unknown_system_context_is_rejected():
