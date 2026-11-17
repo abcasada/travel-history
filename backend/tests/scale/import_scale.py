@@ -40,6 +40,7 @@ SCAN_EVERY_S = 300  # wifiScan + activityRecord (not imported, but they make up 
 
 HISTORY_TABLES = [
     "history_locationpoint",
+    "history_pointrollup",
     "history_timelinesegment",
     "history_placehint",
     "history_importbatch",
@@ -47,7 +48,8 @@ HISTORY_TABLES = [
     "history_uploadsession",
     "history_coveragereport",
 ]
-TILE_ZOOMS = [0, 3, 6, 10, 16]
+TILE_ZOOMS = [0, 3, 6, 10, 13, 16, 18]
+SEGMENT_ZOOMS = [6, 10, 13, 16]
 
 
 # --- generation -------------------------------------------------------------------------------
@@ -351,7 +353,7 @@ def _time_tiles(client: _Client, first_day: str) -> dict:
     ranges = {"all": "", "one_year": f"?from={year}-01-01T00:00:00Z&to={year + 1}-01-01T00:00:00Z"}
     for layer, prefix, zooms in [
         ("points", "/api/v1/history/tiles", TILE_ZOOMS),
-        ("segments", "/api/v1/history/segments/tiles", [6, 10, 16]),
+        ("segments", "/api/v1/history/segments/tiles", SEGMENT_ZOOMS),
     ]:
         for label, query in ranges.items():
             for z in zooms:
@@ -456,10 +458,23 @@ def run(path: Path, results_path: Path) -> int:
             [user.pk],
         )
         results["db_segments"] = dict(cursor.fetchall())
+        # The map roll-up (history migration 0010) must count every point exactly once.
+        cursor.execute(
+            "SELECT source, sum(n) FROM history_pointrollup WHERE owner_id = %s AND level = 20"
+            " AND grain = 2 GROUP BY 1",
+            [user.pk],
+        )
+        results["rollup_points"] = {k: int(v) for k, v in cursor.fetchall()}
+        cursor.execute(
+            "SELECT grain, count(*) FROM history_pointrollup WHERE owner_id = %s GROUP BY 1",
+            [user.pk],
+        )
+        results["rollup_rows"] = dict(cursor.fetchall())
     results["sizes_after_import"] = _sizes()
     with connection.cursor() as cursor:
         # A real import gets the same from autovacuum shortly after; tile plans need the stats.
         cursor.execute("ANALYZE history_locationpoint")
+        cursor.execute("ANALYZE history_pointrollup")
         cursor.execute("ANALYZE history_timelinesegment")
     results["tiles"] = _time_tiles(client, manifest["first_day"])
 
@@ -469,7 +484,9 @@ def run(path: Path, results_path: Path) -> int:
     }
     seg_expected = {k: manifest[k] for k in ("visit", "activity", "path", "memory")}
     results["counts_match"] = (
-        results["db_points"] == expected and results["db_segments"] == seg_expected
+        results["db_points"] == expected
+        and results["rollup_points"] == expected
+        and results["db_segments"] == seg_expected
     )
     results_path.write_text(json.dumps(results, indent=1, default=str))
     print(f"counts match: {results['counts_match']}", flush=True)
@@ -492,9 +509,11 @@ def cleanup() -> int:
     else:
         uid = user.pk
         with connection.cursor() as cursor:
-            # The raw-file trigger blocks UPDATEs only; the owner role may delete.
+            # The raw-file trigger blocks UPDATEs only; the owner role may delete. Deleting the
+            # points also empties their roll-up (trigger); the explicit delete is a backstop.
             for sql in [
                 "DELETE FROM history_locationpoint WHERE owner_id = %s",
+                "DELETE FROM history_pointrollup WHERE owner_id = %s",
                 "UPDATE history_timelinesegment SET superseded_by_id = NULL WHERE owner_id = %s"
                 " AND superseded_by_id IS NOT NULL",
                 "DELETE FROM history_timelinesegment WHERE owner_id = %s",
@@ -530,6 +549,7 @@ def cleanup() -> int:
         with connection.cursor() as cursor:
             # Return the space to the filesystem (short exclusive locks on a small table).
             cursor.execute("VACUUM FULL history_locationpoint")
+            cursor.execute("VACUUM FULL history_pointrollup")
             cursor.execute("VACUUM FULL history_timelinesegment")
             cursor.execute("VACUUM ANALYZE history_locationpoint")
             cursor.execute("VACUUM ANALYZE history_timelinesegment")
