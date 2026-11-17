@@ -5,12 +5,11 @@ import time
 import pytest
 from authlib.integrations.base_client.errors import OAuthError
 from django.http import HttpResponseRedirect
-from django.urls import URLPattern, URLResolver, get_resolver
 from joserfc import jwt
 from joserfc.jwk import KeySet, RSAKey
 
 from tests.factories import UserFactory
-from tests.helpers import as_owner
+from tests.helpers import as_owner, sample_paths
 from travel.accounts import oidc
 from travel.accounts.models import Role, User
 from travel.core.loginwall import is_public_path
@@ -214,31 +213,9 @@ def test_has_recent_auth(rf, idp):
 # --- Login wall ---------------------------------------------------------------------------------
 
 
-def _sample_paths(resolver=None, prefix=""):
-    resolver = resolver or get_resolver()
-    for entry in resolver.url_patterns:
-        route = prefix + str(entry.pattern)
-        if isinstance(entry, URLResolver):
-            yield from _sample_paths(entry, route)
-        elif isinstance(entry, URLPattern):
-            path = "/" + route.lstrip("^").rstrip("$")
-            for converter, sample in (
-                ("<int:", "1"),
-                ("<str:", "x"),
-                ("<slug:", "x"),
-                ("<uuid:", "00000000-0000-0000-0000-000000000000"),
-                ("<path:", "x"),
-                ("<", "x"),
-            ):
-                while converter in path:
-                    start = path.index(converter)
-                    path = path[:start] + sample + path[path.index(">", start) + 1 :]
-            yield path
-
-
 def test_every_non_public_route_rejects_anonymous_requests(client, idp):
     checked = []
-    for path in _sample_paths():
+    for path in sample_paths():
         if is_public_path(path):
             continue
         response = client.get(path)

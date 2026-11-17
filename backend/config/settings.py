@@ -3,6 +3,7 @@
 
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
 from environs import Env
 
 env = Env()
@@ -11,8 +12,27 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = env.str("DJANGO_SECRET_KEY")
 DEBUG = env.bool("DJANGO_DEBUG", False)
-ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", ["localhost", "127.0.0.1"])
-CSRF_TRUSTED_ORIGINS = env.list("DJANGO_CSRF_TRUSTED_ORIGINS", [])
+
+# --- Internet exposure (D-73, D-85; docs/tracking/exposure.md) ------------------------------
+# Host names the internet reaches this app by (the Cloudflare Tunnel's hostname). They are
+# always allowed hosts and trusted HTTPS origins, and always guarded (travel/core/exposure.py):
+# with TRAVEL_PUBLIC_SCOPE=tracker (until go-live) they reach only the tracker endpoints, "all"
+# opens the whole app (go-live, after Authentik with 2FA), and a DEBUG server answers nothing.
+TRAVEL_PUBLIC_HOSTS = [
+    host for raw in env.list("TRAVEL_PUBLIC_HOSTS", []) if (host := raw.strip().lower().rstrip("."))
+]
+TRAVEL_PUBLIC_SCOPE = env.str("TRAVEL_PUBLIC_SCOPE", "tracker")
+# The internet-facing `ingest` service: the tracker endpoints only, whatever the Host header.
+TRAVEL_INGEST_ONLY = env.bool("TRAVEL_INGEST_ONLY", False)
+
+ALLOWED_HOSTS = [
+    *env.list("DJANGO_ALLOWED_HOSTS", ["localhost", "127.0.0.1"]),
+    *TRAVEL_PUBLIC_HOSTS,
+]
+CSRF_TRUSTED_ORIGINS = [
+    *env.list("DJANGO_CSRF_TRUSTED_ORIGINS", []),
+    *(f"https://{host}" for host in TRAVEL_PUBLIC_HOSTS),
+]
 
 # GeoDjango finds these with ctypes; pin them so a base-image change fails loudly.
 GDAL_LIBRARY_PATH = env.str("GDAL_LIBRARY_PATH", None)
@@ -41,6 +61,8 @@ MIDDLEWARE = [
     # First: takes a tracker's `?token=` out of the URL before anything can log or echo it.
     "travel.tracking.middleware.IngestTokenScrubMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    # Before WhiteNoise: public host names reach only the tracker endpoints until go-live.
+    "travel.core.exposure.ExposureGuardMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.middleware.csp.ContentSecurityPolicyMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -166,10 +188,15 @@ SESSION_COOKIE_AGE = env.int("DJANGO_SESSION_AGE", 60 * 60 * 24 * 14)
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "same-origin"
 X_FRAME_OPTIONS = "DENY"
-# Cloudflare Tunnel terminates TLS; cloudflared forwards X-Forwarded-Proto.
-if env.bool("DJANGO_BEHIND_TLS_PROXY", False):
-    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-SECURE_HSTS_SECONDS = env.int("DJANGO_HSTS_SECONDS", 0)
+# Cloudflare terminates TLS: it sets X-Forwarded-Proto to the visitor's scheme (overwriting any
+# value the client sent) and cloudflared passes it on. Behind it the app is HTTPS-only: plain
+# HTTP is redirected (the container's own health check excepted) and HSTS is on.
+BEHIND_TLS_PROXY = env.bool("DJANGO_BEHIND_TLS_PROXY", False)
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https") if BEHIND_TLS_PROXY else None
+SECURE_SSL_REDIRECT = env.bool("DJANGO_SSL_REDIRECT", BEHIND_TLS_PROXY)
+SECURE_REDIRECT_EXEMPT = [r"^healthz$"]
+SECURE_HSTS_SECONDS = env.int("DJANGO_HSTS_SECONDS", 365 * 24 * 3600 if BEHIND_TLS_PROXY else 0)
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 DATA_UPLOAD_MAX_MEMORY_SIZE = 40 * 1024 * 1024  # one upload chunk (32 MB) plus headroom
 
 SECURE_CSP = {
@@ -221,3 +248,22 @@ LOGGING = {
         "django.db.backends": {"level": "WARNING"},
     },
 }
+
+# --- Exposure checks -------------------------------------------------------------------------
+if TRAVEL_PUBLIC_SCOPE not in ("tracker", "all"):
+    raise ImproperlyConfigured("TRAVEL_PUBLIC_SCOPE must be 'tracker' or 'all'")
+if TRAVEL_INGEST_ONLY:
+    # The internet-facing service refuses to start without production settings.
+    from travel.core.exposure import production_problems
+
+    _problems = production_problems(
+        debug=DEBUG,
+        proxy_ssl_header=SECURE_PROXY_SSL_HEADER,
+        ssl_redirect=SECURE_SSL_REDIRECT,
+        hsts_seconds=SECURE_HSTS_SECONDS,
+        secure_cookies=SESSION_COOKIE_SECURE,
+        public_hosts=TRAVEL_PUBLIC_HOSTS,
+        allowed_hosts=ALLOWED_HOSTS,
+    )
+    if _problems:
+        raise ImproperlyConfigured("TRAVEL_INGEST_ONLY: " + "; ".join(_problems))
