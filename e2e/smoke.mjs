@@ -89,13 +89,20 @@ if (refused.status() !== 401) throw new Error(`revoked token answered ${refused.
 await page.getByRole("link", { name: "History" }).click();
 const chooser = page.waitForEvent("filechooser");
 await page.getByRole("button", { name: /Import Google Timeline/ }).click();
+// The batch id comes from this upload's own completion response, so the check below can't be
+// satisfied by an earlier run's batch. A re-run uploads the same file again, which is reported
+// as a duplicate.
+const completed = page.waitForResponse(
+  (r) => /\/api\/v1\/uploads\/[^/]+\/complete$/.test(r.url()) && r.request().method() === "POST",
+  { timeout: 60000 },
+);
 await (await chooser).setFiles("fixtures/timeline-synthetic.json");
-// Wait for this upload to finish, then for the newest import (first in the list) to have a result.
-// A re-run of the smoke test uploads the same file again, which is reported as a duplicate.
+const completion = await completed;
+if (completion.status() !== 202) throw new Error(`upload complete: ${completion.status()}`);
+const batchId = (await completion.json()).id;
 await page.getByRole("status").waitFor({ state: "detached", timeout: 60000 });
 await page
-  .locator("li")
-  .first()
+  .locator(`li[data-import-id="${batchId}"]`)
   .getByText(/(new|unchanged) segments|already imported/)
   .waitFor({ timeout: 60000 });
 await page.screenshot({ path: "out/history.png" });

@@ -200,18 +200,105 @@ def test_segments_tile_shows_current_versions_in_range(member):
     assert cycling.properties["t0"] == int((DAY1 + dt.timedelta(days=30)).timestamp())
 
 
-def test_segments_tile_is_capped(member, monkeypatch):
+def test_dense_segments_tile_merges_instead_of_dropping(member, monkeypatch):
+    """Over the cap, coinciding segments become one feature with their number; none is lost."""
     monkeypatch.setattr(tiles, "MAX_SEGMENTS_PER_TILE", 2)
+    line = LineString((WICHITA.x, WICHITA.y), (WICHITA.x + 0.02, WICHITA.y + 0.01))
     with as_owner():
         for i in range(3):
             TimelineSegmentFactory(
                 owner=member.user,
+                kind="path",
+                geom=line,
                 start_utc=DAY1 + dt.timedelta(hours=i),
                 end_utc=DAY1 + dt.timedelta(hours=i, minutes=30),
             )
+        TimelineSegmentFactory(owner=member.user, kind="visit", start_utc=DAY2, end_utc=DAY2)
     response = get_tile(member, 12, kind="segments")
-    assert len(segment_ids(response.content)) == 2
+    assert response["X-Tile-Aggregated"] == "1"
+    assert "X-Tile-Truncated" not in response
+    features = mvt.decode(response.content)["segments"].features
+    by_kind = {f.properties["kind"]: f.properties for f in features}
+    assert len(features) == 2
+    assert by_kind["path"]["n"] == 3
+    assert by_kind["path"]["t0"] == int(DAY1.timestamp())
+    assert by_kind["visit"]["n"] == 1
+    assert "id" not in by_kind["path"]
+
+
+def test_merged_segments_are_capped_most_travelled_first(member, monkeypatch):
+    monkeypatch.setattr(tiles, "MAX_SEGMENTS_PER_TILE", 0)
+    monkeypatch.setattr(tiles, "MAX_SEGMENT_FEATURES", 1)
+    with as_owner():
+        for i, n in enumerate([1, 2]):
+            for j in range(n):
+                TimelineSegmentFactory(
+                    owner=member.user,
+                    kind="path",
+                    geom=LineString(
+                        (WICHITA.x, WICHITA.y), (WICHITA.x + 0.03 * (i + 1), WICHITA.y)
+                    ),
+                    start_utc=DAY1 + dt.timedelta(hours=i * 3 + j),
+                    end_utc=DAY1 + dt.timedelta(hours=i * 3 + j, minutes=30),
+                )
+    response = get_tile(member, 12, kind="segments")
     assert response["X-Tile-Truncated"] == "1"
+    assert [f.properties["n"] for f in mvt.decode(response.content)["segments"].features] == [2]
+
+
+def test_segment_keys_find_exactly_the_overlapping_segments(member):
+    """Random points and lines of every size: the key lookup (ranges + ancestors) returns the
+    same segments as a plain bounding-box test against the tile and its margin, at every zoom."""
+    rng = random.Random(11)  # noqa: S311 - synthetic test data
+    with as_owner():
+        for i in range(150):
+            size = rng.choice([0, 0.0005, 0.01, 0.3, 3, 40])
+            x0 = WICHITA.x + rng.uniform(-1, 1) * rng.choice([0.01, 0.2, 2])
+            y0 = WICHITA.y + rng.uniform(-1, 1) * rng.choice([0.01, 0.2, 2])
+            geom = (
+                Point(x0, y0, srid=4326)
+                if size == 0
+                else LineString((x0, y0), (x0 + size * rng.uniform(-1, 1), y0 + size / 2))
+            )
+            TimelineSegmentFactory(
+                owner=member.user,
+                kind="visit" if size == 0 else "path",
+                geom=geom,
+                start_utc=DAY1 + dt.timedelta(hours=i),
+                end_utc=DAY1 + dt.timedelta(hours=i, minutes=20),
+            )
+    for z in (5, 8, 11, 14, 18):
+        zz, x, y = tile_of(WICHITA, z)
+        with rls_context(member.user.pk):
+            found = segment_ids(tiles.segments_tile(zz, x, y).data)
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT s.id FROM history_timelinesegment s WHERE s.is_current AND"
+                    " s.geom && ST_Transform(ST_TileEnvelope(%s, %s, %s, margin => %s), 4326)"
+                    " AND ST_AsMVTGeom(ST_Simplify(ST_Transform(s.geom, 3857),"
+                    " (ST_XMax(ST_TileEnvelope(%s, %s, %s)) - ST_XMin(ST_TileEnvelope(%s, %s, %s)))"
+                    " / 4096), ST_TileEnvelope(%s, %s, %s), 4096, %s, true) IS NOT NULL",
+                    [zz, x, y, tiles.MARGIN, zz, x, y, zz, x, y, zz, x, y, tiles.BUFFER],
+                )
+                expected = {row[0] for row in cursor.fetchall()}
+        assert found == expected, z
+        assert expected or z > 11
+
+
+def test_extent_key_is_the_smallest_enclosing_tile(member):
+    with connection.cursor() as cursor:
+        for z in (0, 3, 9, 15, 20):
+            zz, x, y = tile_of(WICHITA, z)
+            cursor.execute(
+                "SELECT app.extent_key(ST_Buffer(ST_Transform(ST_TileEnvelope(%s, %s, %s), 4326),"
+                " -1e-9))",
+                [zz, x, y],
+            )
+            assert cursor.fetchone()[0] == tiles.segment_key(zz, x, y)
+        cursor.execute("SELECT app.extent_key(ST_MakeLine(ST_Point(-1, 1), ST_Point(1, 1)))")
+        assert cursor.fetchone()[0] == tiles.segment_key(0, 0, 0)  # crosses the meridian
+        cursor.execute("SELECT app.extent_key('POINT EMPTY'::geometry)")
+        assert cursor.fetchone()[0] is None
 
 
 def test_slow_tile_query_times_out_without_breaking_the_request(member, monkeypatch):

@@ -195,7 +195,7 @@ export function HistoryPage() {
       {imports.data?.length === 0 && <p className="text-sm text-slate-600">No imports yet.</p>}
       <ul className="space-y-3">
         {imports.data?.map((batch) => (
-          <li key={batch.id} className="rounded border p-3">
+          <li key={batch.id} data-import-id={batch.id} className="rounded border p-3">
             <div className="flex justify-between text-sm">
               <span className="font-medium">{batch.original_name ?? batch.kind}</span>
               <span className="text-slate-500">

@@ -2358,7 +2358,7 @@
     },
     "/api/v1/history/segments/tiles/{z}/{x}/{y}.mvt": {
       "get": {
-        "description": "The caller's current Timeline segments as a vector tile (layer `segments`; zoom 5 and\nup): visits as points, activities and paths as lines, with `kind`, `activity`, `semantic`,\n`t0`/`t1` (epoch seconds).",
+        "description": "The caller's current Timeline segments as a vector tile (layer `segments`; zoom 5 and\nup): visits as points, activities and paths as lines, with `id`, `kind`, `activity`,\n`semantic`, `t0`/`t1` (epoch seconds). Tiles with too many segments are merged\n(`X-Tile-Aggregated: 1`): geometries snapped to a coarse lattice, identical ones combined\ninto one feature with `n` (how many), `kind`, `activity` and the span `t0`/`t1`, no `id`.",
         "operationId": "getHistorySegmentsTile",
         "parameters": [
           {

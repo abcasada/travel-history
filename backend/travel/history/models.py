@@ -250,6 +250,16 @@ class TimelineSegment(models.Model):
     probability = models.FloatField(null=True, blank=True)
     geom = gis.GeometryField(srid=4326, null=True, blank=True)
     distance_m = models.FloatField(null=True, blank=True)
+    # The smallest Web Mercator tile (zoom <= 20) holding the whole geometry, as a quadtree key:
+    # (Morton prefix at zoom 20) << 5 | zoom. History migration 0011; map tiles select segments
+    # by key ranges and ancestor keys, like points by `tile_key` (travel/history/tiles.py).
+    seg_key = models.GeneratedField(
+        expression=Func(
+            F("geom"), function="app.extent_key", output_field=models.BigIntegerField()
+        ),
+        output_field=models.BigIntegerField(),
+        db_persist=True,
+    )
     data = models.JSONField()
     fingerprint = models.CharField(max_length=64)
     import_batch = models.ForeignKey(
@@ -271,6 +281,11 @@ class TimelineSegment(models.Model):
         indexes = [
             GistIndex(fields=["owner", "time_range"], name="segment_owner_range_gist"),
             models.Index(fields=["owner", "kind", "is_current"], name="segment_owner_kind_idx"),
+            models.Index(
+                fields=["owner", "seg_key"],
+                condition=Q(is_current=True),
+                name="segment_owner_key_idx",
+            ),
         ]
 
     def __str__(self) -> str:

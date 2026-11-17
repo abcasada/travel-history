@@ -22,7 +22,13 @@ function describe(feature: MapGeoJSONFeature): string[] {
   const p = feature.properties ?? {};
   if (feature.layer.id.startsWith("history-segment")) {
     const label = p.kind === "visit" ? `Visit${p.semantic ? ` (${p.semantic})` : ""}` : p.kind;
-    return [String(label), `${when(p.t0)} – ${when(p.t1)}`, p.activity ? String(p.activity) : ""];
+    // A dense tile merges coinciding segments into one feature with their number `n`.
+    const merged = Number(p.n) > 1 ? `${Number(p.n).toLocaleString()} × ` : "";
+    return [
+      `${merged}${String(label)}`,
+      `${when(p.t0)} – ${when(p.t1)}`,
+      p.activity ? String(p.activity) : "",
+    ];
   }
   if (p.ts !== undefined) return [when(p.ts), `Source: ${p.src}`];
   return [`${Number(p.n).toLocaleString()} points here`, "Zoom in for single points"];

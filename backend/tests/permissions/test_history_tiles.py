@@ -242,3 +242,15 @@ def test_rls_rollup_of_another_user_cannot_be_written(history):
         )
         assert cursor.fetchall() == before
     assert rollup_mismatches() == []
+
+
+@pytest.mark.parametrize("actor", ["alice", "bob", "admin", "ivan", None])
+def test_rls_merged_segments_count_only_own(history, monkeypatch, actor):
+    """Merged segment features (dense tiles) are built as travel_app under RLS too."""
+    monkeypatch.setattr(tiles, "MAX_SEGMENTS_PER_TILE", 0)
+    user_id = getattr(history, actor).pk if actor else None
+    with rls_context(user_id):
+        tile = tiles.segments_tile(*tile_of(WICHITA, 12))
+    layer = mvt.decode(tile.data).get("segments")
+    merged = sum(f.properties["n"] for f in layer.features) if layer else 0
+    assert merged == (1 if actor in ("alice", "bob") else 0)

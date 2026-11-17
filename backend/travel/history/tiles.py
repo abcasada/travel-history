@@ -13,8 +13,9 @@ Bounds (so one request can't tie up the database or the browser):
   cell, so at most (GRID + 2*MARGIN_CELLS)^2 features however much history there is). The counts
   come from the per-day/per-year roll-up (`history_pointrollup`, history migration 0010), with raw
   points only for the partial UTC days at the ends of a date range;
-- segment tiles start at SEGMENTS_MIN_ZOOM and hold at most MAX_SEGMENTS_PER_TILE features
-  (newest first), simplified to about a pixel;
+- segment tiles start at SEGMENTS_MIN_ZOOM; up to MAX_SEGMENTS_PER_TILE segments are drawn one
+  feature each, simplified to about a pixel; denser tiles snap geometries to a coarse lattice and
+  merge the ones that coincide (at most MAX_SEGMENT_FEATURES features, most travelled first);
 - every tile query runs under a statement timeout (TileTimeout -> HTTP 503);
 - the coverage strip covers at most MAX_COVERAGE_DAYS per request.
 """
@@ -36,7 +37,9 @@ GRID = 2**GRID_BITS  # cells per tile side when aggregating (4096 / 128 = 32 til
 MARGIN_CELLS = 4  # neighbouring cells drawn too, so circles near tile edges aren't cut off
 MAX_POINTS_PER_TILE = 10_000
 SEGMENTS_MIN_ZOOM = 5
-MAX_SEGMENTS_PER_TILE = 3_000
+MAX_SEGMENTS_PER_TILE = 3_000  # beyond this, identical-looking segments are merged
+SEGMENT_LATTICE = 64  # merged geometries snap to a 64 x 64 lattice per tile (4 px at 256 px)
+MAX_SEGMENT_FEATURES = 10_000
 TIMEOUT_MS = 10_000
 MAX_COVERAGE_DAYS = 400
 
@@ -97,13 +100,13 @@ def key_range(z: int, x: int, y: int) -> tuple[int, int]:
     return prefix << shift, (prefix + 1) << shift
 
 
-def key_ranges(z: int, x: int, y: int) -> list[tuple[int, int]]:
-    """Key ranges covering the tile plus its margin: the tile itself and, of each neighbour,
-    the sub-tiles NEIGHBOUR_DEPTH levels down that touch it (a quarter of the neighbour, well
-    beyond the 1/32-tile margin). No wrap-around at the antimeridian."""
+def _pieces(z: int, x: int, y: int) -> list[tuple[int, int, int]]:
+    """The tile itself and, of each neighbour, the sub-tiles NEIGHBOUR_DEPTH levels down that
+    touch it (a quarter of the neighbour, well beyond the 1/32-tile margin), as (z, x, y).
+    No wrap-around at the antimeridian."""
     n, depth = 2**z, min(NEIGHBOUR_DEPTH, KEY_ZOOM - z)
     s = 2**depth
-    ranges = [key_range(z, x, y)]
+    pieces = [(z, x, y)]
     for dx in (-1, 0, 1):
         for dy in (-1, 0, 1):
             nx, ny = x + dx, y + dy
@@ -111,14 +114,42 @@ def key_ranges(z: int, x: int, y: int) -> list[tuple[int, int]]:
                 continue
             columns = {-1: [s - 1], 0: range(s), 1: [0]}[dx]
             rows = {-1: [s - 1], 0: range(s), 1: [0]}[dy]
-            ranges += [key_range(z + depth, nx * s + c, ny * s + r) for c in columns for r in rows]
+            pieces += [(z + depth, nx * s + c, ny * s + r) for c in columns for r in rows]
+    return pieces
+
+
+def key_ranges(z: int, x: int, y: int) -> list[tuple[int, int]]:
+    """Key ranges covering the tile plus its margin (`_pieces`), merged."""
     merged: list[tuple[int, int]] = []
-    for lo, hi in sorted(ranges):
+    for lo, hi in sorted(key_range(*piece) for piece in _pieces(z, x, y)):
         if merged and lo <= merged[-1][1]:
             merged[-1] = (merged[-1][0], max(hi, merged[-1][1]))
         else:
             merged.append((lo, hi))
     return merged
+
+
+SEG_ZOOM_BITS = 5  # app.extent_key(): (zoom-20 Morton prefix) << 5 | zoom
+
+
+def segment_key(z: int, x: int, y: int) -> int:
+    """app.extent_key() of a geometry whose smallest enclosing tile is z/x/y."""
+    return (key_range(z, x, y)[0] << SEG_ZOOM_BITS) | z
+
+
+def segment_keys(z: int, x: int, y: int) -> tuple[list[tuple[int, int]], list[int]]:
+    """What a segment's key must match to touch tile z/x/y or its margin: a key range for
+    segments whose enclosing tile lies inside a piece (`key_ranges`, shifted), or one of the
+    pieces' ancestors' keys (segments whose enclosing tile holds a piece). Quadtree tiles are
+    nested or disjoint, so nothing else can overlap."""
+    ranges = [(lo << SEG_ZOOM_BITS, hi << SEG_ZOOM_BITS) for lo, hi in key_ranges(z, x, y)]
+    ancestors = {
+        segment_key(k, px >> (pz - k), py >> (pz - k))
+        for pz, px, py in _pieces(z, x, y)
+        for k in range(pz)
+    }
+    outside = sorted(key for key in ancestors if not any(lo <= key < hi for lo, hi in ranges))
+    return ranges, outside
 
 
 def _filters(
@@ -321,28 +352,64 @@ def _count_parts(
     return "\n   UNION ALL ".join(selects)
 
 
+# Segments by key (index on owner_id, seg_key for current versions), then the exact envelope.
+_SEGMENT_JOIN = "JOIN history_timelinesegment s ON {keys} AND s.geom && q.outer4326"
+
+_COUNT_SEGMENTS = (
+    _ENVELOPE  # noqa: S608
+    + """
+SELECT count(*) FROM (
+  SELECT 1 FROM q {segments}
+   WHERE s.is_current {filters}
+   LIMIT %(cap)s
+) c
+"""
+)
+
 _SEGMENTS = (
     _ENVELOPE  # noqa: S608
     + """
-, picked AS (
-  SELECT s.id, s.kind, s.activity_type, s.semantic_type, s.start_utc, s.end_utc,
-         ST_Transform(s.geom, 3857) AS g
-    FROM q JOIN history_timelinesegment s ON s.geom && q.outer4326
+SELECT ST_AsMVT(f, 'segments', %(extent)s, 'geom') FROM (
+  SELECT ST_AsMVTGeom(ST_Simplify(ST_Transform(s.geom, 3857), q.px), q.tile, %(extent)s,
+                      %(buffer)s, true) AS geom,
+         s.id,
+         s.kind,
+         s.activity_type AS activity,
+         s.semantic_type AS semantic,
+         extract(epoch FROM s.start_utc)::bigint AS t0,
+         extract(epoch FROM s.end_utc)::bigint AS t1
+    FROM q {segments}
    WHERE s.is_current {filters}
-   ORDER BY s.start_utc DESC
-   LIMIT %(cap)s
-)
-SELECT ST_AsMVT(f, 'segments', %(extent)s, 'geom'), (SELECT count(*) FROM picked) FROM (
-  SELECT ST_AsMVTGeom(ST_Simplify(p.g, q.px), q.tile, %(extent)s, %(buffer)s, true) AS geom,
-         p.id,
-         p.kind,
-         p.activity_type AS activity,
-         p.semantic_type AS semantic,
-         extract(epoch FROM p.start_utc)::bigint AS t0,
-         extract(epoch FROM p.end_utc)::bigint AS t1
-    FROM picked p, q
 ) f
 WHERE f.geom IS NOT NULL
+"""
+)
+
+# Too many segments for one tile: every geometry is snapped to a SEGMENT_LATTICE x
+# SEGMENT_LATTICE lattice over the tile, and segments that end up identical (same shape, kind
+# and activity) become one feature with their number `n` and time span. Nothing is dropped
+# unless even the merged features exceed MAX_SEGMENT_FEATURES (then the most travelled stay).
+_MERGED_SEGMENTS = (
+    _ENVELOPE  # noqa: S608
+    + """
+, snapped AS (
+  SELECT ST_AsMVTGeom(
+           ST_SnapToGrid(ST_Transform(s.geom, 3857), q.x0, q.y0, q.snap, q.snap),
+           q.tile, %(extent)s, %(buffer)s, true) AS geom,
+         s.kind, s.activity_type, s.start_utc, s.end_utc
+    FROM (SELECT q.*, q.px * %(extent)s / %(lattice)s AS snap FROM q) q {segments}
+   WHERE s.is_current {filters}
+), merged AS (
+  SELECT geom, kind, activity_type AS activity, count(*) AS n,
+         extract(epoch FROM min(start_utc))::bigint AS t0,
+         extract(epoch FROM max(end_utc))::bigint AS t1
+    FROM snapped
+   WHERE geom IS NOT NULL
+   GROUP BY geom, kind, activity_type
+)
+SELECT (SELECT ST_AsMVT(f, 'segments', %(extent)s, 'geom') FROM (
+          SELECT * FROM merged ORDER BY n DESC, t1 DESC LIMIT %(features)s) f),
+       (SELECT count(*) FROM merged)
 """
 )
 
@@ -427,7 +494,8 @@ def segments_tile(
     end: dt.datetime | None = None,
 ) -> Tile:
     """The caller's current Timeline segments (visits as points, activities and paths as lines)
-    overlapping [start, end)."""
+    overlapping [start, end): one feature each, or merged (`aggregated`, with `n`) when there are
+    more than MAX_SEGMENTS_PER_TILE."""
     check_tile(z, x, y, min_zoom=SEGMENTS_MIN_ZOOM)
     filters, params = "", _base_params(z, x, y)
     if start is not None:
@@ -436,9 +504,20 @@ def segments_tile(
     if end is not None:
         filters += " AND s.start_utc < %(end)s"
         params["end"] = end
-    params["cap"] = MAX_SEGMENTS_PER_TILE
-    data, picked = _run(_SEGMENTS.format(filters=filters), params)
-    return Tile(bytes(data or b""), aggregated=False, truncated=picked >= MAX_SEGMENTS_PER_TILE)
+    ranges, ancestors = segment_keys(z, x, y)
+    keys = _key_condition(ranges, params, "s.seg_key")
+    if ancestors:
+        params["ancestors"] = ancestors
+        keys = f"({keys} OR s.seg_key = ANY(%(ancestors)s::bigint[]))"
+    sql = {"filters": filters, "segments": _SEGMENT_JOIN.format(keys=keys)}
+    params["cap"] = MAX_SEGMENTS_PER_TILE + 1
+    (count,) = _run(_COUNT_SEGMENTS.format(**sql), params)
+    if count <= MAX_SEGMENTS_PER_TILE:
+        (data,) = _run(_SEGMENTS.format(**sql), params)
+        return Tile(bytes(data or b""), aggregated=False)
+    params |= {"lattice": SEGMENT_LATTICE, "features": MAX_SEGMENT_FEATURES}
+    data, merged = _run(_MERGED_SEGMENTS.format(**sql), params)
+    return Tile(bytes(data or b""), aggregated=True, truncated=merged > MAX_SEGMENT_FEATURES)
 
 
 # --- Coverage strip ------------------------------------------------------------------------

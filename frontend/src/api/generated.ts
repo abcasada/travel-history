@@ -749,8 +749,10 @@ export const getGetHistorySegmentsTileUrl = (z: number,
 
 /**
  * The caller's current Timeline segments as a vector tile (layer `segments`; zoom 5 and
- * up): visits as points, activities and paths as lines, with `kind`, `activity`, `semantic`,
- * `t0`/`t1` (epoch seconds).
+ * up): visits as points, activities and paths as lines, with `id`, `kind`, `activity`,
+ * `semantic`, `t0`/`t1` (epoch seconds). Tiles with too many segments are merged
+ * (`X-Tile-Aggregated: 1`): geometries snapped to a coarse lattice, identical ones combined
+ * into one feature with `n` (how many), `kind`, `activity` and the span `t0`/`t1`, no `id`.
  * @summary History Segments Tile
  */
 export const getHistorySegmentsTile = async (z: number,

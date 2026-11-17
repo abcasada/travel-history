@@ -249,8 +249,10 @@ def history_points_tile(request, z: int, x: int, y: int, params: Query[PointsTil
 )
 def history_segments_tile(request, z: int, x: int, y: int, params: Query[TimeRangeIn]):
     """The caller's current Timeline segments as a vector tile (layer `segments`; zoom 5 and
-    up): visits as points, activities and paths as lines, with `kind`, `activity`, `semantic`,
-    `t0`/`t1` (epoch seconds)."""
+    up): visits as points, activities and paths as lines, with `id`, `kind`, `activity`,
+    `semantic`, `t0`/`t1` (epoch seconds). Tiles with too many segments are merged
+    (`X-Tile-Aggregated: 1`): geometries snapped to a coarse lattice, identical ones combined
+    into one feature with `n` (how many), `kind`, `activity` and the span `t0`/`t1`, no `id`."""
     _require_raw_history(request)
     start, end = _range(params)
     return _tile_response(request, lambda: tiles.segments_tile(z, x, y, start=start, end=end))
