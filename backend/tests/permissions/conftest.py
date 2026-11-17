@@ -30,6 +30,7 @@ from tests.factories import (
 )
 from tests.helpers import as_owner
 from travel.accounts.models import AccessRequest, DeviceToken, Person, Role, User
+from travel.flights.models import FlightRecord
 from travel.history.models import HomePeriod, LocationPoint, RawFile, TimelineSegment
 from travel.media.models import Media
 from travel.trips.models import (
@@ -133,6 +134,15 @@ def build_family() -> SimpleNamespace:
         f.bob_point = LocationPointFactory(owner=f.bob)
         f.alice_segment = TimelineSegmentFactory(owner=f.alice)
         f.alice_raw = RawFileFactory(owner=f.alice)
+        f.alice_flight = FlightRecord.objects.create(
+            owner=f.alice,
+            row_key="a" * 64,
+            content_hash="b" * 64,
+            row_number=2,
+            status=FlightRecord.Status.UNMATCHED,
+            from_code="QQQ",
+            to_code="QQR",
+        )
         f.alice_home = HomePeriod.objects.create(
             person=f.alice.person, managed_by=f.alice, address="1 Synthetic St"
         )
@@ -202,7 +212,7 @@ def _row_counts():
     tables = (
         Trip, TripParticipant, TripNote, Leg, LegParticipantOverride, Route, LocationPoint,
         TimelineSegment, RawFile, HomePeriod, Vehicle, VehiclePrivate, Person, User,
-        DeviceToken, AccessRequest, Purpose, Media, TripTag,
+        DeviceToken, AccessRequest, Purpose, Media, TripTag, FlightRecord,
     )  # fmt: skip
     # One round trip per case: SELECT (SELECT count(*) FROM a), (SELECT count(*) FROM b), ...
     # Table names come from model metadata, never from input.

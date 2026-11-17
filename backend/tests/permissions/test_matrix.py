@@ -18,6 +18,7 @@ from tests.helpers import as_owner
 from travel.accounts.models import AccessRequest, DeviceToken, Person, User, UserDirectory
 from travel.core import policy
 from travel.core.rls import set_context
+from travel.flights.models import FlightRecord
 from travel.history.models import HomePeriod, LocationPoint, RawFile, TimelineSegment
 from travel.trips.models import (
     Leg,
@@ -332,6 +333,31 @@ ACTIONS = {
         lambda f, a: sees(RawFile, f.alice_raw.pk),
         lambda f, u: policy.can_access_raw_history(u, f.alice.pk),
     ),
+    # Imported flights (work-order item 10) are raw history: own only.
+    "view_alice_flight": (
+        lambda f, a: sees(FlightRecord, f.alice_flight.pk),
+        lambda f, u: policy.can_access_raw_history(u, f.alice.pk),
+    ),
+    "edit_alice_flight": (
+        lambda f, a: updates(FlightRecord, f.alice_flight.pk, notes="changed"),
+        lambda f, u: policy.can_access_raw_history(u, f.alice.pk),
+    ),
+    "delete_alice_flight": (
+        lambda f, a: deletes(FlightRecord, f.alice_flight.pk),
+        lambda f, u: policy.can_access_raw_history(u, f.alice.pk),
+    ),
+    "import_own_flight": (
+        lambda f, a: inserts(
+            lambda: FlightRecord.objects.create(
+                owner_id=uid(f, a),
+                row_key="n" * 64,
+                content_hash="n" * 64,
+                row_number=2,
+                status=FlightRecord.Status.RESOLVED,
+            )
+        ),
+        lambda f, u: policy.can_import(u),
+    ),
     "view_alice_token": (
         lambda f, a: sees(DeviceToken, f.alice_token.pk),
         lambda f, u: policy.can_access_raw_history(u, f.alice.pk),
@@ -494,6 +520,10 @@ MATRIX = {
     "insert_point_for_alice":      (F, T, F, F, F, F, F),
     "view_alice_segment":          (F, T, F, F, F, F, F),
     "view_alice_rawfile":          (F, T, F, F, F, F, F),
+    "view_alice_flight":           (F, T, F, F, F, F, F),
+    "edit_alice_flight":           (F, T, F, F, F, F, F),
+    "delete_alice_flight":         (F, T, F, F, F, F, F),
+    "import_own_flight":           (T, T, T, T, F, F, F),
     "view_alice_token":            (F, T, F, F, F, F, F),
     "create_own_token":            (T, T, T, T, F, F, F),
     "revoke_alice_token":          (F, T, F, F, F, F, F),
