@@ -73,14 +73,14 @@ Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhi
 9. **[H] T8:** nightly jobs that cover all users under RLS.
    - Status: done (2026-11-18)
 10. **[M] T12 + T13:** flight datasets, the import template, and the conversion. Use my spreadsheet if it's present; otherwise synthetic data.
-    - Status: in progress (dispatched 2026-11-18; synthetic data, no spreadsheet yet)
+    - Status: done (2026-11-19, synthetic data; Adam's spreadsheet not yet provided)
 11. **[M] T14 + T15:** flights on the map, grouping into trips, and dedupe against Timeline. ← my flights become viewable
     - Status: todo
 12. **[M] T10:** coverage report, without the trip comparison.
     - Status: todo
     - **→ Review pause A:** history, flights, and tracking are live. I'll try them.
 13. **[H] The rest of T18:** tags, stops, notes, media, tracks, the routes listing, bulk edit, duplicates/join/merge, leg reorder and list filters. Make sure a removed participant can no longer edit or delete their notes and tracks, matching the leg rule from item 6. Apply Adam's answer to Q-16.
-    - Status: todo
+    - Status: in progress (dispatched 2026-11-19)
 14. **[M] T26:** places.
     - Status: todo
 15. **[H] T9:** home-period detection.
@@ -249,3 +249,4 @@ Nature: mech = mechanical, mod = moderate, hard. Size is S/M/L/XL with approxima
 - 2026-11-18: item 9 done and verified (`./dev test-quick` 1394 + 31 passed). D-87 (the per-user job runner) is waiting for Adam. Item 10 dispatched with synthetic flights.
 - 2026-11-18: reordered at Adam's request: items 13, 20 and 21 run right after item 10, so he can add and browse trips sooner. T19 depends only on T18, so no dependency is broken. Item 4 jumps the queue when its prerequisites arrive.
 - 2026-11-18: Adam approved item 8 ("go"). Its last step runs right after item 10.
+- 2026-11-19: item 10 done and verified (`./dev test-quick` 1523 + 32 passed; the dev stack was restarted to pick up new packages). D-88 is waiting for Adam. The tunnel route isn't in place yet (travel.adamcasada.com answers 404 from Cloudflare), so item 8's last step waits for Adam's dashboard change and item 13 runs now.
