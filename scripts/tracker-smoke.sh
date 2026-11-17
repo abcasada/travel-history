@@ -21,7 +21,7 @@ base=""
 for arg in "$@"; do
   case "$arg" in
     --store) store=true ;;
-    -h|--help) sed -n '2,16p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,15p' "$0"; exit 0 ;;
     *) base="$arg" ;;
   esac
 done
