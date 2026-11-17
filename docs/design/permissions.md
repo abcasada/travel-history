@@ -153,7 +153,8 @@ status are fixed; only a participant (or their managing user) sets their public 
 contributions keep their author. Account privacy (D-76) is `core` migration 0002 tightened by
 `accounts/migrations/0003_user_directory.py`; the only view `travel_app` may read is listed in
 `db_privileges.APP_READABLE_VIEWS`. Every request runs in one transaction with
-`app.user_id` set by `RlsContextMiddleware`; workers use `rls_context(user_id)`.
+`app.user_id` set by `RlsContextMiddleware`; workers use `rls_context(user_id)`, and jobs that
+cover every user use `travel.core.jobs` (below).
 
 **Trips API (work-order item 6).** `trips/migrations/0003_trip_api_guards.py` adds the person
 visibility checks above, makes deleting a contributed leg need the same right as editing it
@@ -163,6 +164,23 @@ trip; a leg's stops belong to its trip and its current route is one of its own v
 apply to every role); a leg takes only a vehicle the acting user can see (owner role exempt).
 Each fires only when the column is set or changed, so an existing reference never blocks an
 unrelated edit.
+
+**Periodic jobs across users (work-order item 9, T8, D-87).** The worker stays `travel_app`;
+nothing uses BYPASSRLS and there is no extra role. A nightly job first lists the users it
+applies to with `app.job_user_ids(roles)` (`core/migrations/0003_job_user_enumerator.py`):
+SECURITY DEFINER, owned by the owner role, pinned `search_path`, executable by `travel_app` only,
+returning bare ids of active accounts with one of `roles`, and only in the system context `jobs`
+with no user set (any other context gets no rows; the `jobs` context itself grants no rows, since no
+policy mentions it). `travel.core.jobs.run_per_user` then runs the job body once per user, each
+in its own transaction with that user's transaction-local context, so the body reads and writes
+exactly what that user could. A failing user is rolled back and logged (job, account id,
+exception class) and the others continue. A session advisory lock on a dedicated connection
+makes a second concurrent run of the same job skip. No user-facing action was added, so the
+matrix (§6.3) is unchanged. Tests: `tests/permissions/test_user_jobs.py`, as `travel_app`
+(the function's shape and grants, ids only and only active users with the roles, nothing outside
+the `jobs` context, one transaction and one user's rows per body call, no context left behind,
+failure isolation, the run lock with a real second connection and a concurrent thread, the
+`stale_uploads` job end to end).
 
 **Performance notes (milestone 2.3).** Policies on large tables write the role check as
 `(SELECT app.is_family())`, so PostgreSQL computes it once per statement (an InitPlan) instead of

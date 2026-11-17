@@ -66,6 +66,9 @@ Key points:
   migrations. `web` and `worker` connect as `travel_app`, which is subject to row-level security.
   The public renderer connects as `travel_public`, which can read only the public snapshot tables
   (§6.5).
+  Periodic jobs that cover every user (nightly maintenance, later coverage, detection and
+  snapshots) still run as `travel_app`: they list the users through a narrow id-only function
+  and then act as each user in turn, one transaction per user (§6.4, D-87).
 - **No Redis.** The job queue (Procrastinate), rate-limit counters and cache all live in
   PostgreSQL.
 - **Networks.** `db` is only on an `internal: true` network with no published ports. `web` and
