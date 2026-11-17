@@ -48,7 +48,7 @@ Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhi
      - make the e2e upload check verify its own upload, not an earlier one.
 
      Run after item 3 has measured tile timings at 500 MB–1 GB. Then run `./dev restore-test` once the disk is fixed, to confirm the generated `tile_key` column restores.
-     - Status: in progress (dispatched 2026-11-17)
+     - Status: done (2026-11-18)
 6. **[X] T18 core:** the permission-critical trips API, with endpoint tests for every role and visibility rule.
    - Status: done (2026-11-11)
 7. **[X] T7:** tracker endpoints, built and tested locally.
@@ -69,7 +69,7 @@ Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhi
    - Walk me through setting up my phone with the setup guide and QR code. ← the bake-off starts
    - Status: blocked on Adam's "go" (prepared and verified 2026-11-17; checklist in docs/tracking/exposure.md)
 9. **[H] T8:** nightly jobs that cover all users under RLS.
-   - Status: todo
+   - Status: in progress (dispatched 2026-11-18)
 10. **[M] T12 + T13:** flight datasets, the import template, and the conversion. Use my spreadsheet if it's present; otherwise synthetic data.
     - Status: todo
 11. **[M] T14 + T15:** flights on the map, grouping into trips, and dedupe against Timeline. ← my flights become viewable
@@ -243,3 +243,4 @@ Nature: mech = mechanical, mod = moderate, hard. Size is S/M/L/XL with approxima
 - 2026-11-17: Adam approved D-81, D-82, D-83 (item 5 tiles), the D-76 directory fields, Q-10, Q-12, Q-16 and Q-17. Item 3 is unblocked by D-84 (bulk on the SSD while the HDD is replaced). Item 8 is dispatched to prepare only.
 - 2026-11-17: item 8 prepared and verified (pushed, tree clean, `./dev test-quick` 1260 + 31 passed; the ingest service on 127.0.0.1:8783 returns 404 off the ingest paths and sends HSTS and security headers). Waiting for Adam's "go". Item 3 dispatched meanwhile.
 - 2026-11-17: item 3 done and verified (`./dev test-quick` 1260 + 31 passed). The builder lost Bash access at its last step, so the orchestrator committed its docs. Finding #4 is closed. The tiles confirm item 5a is needed: whole-history point tiles take 1–2 s at 3.6 M points. Point storage is about 347 B per point, so 20 M points would be about 7 GB against a 5 GB budget; the budget note is in resource-budget.md §21.1. Item 5a dispatched.
+- 2026-11-18: item 5a done and verified (`./dev test-quick` 1375 + 31 passed, now about 3.3 min). Whole-history tiles take 50–274 ms; the cost is +37 % import time and +36 % point storage (about 9.3 GB at 20 M points). D-86 is waiting for Adam. Item 8 still waits for "go", so item 9 was dispatched.
