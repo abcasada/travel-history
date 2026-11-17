@@ -18,7 +18,8 @@ orchestrated work order in [docs/ROADMAP.md](docs/ROADMAP.md) (process:
 | 0 Adam (exports, backup key, NAS) | ⛔ waiting on Adam | [phases](docs/design/phases.md) |
 | 1 Skeleton | ✅ 2026-10-20 | [phases](docs/design/phases.md) |
 | 2 Timeline and tracking | 🔄 2.1–2.4 done | [phases](docs/design/phases.md) |
-| 3 Flights · 4 Catalog · 5 Routes · 6 Statistics | ⏳ (4: trips API core done) | [phases](docs/design/phases.md) |
+| 3 Flights | 🔄 3.1–3.2 done (synthetic) | [phases](docs/design/phases.md) |
+| 4 Catalog · 5 Routes · 6 Statistics | ⏳ (4: trips API core done) | [phases](docs/design/phases.md) |
 | 7 Mobile and photos · 8 Family and public · 9 Android · 10 Later | ⏳ | [phases](docs/design/phases.md) |
 
 ## Section map
@@ -149,6 +150,7 @@ Other guides: [backups to the NAS](docs/backup-nas.md), [restore](docs/restore.m
 - D-84 Bulk storage temporarily on the SSD (`var/bulk`) until the HDD is replaced
 - D-85 Tracker exposure: tracker-only `ingest` service on `127.0.0.1:8783` behind the tunnel; app-level public-host guard (404 except ingest paths; DEBUG answers nothing); production settings enforced at startup
 - D-86 History map at scale: trigger-maintained per-day/per-year point roll-up (RLS), quadtree `seg_key` for segments, dense segment tiles merged instead of truncated
+- D-88 Flight imports: pinned reference downloads, bundled code overrides, user-owned `flight_record` staging table, CLI import under RLS (pending Adam)
 - D-87 Cross-user periodic jobs: `app.job_user_ids` enumerator (ids of active users, `jobs` context only), one RLS transaction per user, failures isolated, advisory run lock; first job `stale_uploads`
 
 ## 25. Open questions (for Adam, answer whenever — nothing is blocked on these)

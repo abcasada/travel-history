@@ -44,12 +44,12 @@ Status markers: ✅ done · 🔄 in progress · ⏳ not started · ⛔ blocked o
 | 2.5 Home periods | Suggestions per §10.1 (synthetic multi-year fixture with two moves and a long stay detects all three), manual entry, gap/overlap validation |
 | 2.6 Coverage + bake-off | Daily coverage per user and source; comparison of trips detected by each source; bake-off page |
 
-### Phase 3 — Flights ⏳ (← flights become viewable)
+### Phase 3 — Flights 🔄 (← flights become viewable)
 
 | Milestone | Acceptance criteria |
 |---|---|
-| 3.1 Reference data | OurAirports, OpenFlights airlines/aircraft loaded by a management command with versions recorded; attribution page |
-| 3.2 Template + conversion | Template CSV documented; conversion script reads the spreadsheet in `data/private/` (or the synthetic sample), flags rows it can't match; reassigned/closed codes resolved by date with manual override |
+| 3.1 Reference data ✅ 2026-11-18 | OurAirports, OpenFlights airlines/aircraft loaded by a management command with versions recorded; attribution page. Done: `load_flight_reference` (pinned commits + SHA-256), About page in the app |
+| 3.2 Template + conversion ✅ 2026-11-18 (synthetic) | Template CSV documented; conversion script reads the spreadsheet in `data/private/` (or the synthetic sample), flags rows it can't match; reassigned/closed codes resolved by date with manual override. Done: `flights_convert`, `flights_import`, `flight_record` (D-88), docs/flights/README.md; waits for Adam's real spreadsheet |
 | 3.3 Arcs + grouping | Great-circle arcs split at ±180°; flights on the map; trip key or auto-grouping with review |
 | 3.4 Dedupe | Flights deduplicated against Timeline flying segments |
 | 3.5 Other importers | MyFlightRadar24, Flighty, App in the Air, TripIt, JetLog, byAir (from format specs) — may slip to phase 10 |

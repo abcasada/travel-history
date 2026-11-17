@@ -96,6 +96,7 @@ otherwise `created_by`. Edit rights: managing user, plus the Admin if the Admin 
 | Table | Columns |
 |---|---|
 | `raw_file` | `owner` · `original_name` · `content_type` · `size_bytes` · `sha256` (of the original bytes; unique per owner → identical re-uploads detected) · `storage_path` (relative to `/bulk/raw`) · `compression` (zstd) · `compressed_size` · `uploaded_via` enum(web, companion, api) · `uploaded_at`. Immutable (trigger). File on disk is mode 0440 and verified by decompress-and-hash after write. |
+| `flight_record` | `owner` · `import_batch` · `row_key` (unique per owner: date, airports, airline, flight number, departure time + occurrence) · `content_hash` · `row_number` · `status` enum(resolved, unmatched) · `problems`, `warnings` jsonb `[{field, reason, detail}]` · template values (`trip_key`, `date` + `date_precision` enum(day, month, year), local `dep_time`/`arr_time`, `arr_date`, `from_code`/`to_code`, `airline_text`, `flight_number`, `aircraft_text`, `registration`, `seat`, `cabin_class`, `seat_type`, `purpose`, `notes`, `participants` text[]) · resolved `origin_airport`, `destination_airport`, `airline`, `aircraft_type` · timestamps. One per imported template row (D-88); raw history, own-only RLS. |
 | `import_batch` | `owner` · `kind` enum(google_timeline, flights_template, myflightradar24, flighty, appintheair, tripit, jetlog, byair, gpx) · `raw_file` · `status` enum(queued, processing, done, failed) · `summary` jsonb · `error` · timestamps |
 | `location_point` | `id` bigint · `owner` · `ts` · `geom` Point · `accuracy_m`, `altitude_m`, `speed_mps`, `course_deg`, `battery_pct` · `source` enum(owntracks, overland, gpslogger, colota, google_raw, google_path, gpx, other) · `device` → device_token null · `import_batch` null · `received_at` · `extra` jsonb (tracker points: `{"flags": ["implied_speed" | "reported_speed"]}` when implausible, otherwise NULL; §9.1) · `tile_key` bigint (generated: the point's Web Mercator tile at zoom 20, Morton-interleaved, `app.tile_key()`; map tiles select by key range, §14). **Append-only** (trigger rejects `UPDATE`; `DELETE` only through the owner's explicit purge). Unique (owner, source, device, ts) → duplicates dropped with `ON CONFLICT DO NOTHING`. Indexes: btree (owner, ts), btree (owner, tile_key), BRIN (ts), GiST (geom; unusable by `travel_app` under RLS, see §14). Partition by year later if it passes ~50 M rows. |
 | `point_rollup` | `owner` · `level` (cell zoom 8, 10, …, 20; 0 for hour rows) · `grain` (1 UTC day, 2 UTC year, 3 UTC hour) · `period` date (the day, or 1 January) · `source` · `cell` bigint (`tile_key >> 2·(20 − level)`; the UTC hour for grain 3) · `n` > 0. **Derived** from `location_point` by statement-level INSERT/DELETE triggers in the same transaction (work-order item 5a, D-86, §14); never written by application code. Unique (owner, level, grain, cell, period, source), also the tile index. RLS `own_all` like the points. |
@@ -129,13 +130,14 @@ and by a trigger.
 | Table | Source | Notes |
 |---|---|---|
 | `airport` | OurAirports `airports.csv` | all types including `closed`; `iata_code`, `icao_code`/`gps_code`, `keywords` |
-| `airport_code_history` | manual + derived | `code`, `airport`, `valid_from`, `valid_to`: resolves reassigned/closed codes by flight date; manual override |
+| `airport_code_history` | manual + bundled + derived | `code`, `airport`, `valid_from`, `valid_to`, `source` enum(keywords, bundled, manual): resolves reassigned/closed codes by flight date; manual override |
+| `airline_code_history` | bundled (`geo/data/airline_code_overrides.csv`) | `code`, `airline`, `valid_from`, `valid_to`: reused IATA airline codes by date (D-88) |
 | `airline` | OpenFlights `airlines.dat` | keeps defunct (`active = N`) airlines |
 | `aircraft_type` | OpenFlights `planes.dat` | name, IATA, ICAO |
 | `country`, `region` | Natural Earth admin-0 / admin-1 (10m) | MultiPolygon, GiST |
 | `us_county` | Census cartographic boundary file (500k) | GEOID, MultiPolygon |
 | `geonames_place` | GeoNames `cities500` (+ admin codes) | names for stops via nearest-place lookup |
-| `dataset_version` | — | source, URL, version/date, checksum, license, loaded_at |
+| `dataset_version` | — | name, title, source URL, homepage, version, source commit + date, checksum (SHA-256), license + URL, attribution, row count, loaded_at |
 
 ### 5.9 Access, devices, integrations
 

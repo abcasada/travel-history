@@ -52,7 +52,7 @@ object under §6.2. "Participant" means a Member whose person participates in th
 | Which legs *I* was on (own overrides) | own person | own person | own person | ❌ | ❌ | ❌ |
 | Who was on a leg (anyone's overrides) | vis (people they can see) | ✅ (people they can see) | ❌ | ❌ | ❌ | ❌ |
 | Public consent for my name/notes/photos/legs | own | own | own | ❌ | own | ❌ |
-| Raw history (points and their map roll-up, segments, imports, coverage; also the history map's tiles and coverage strip) | own only | own only | own only | own only | ❌ (no imports) | ❌ |
+| Raw history (points and their map roll-up, segments, imports and imported flight records, coverage; also the history map's tiles and coverage strip) | own only | own only | own only | own only | ❌ (no imports) | ❌ |
 | Home periods | own; family-shared ones read-only | own; shared read-only | — | shared read-only | shared read-only | ❌ |
 | Tags (definitions) | own | own | own | own | ❌ | ❌ |
 | Person: create | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
@@ -77,6 +77,13 @@ Notes:
 - A *core* leg is one created by the owner or the Admin (`is_contribution = false`). A
   contributor's leg (`is_contribution = true`) is edited only by its author.
 - Viewers are read-only. To contribute, a user must be a Member (Open question Q-6).
+- Imported flights (work-order item 10, D-88): `flight_record` rows are raw history. Policy
+  `own_all` (flights migration 0002): read/update/delete only by the owner (`app.is_family()`),
+  write checks need `app.can_create()` (Admin/Member). The matrix adds `view_alice_flight`,
+  `edit_alice_flight`, `delete_alice_flight` (alice only) and `import_own_flight` (Admin and
+  Members); `tests/permissions/test_flights_api.py` checks `GET /flights/records` for every actor
+  (Admin sees none of alice's) and `GET /reference/datasets` (every signed-in family member).
+  `flights_import` runs as `travel_app` in the user's context, never as the owner role.
 - History map (milestone 2.3): the point/segment tiles and coverage strip are reads of raw
   history, not a new action. RLS alone limits them to the caller's rows (the builders never
   filter by owner); `tests/permissions/test_history_tiles.py` checks every actor through the API
@@ -131,7 +138,7 @@ schema and fails if any user-owned table lacks RLS or a policy for each command.
 
 | Table group | SELECT | INSERT | UPDATE | DELETE |
 |---|---|---|---|---|
-| `location_point`, `point_rollup`, `timeline_segment`, `raw_file`, `import_batch`, `coverage_report`, `detection_run`, `rejected_candidate`, `device_token`, `push_subscription`, `integration_setting`, `user_preference`, `tag` | `owner = app.user_id()`; `device_token` also by hash in the `ingest` context | same; points: Admin/Member only, and a named device must be the owner's unrevoked token | same (points/raw files: never, trigger; tokens: name and counters only, revocation final) | owner (points: purge only) |
+| `location_point`, `point_rollup`, `timeline_segment`, `raw_file`, `import_batch`, `flight_record`, `coverage_report`, `detection_run`, `rejected_candidate`, `device_token`, `push_subscription`, `integration_setting`, `user_preference`, `tag` | `owner = app.user_id()`; `device_token` also by hash in the `ingest` context | same; points: Admin/Member only, and a named device must be the owner's unrevoked token | same (points/raw files: never, trigger; tokens: name and counters only, revocation final) | owner (points: purge only) |
 | `trip` | `app.can_view_trip(id)` | `owner = me AND app.can_create()` | `app.can_edit_trip_core(id)` | `owner = me` |
 | `leg`, `route` | `app.can_view_trip(trip)` | core editor, or contributor with `author = me` | core editor on core legs, author on own (while they may contribute) | same as update |
 | `trip_participant` | view trip | core editor, and the person is visible to them | core editor; own `public_consent` via function; the person stays visible | core editor |

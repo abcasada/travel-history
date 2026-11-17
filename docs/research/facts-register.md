@@ -63,6 +63,9 @@ and more sources: `docs/research/*.md`. Re-verify before acting on anything olde
 | Battery | dontkillmyapp.com vendor steps; Android 14 location FGS rules | dontkillmyapp.com; developer.android.com | 2026-10-19 | H |
 | OurAirports | public domain (Unlicense), daily; closed airports have empty iata_code, old codes in keywords | github.com/davidmegginson/ourairports-data | 2026-10-19 | H |
 | OpenFlights | ODbL + DbCL; airlines 2017, stale; Active unreliable | openflights.org/data.php | 2026-10-19 | H |
+| Flight dataset pins | OurAirports airports.csv commit 845fd12 (2026-11-17) sha256 3d7eeb55…; OpenFlights airlines.dat 5d623a6 (2017-02-02) 39be1a43…; planes.dat 4847887 (2019-05-07) 04ba4193… | GitHub API commits?path= | 2026-11-18 | H |
+| Airport code changes (bundled overrides) | DEN Stapleton → DIA 1995-02-28; HKG Kai Tak → Chek Lap Kok 1998-07-06; MUC Riem → new MUC 1992-05-17; Tegel last flight 2020-11-08; BER opened 2020-10-31; Fornebu → Gardermoen 1998-10-08 | general knowledge, matches OurAirports keywords | 2026-11-18 | M (exact boundary day) |
+| Airline code reuse (bundled overrides) | Pan Am (PA) ceased 1991-12-04; TWA (TW) last flight 2001-12-01; T'way uses TW from 2010 | general knowledge | 2026-11-18 | M |
 | Natural Earth | public domain; v5.1.x; use `ISO_A2_EH` | naturalearthdata.com | 2026-10-19 | H |
 | Census | 2025 cartographic boundary counties `cb_2025_us_county_500k.zip` | www2.census.gov/geo/tiger/GENZ2025/shp/ | 2026-10-20 | H |
 | GeoNames | CC BY 4.0; cities500 13 MB; admin1 codes often FIPS | download.geonames.org/export/dump/readme.txt | 2026-10-20 | H |
