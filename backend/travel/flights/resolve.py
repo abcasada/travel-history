@@ -93,9 +93,7 @@ def resolve_airport(raw: str, when: FlightDate | None) -> Resolution:
                 problem="ambiguous_airport",
                 detail=f"{code}: several overrides cover the date: {_names(covering)}",
             )
-        overlapping = {
-            row.airport for row in rows if _overlaps(row.valid_from, row.valid_to, when)
-        }
+        overlapping = {row.airport for row in rows if _overlaps(row.valid_from, row.valid_to, when)}
         if len(overlapping) == 1:
             airport = overlapping.pop()
             return Resolution(
@@ -166,10 +164,15 @@ def resolve_airport(raw: str, when: FlightDate | None) -> Resolution:
         return Resolution(
             problem="ambiguous_airport", detail=f"{code} at {when.iso()}: {_names(candidates)}"
         )
+    gone += [
+        row.airport
+        for row in overrides
+        if row.valid_to is not None and row.valid_to < when.start and row.airport not in gone
+    ]
     if gone:
         return Resolution(
             problem="airport_closed",
-            detail=f"{code} belonged to {_names(gone)}, closed before {when.iso()}",
+            detail=f"{code} belonged to {_names(dict.fromkeys(gone))}, closed before {when.iso()}",
         )
     return Resolution(problem="unknown_airport", detail=f"no airport with code {code}")
 
@@ -206,8 +209,10 @@ def _airline_names(airlines) -> str:
 
 
 def _narrow(candidates: list[Airline], when: FlightDate | None) -> list[Airline]:
-    with_icao = [a for a in candidates if a.icao]
-    candidates = with_icao or candidates
+    # OpenFlights has many half-filled duplicates; an airline with real codes is the likely one.
+    candidates = [a for a in candidates if a.icao] or candidates
+    if len(candidates) > 1:
+        candidates = [a for a in candidates if a.iata] or candidates
     if len(candidates) > 1 and when is not None and when.start >= OPENFLIGHTS_SNAPSHOT:
         candidates = [a for a in candidates if a.active] or candidates
     return candidates
@@ -250,7 +255,9 @@ def _by_name(name: str, when: FlightDate | None) -> list[Airline]:
     return _narrow(loose, when)
 
 
-def resolve_airline(raw: str, when: FlightDate | None) -> Resolution:
+def resolve_airline(raw: str, when: FlightDate | None, code_hint: str = "") -> Resolution:
+    """`code_hint` is the prefix of the flight number ('UA' in 'UA 123'), used to pick among
+    airlines that match a name."""
     value = re.sub(r"\s+", " ", raw or "").strip()
     if not value:
         return Resolution()
@@ -263,6 +270,10 @@ def resolve_airline(raw: str, when: FlightDate | None) -> Resolution:
         candidates, rule = _by_iata(upper, when)
     if not candidates:
         candidates, rule = _by_name(value, when), "name"
+    hint = code_hint.upper()
+    if len(candidates) > 1 and hint:
+        hinted = [a for a in candidates if hint in (a.iata, a.icao)]
+        candidates = hinted or candidates
     if len(candidates) == 1:
         return Resolution(obj=candidates[0], rule=rule)
     if candidates:
@@ -287,9 +298,9 @@ def resolve_aircraft(raw: str) -> Resolution:
             return Resolution(obj=found[0], rule=column)
     found = list(AircraftType.objects.filter(name__iexact=value)[:2])
     if len(found) != 1:
-        found = list(AircraftType.objects.filter(name__icontains=value)[:2])
+        found = list(AircraftType.objects.filter(name__icontains=value)[:20])
+        if len(found) > 1:  # "747-400" → "Boeing 747-400", not "Boeing 747-400F"
+            found = [a for a in found if a.name.lower().endswith(" " + value.lower())]
     if len(found) == 1:
         return Resolution(obj=found[0], rule="name")
-    return Resolution(
-        warnings=[f"aircraft {value!r} not matched; kept as text"], rule="unmatched"
-    )
+    return Resolution(warnings=[f"aircraft {value!r} not matched; kept as text"], rule="unmatched")

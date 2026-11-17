@@ -177,10 +177,15 @@ def fetch(source: Source, *, latest: bool = False, directory: Path | None = None
 # --- Parsing helpers ------------------------------------------------------------------------
 
 
+def _lines(handle) -> Iterator[str]:
+    """Lines not starting with '#': comments in the bundled override files and test subsets
+    (no dataset row starts with one)."""
+    return (line for line in handle if not line.startswith("#"))
+
+
 def _rows_without_comments(path: Path) -> Iterator[dict[str, str]]:
     with path.open(encoding="utf-8", newline="") as handle:
-        lines = (line for line in handle if not line.startswith("#"))
-        yield from csv.DictReader(lines)
+        yield from csv.DictReader(_lines(handle))
 
 
 def _int(value: str) -> int | None:
@@ -262,7 +267,7 @@ AIRPORT_FIELDS = [
 
 def _airports(path: Path) -> Iterator[Airport]:
     with path.open(encoding="utf-8", newline="") as handle:
-        for row in csv.DictReader(handle):
+        for row in csv.DictReader(_lines(handle)):
             try:
                 point = Point(float(row["longitude_deg"]), float(row["latitude_deg"]), srid=4326)
             except (TypeError, ValueError):
@@ -366,7 +371,7 @@ def apply_airport_overrides(overrides: Path = AIRPORT_OVERRIDES) -> None:
 def load_airlines(fetched: Fetched, overrides: Path = AIRLINE_OVERRIDES) -> DatasetVersion:
     airlines = []
     with fetched.path.open(encoding="utf-8", newline="") as handle:
-        for row in csv.reader(handle):
+        for row in csv.reader(_lines(handle)):
             if len(row) < 8 or _int(row[0]) is None or int(row[0]) < 1:
                 continue  # "-1 Unknown" is a placeholder, not an airline
             airlines.append(
@@ -416,7 +421,7 @@ def apply_airline_overrides(overrides: Path = AIRLINE_OVERRIDES) -> None:
 
 def load_aircraft(fetched: Fetched) -> DatasetVersion:
     with fetched.path.open(encoding="utf-8", newline="") as handle:
-        rows = [row for row in csv.reader(handle) if len(row) >= 3 and row[0].strip()]
+        rows = [row for row in csv.reader(_lines(handle)) if len(row) >= 3 and row[0].strip()]
     with transaction.atomic():
         existing = {aircraft.name: aircraft for aircraft in AircraftType.objects.all()}
         for row in rows:

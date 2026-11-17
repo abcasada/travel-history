@@ -136,7 +136,7 @@ def process_row(raw: dict[str, Any], row_number: int, *, dayfirst: bool = False)
     prefix, number = n.split_flight_number(get("flight_number"))
     airline_text = n.text(get("airline")) or prefix
     flight_number = f"{prefix}{number}" if prefix else number
-    airline = resolve_airline(airline_text, when)
+    airline = resolve_airline(airline_text, when, code_hint=prefix)
     if airline.problem:
         problems.append(Issue("airline", airline.problem, airline.detail))
 

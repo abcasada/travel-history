@@ -38,7 +38,8 @@ def read_template(handle: io.TextIOBase) -> list[ProcessedRow]:
     missing = [column for column in REQUIRED if column not in header]
     if missing:
         raise TemplateError(
-            "not a flight template: missing column(s) " + ", ".join(missing)
+            "not a flight template: missing column(s) "
+            + ", ".join(missing)
             + " (convert the spreadsheet with flights_convert first)"
         )
     reader.fieldnames = header
@@ -139,7 +140,10 @@ def import_flight_template(batch: ImportBatch) -> dict:
     counts = store(batch.owner_id, batch.pk, rows)
     return {
         **summarize(rows),
-        "records": {"new": counts["new"], "changed": counts["changed"],
-                    "identical": counts["identical"]},
+        "records": {
+            "new": counts["new"],
+            "changed": counts["changed"],
+            "identical": counts["identical"],
+        },
         "imported_at": timezone.now().isoformat(),
     }

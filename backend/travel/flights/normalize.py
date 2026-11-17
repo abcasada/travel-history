@@ -186,7 +186,7 @@ def airport_code(value) -> str:
         return m[1].upper()
     if re.fullmatch(r"[A-Za-z]{3,4}", raw):
         return raw.upper()
-    if m := re.match(r"([A-Za-z]{3,4})\s*[-–—:/|,]\s*\S", raw):
+    if m := re.match(r"([A-Za-z]{3,4})\s*[-\u2013\u2014:/|,]\s*\S", raw):
         return m[1].upper()
     codes = AIRPORT_CODE.findall(raw)
     if len(codes) == 1:
@@ -198,7 +198,9 @@ def split_route(value) -> tuple[str, str] | None:
     """'MCI-DEN', 'MCI → DEN', 'MCI to DEN', 'MCI/DEN', 'MCI DEN'."""
     raw = text(value)
     m = re.fullmatch(
-        r"([A-Za-z]{3,4})\s*(?:-|–|—|>|→|->|/|to|\s)\s*([A-Za-z]{3,4})", raw, flags=re.I
+        r"([A-Za-z]{3,4})\s*(?:-|\u2013|\u2014|>|\u2192|->|/|to|\s)\s*([A-Za-z]{3,4})",
+        raw,
+        flags=re.I,
     )
     if m:
         return m[1].upper(), m[2].upper()

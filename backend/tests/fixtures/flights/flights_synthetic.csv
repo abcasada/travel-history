@@ -1,0 +1,18 @@
+SYNTHETIC flight list for tests - invented people and trips,,,,,,,,,,,,,,,,
+Trip,Date Flown,Dep Time,Arr Time,From,To,Carrier,Flight #,Equipment,Tail,Seat,Class,Window/Aisle,Reason,With,Comments,Miles
+spring98,3/14/1998,7:05 PM,7:50 PM,MCI,DEN,United,UA 1234,B733,n123ex,12a,Coach,W,Business,Pat Example; Sam Example,first leg,533
+spring98,3/18/1998,0705,1000,DEN,mci,UA,1235,737-300,,14C,Y,aisle,Business,Pat Example,,533
+,1994-06,,,Kansas City (MCI),DEN,TWA,,Boeing 727-200,,,economy,,Family,Pat Example & Sam Example,month only,
+,1997,,,HKG,LAX,UA,,747-400,,,First Class,,Leisure,,before the new airport,
+,1998,,,HKG,LAX,UA,,,,,,,,,year spans the airport change,
+,08/02/2015,,,BER,LHR,British Airways,BA 983,A320,,,,,,,two closed airports list BER,
+,14 Mar 2019,,,TXL,JFK,DL,,Airbus A320,,,Business,,,,,
+,2021-05-05,,,TXL,JFK,DL,,,,,,,,,Tegel had closed,
+,1985-07-04,,,JFK,LHR,,PA 101,B744,,,F,,,,,
+,1995-07-04,,,JFK,LHR,PA,2,,,,,,,,,
+,31/31/2001,,,MCI,STL,Southwest,,,,,,,,,,
+,2003-03-03,,,QQQ,STL,Southwest,WN 12,,,,,,,,,
+,,,,,,,,,,,,,,,,
+,1990,,,MCI,STL,TW,,,,,,,,,,
+,1990,,,MCI,STL,TW,,,,,,,,,,
+,2012-09-09,,,STL,Chicago,Southwest Airlines,,,,,Premium,,,,city name only,

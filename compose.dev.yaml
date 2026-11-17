@@ -47,6 +47,13 @@ services:
     <<: *dev-backend
     profiles: ["tools"]
     user: "${APP_UID:-1000}:${APP_GID:-1000}"
+    # ./data for the flight converter and importer (`data/private/...` paths, docs/flights);
+    # synthetic fixtures read-only.
+    volumes:
+      - ./backend:/app
+      - ${TRAVEL_BULK_DIR:?set in .env}:/bulk
+      - ./data/private:/data/private
+      - ./data/fixtures:/data/fixtures:ro
     environment:
       DB_HOST: db
       DB_NAME: travel
