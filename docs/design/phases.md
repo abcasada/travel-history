@@ -60,7 +60,7 @@ Status markers: ✅ done · 🔄 in progress · ⏳ not started · ⛔ blocked o
 |---|---|
 | 4.1 Valhalla (Kansas) | `valhalla` compose project builds Kansas tiles; route + trace_route work through the backend; full NA build **not** run without approval |
 | 4.2 Auto-detection + review queue | §11 on synthetic fixtures (overnight, day trip, multi-mode); review queue fully keyboard-driven; rejected never resurface; confirmed locked |
-| 4.3 Desktop catalog 🔄 | Map home screen; list + map with persisted divider; filters; tags; participants; bulk edit; shortcuts help. Trips API core (T18 core, item 6) ✅ 2026-11-11: trips, legs, participants and consent endpoints with API-level tests for every role and RLS-level tests (matrix 65 actions × 7 actors); the rest of T18 (item 13) and the UI (T19) to come |
+| 4.3 Desktop catalog 🔄 | Map home screen; list + map with persisted divider; filters; tags; participants; bulk edit; shortcuts help. Trips API core (T18 core, item 6) ✅ 2026-11-11: trips, legs, participants and consent endpoints with API-level tests for every role and RLS-level tests (matrix 65 actions × 7 actors); rest of T18 (item 13) ✅ 2026-11-19: tags, purposes, stops, notes, GPS tracks (time range), photo metadata, route versions (read-only), leg order, all-or-nothing bulk edit, list filters (purpose, tag, vehicle, mode, bbox); contributions follow the leg rule and the owner may delete a removed participant's (Q-16, D-89); matrix 95 actions × 7 actors. Duplicates/join/merge stay with T35. The UI (T19) to come |
 | 4.4 Vehicles | Ownership history with exactly-one-owner constraint; "is it this one?" check; merge; rental quick-add |
 | 4.5 Map matching | Drive legs map-matched with Valhalla; stored as frozen routes |
 

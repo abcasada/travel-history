@@ -5,11 +5,11 @@
 > This index plus the files it links are the source of truth for design and progress. Keep them
 > current (CLAUDE.md requires it). Read the index every session; open design docs on demand.
 
-**Status (2026-11-17):** Phase 1 complete; phase 2 (Timeline and tracking) in progress —
+**Status (2026-11-19):** Phase 1 complete; phase 2 (Timeline and tracking) in progress —
 milestones 2.1–2.4 done (2.4 tracker ingestion built and tested locally). Work-order item 8
 (tracker exposure) is prepared: the `ingest` service runs on `127.0.0.1:8783` with the exposure
 guard and production settings; the tunnel route waits for Adam's "go"
-([docs/tracking/exposure.md](docs/tracking/exposure.md)). Phase 4: the trips API core (T18 core) is done. Work now follows the
+([docs/tracking/exposure.md](docs/tracking/exposure.md)). Phase 4: the trips API (T18) is done (item 13, 2026-11-19). Work now follows the
 orchestrated work order in [docs/ROADMAP.md](docs/ROADMAP.md) (process:
 [docs/ORCHESTRATION.md](docs/ORCHESTRATION.md)).
 
@@ -19,7 +19,7 @@ orchestrated work order in [docs/ROADMAP.md](docs/ROADMAP.md) (process:
 | 1 Skeleton | ✅ 2026-10-20 | [phases](docs/design/phases.md) |
 | 2 Timeline and tracking | 🔄 2.1–2.4 done | [phases](docs/design/phases.md) |
 | 3 Flights | 🔄 3.1–3.2 done (synthetic) | [phases](docs/design/phases.md) |
-| 4 Catalog · 5 Routes · 6 Statistics | ⏳ (4: trips API core done) | [phases](docs/design/phases.md) |
+| 4 Catalog · 5 Routes · 6 Statistics | ⏳ (4: trips API done, T18) | [phases](docs/design/phases.md) |
 | 7 Mobile and photos · 8 Family and public · 9 Android · 10 Later | ⏳ | [phases](docs/design/phases.md) |
 
 ## Section map
@@ -152,6 +152,7 @@ Other guides: [backups to the NAS](docs/backup-nas.md), [restore](docs/restore.m
 - D-86 History map at scale: trigger-maintained per-day/per-year point roll-up (RLS), quadtree `seg_key` for segments, dense segment tiles merged instead of truncated
 - D-88 Flight imports: pinned reference downloads, bundled code overrides, user-owned `flight_record` staging table, CLI import under RLS (pending Adam)
 - D-87 Cross-user periodic jobs: `app.job_user_ids` enumerator (ids of active users, `jobs` context only), one RLS transaction per user, failures isolated, advisory run lock; first job `stale_uploads`
+- D-89 Rest of the trips API: contributions editable by their author only while on the trip; the trip owner may delete a removed participant's contributions (Q-16); stop places own or already on the trip; all-or-nothing bulk edit; hidden vehicles filter like missing ones; merge left to T35 (pending Adam)
 
 ## 25. Open questions (for Adam, answer whenever — nothing is blocked on these)
 
@@ -172,5 +173,5 @@ Other guides: [backups to the NAS](docs/backup-nas.md), [restore](docs/restore.m
 | Q-13 | Any intention to publish the source? (Would decide a license, e.g. MIT or AGPL.) | **Answered 2026-11-10:** MIT license (D-80). |
 | Q-14 | Should family members be able to see each other's **vehicles' ownership history** (who owned it when), or only the vehicle and current owner? | **Answered 2026-11-10:** full history visible to family unless hidden. |
 | Q-15 | The server's LAN address is DHCP-assigned. A DHCP reservation on the EdgeRouter would keep the dev binding stable (router change → yours). | **Resolved 2026-11-10:** the server already has a fixed address outside the router's DHCP range. |
-| Q-16 | A participant contributed their own leg (e.g. a separate flight home) and is later removed from the trip. Should that leg keep sharing the trip with them, and who may delete it? | **Answered 2026-11-17:** the trip owner may delete a removed participant's leg (item 13 builds this). |
+| Q-16 | A participant contributed their own leg (e.g. a separate flight home) and is later removed from the trip. Should that leg keep sharing the trip with them, and who may delete it? | **Answered 2026-11-17:** the trip owner may delete a removed participant's leg. Built in item 13 (2026-11-19), for notes, tracks, tags and photos too (D-89). |
 | Q-17 | GPSLogger's setup link (`gpslogger://properties/<https URL>`) downloads a settings file from a web address. Serving one would mean handing the token to anyone with that address (even short-lived, it passes through any proxy's logs). OK to skip it? | **Answered 2026-11-17:** yes, no hosted GPSLogger profile; copyable fields plus a token QR. |

@@ -48,13 +48,17 @@ object under §6.2. "Participant" means a Member whose person participates in th
 | Legs, participants (trip-level and per leg), participants' consent: read | vis | ✅ | vis | vis | vis | ❌ |
 | Participants: add (only people the editor can see) / remove | vis | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Notes, photos, own legs, own tags, own GPS track: add | vis + participant | ✅ | ✅ | ❌ | ❌ | ❌ |
-| Contributions: edit / delete | own | own | own | ❌ | ❌ | ❌ |
+| Contributions: edit / delete (while the author may still contribute, D-89) | own | own | own | ❌ | ❌ | ❌ |
+| Contributions of someone no longer on the trip: delete (not edit; Q-16) | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Stops: add / edit / delete (place: own, or already on the trip) | vis | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Leg order (every leg, contributed ones included) | vis | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Bulk edit (purpose, visibility, participants, own tags) | each trip as the single edit; all or nothing | same | same | same | ❌ | ❌ |
 | Which legs *I* was on (own overrides) | own person | own person | own person | ❌ | ❌ | ❌ |
 | Who was on a leg (anyone's overrides) | vis (people they can see) | ✅ (people they can see) | ❌ | ❌ | ❌ | ❌ |
 | Public consent for my name/notes/photos/legs | own | own | own | ❌ | own | ❌ |
 | Raw history (points and their map roll-up, segments, imports and imported flight records, coverage; also the history map's tiles and coverage strip) | own only | own only | own only | own only | ❌ (no imports) | ❌ |
 | Home periods | own; family-shared ones read-only | own; shared read-only | — | shared read-only | shared read-only | ❌ |
-| Tags (definitions) | own | own | own | own | ❌ | ❌ |
+| Tags (definitions; `GET /tags` lists own; purposes likewise own) | own | own | own | own | ❌ | ❌ |
 | Person: create | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
 | Person: edit | ✅ | managing user | managing user | managing user | ❌ | ❌ |
 | Vehicle: read | vis (not hidden, or managing) | managing or not hidden | same | same | not hidden | ❌ |
@@ -130,6 +134,32 @@ Notes:
   - Tests: `tests/permissions/test_trips_api.py` (every endpoint × every actor, plus what each
     actor sees), `test_trip_guards.py` (the reference triggers as `travel_app`), and the matrix
     (65 actions × 7 actors).
+- Rest of the trips API (work-order item 13, D-89; endpoints in [api.md](api.md) §17):
+  - Contributions (notes, GPS tracks, own tags on a trip, trip photos) follow the leg rule: the
+    author edits and deletes them only while they may still contribute (`policy.
+    can_edit_contribution`, which now asks `can_contribute`). A removed participant still reads a
+    family trip but changes nothing on it.
+  - Q-16: the trip owner may delete (never edit) a leg, note, track, tag or photo whose author is
+    no longer on the trip (`policy.can_delete_left_contribution`; SQL
+    `app.can_delete_left_contribution`). "On the trip" is the sharing test (trip-level, or
+    included on a leg); an account without a person is never on a trip; the owner's own rows
+    never count as left. The Admin gets no such right. A participant demoted to Viewer or
+    deactivated keeps their rows frozen until the owner removes them from the trip.
+  - Stops are core itinerary. Their place must be the editor's own or already on the same trip
+    (a place can be a home address; a guessed id must not copy it onto a trip others read). A
+    stop's leg, and a photo's leg and stop, stay inside their trip.
+  - Leg order: core editors renumber every leg, contributed ones included, through
+    `app.reorder_legs`; nothing else on a contributed leg changes.
+  - List filters stay within visible trips; a hidden vehicle filters like a missing one (no
+    results), so a filter never reveals which visible trips use it. Route versions are read-only
+    (rule 5). Photo responses carry metadata only, never file paths.
+  - Bulk edit asks the same policy per trip as the single edits and writes nothing if any trip
+    refuses (403 lists them).
+  - Tests: `tests/permissions/test_trips_api_rest.py` (every new endpoint × every actor, Q-16
+    end to end, filters, bulk, route versions), `test_trip_guards.py` (the new triggers, the
+    reorder function, Q-16 and the new helpers as `travel_app`), and the matrix (now 95 actions
+    × 7 actors; adds note/track/tag/photo/leg rows before and after Bob's removal, tagging, stops
+    and their places, leg order).
 
 ### 6.4 Row-level security policies
 
@@ -140,10 +170,11 @@ schema and fails if any user-owned table lacks RLS or a policy for each command.
 |---|---|---|---|---|
 | `location_point`, `point_rollup`, `timeline_segment`, `raw_file`, `import_batch`, `flight_record`, `coverage_report`, `detection_run`, `rejected_candidate`, `device_token`, `push_subscription`, `integration_setting`, `user_preference`, `tag` | `owner = app.user_id()`; `device_token` also by hash in the `ingest` context | same; points: Admin/Member only, and a named device must be the owner's unrevoked token | same (points/raw files: never, trigger; tokens: name and counters only, revocation final) | owner (points: purge only) |
 | `trip` | `app.can_view_trip(id)` | `owner = me AND app.can_create()` | `app.can_edit_trip_core(id)` | `owner = me` |
-| `leg`, `route` | `app.can_view_trip(trip)` | core editor, or contributor with `author = me` | core editor on core legs, author on own (while they may contribute) | same as update |
+| `leg`, `route` | `app.can_view_trip(trip)` | core editor, or contributor with `author = me` | core editor on core legs, author on own (while they may contribute) | same as update; legs also the trip owner once a contributor left the trip (Q-16) |
+| `stop` | view trip | core editor; the place the editor's own or already on the trip (trigger) | core editor | core editor |
 | `trip_participant` | view trip | core editor, and the person is visible to them | core editor; own `public_consent` via function; the person stays visible | core editor |
 | `leg_participant_override` | view trip | core editor, or a person I manage who may contribute; the person visible to me | same | same |
-| `trip_note`, `media`, `trip_tag`, `track_contribution` | view trip | contributor and `author = me` | `author = me` | `author = me` |
+| `trip_note`, `media`, `trip_tag`, `track_contribution` | view trip | contributor and `author = me` | `author = me` while they may contribute (trip photos; vehicle photos and avatars as before) | same, or the trip owner once the author left the trip (Q-16) |
 | `vehicle`, `vehicle_ownership` | `app.can_view_vehicle(v)` | any member | `app.can_manage_vehicle(v)` | managing user |
 | `vehicle_private` | managing user | managing user | managing user | managing user |
 | `home_period` | `managed_by = me OR (shared_with_family AND app.is_family())` | `managed_by = me` | `managed_by = me` | `managed_by = me` |
@@ -171,6 +202,18 @@ trip; a leg's stops belong to its trip and its current route is one of its own v
 apply to every role); a leg takes only a vehicle the acting user can see (owner role exempt).
 Each fires only when the column is set or changed, so an existing reference never blocks an
 unrelated edit.
+
+**Rest of the trips API (work-order item 13, D-89).** `trips/migrations/0004_contribution_rules.py`
+tightens the update and delete policies of notes, tracks, trip tags and trip photos to
+`author = me AND app.can_contribute(trip)` (as legs), and adds the Q-16 branch
+`app.can_delete_left_contribution(trip, author)` to their delete policies and to `leg_delete`.
+Helpers: `app.user_person(u)` (another account's person; family only) and
+`app.is_person_on_trip(t, p)` (only for trips the caller can see), so neither is an oracle.
+Triggers: a stop's place must pass `app.can_use_place` (own, or already on the trip; owner role
+exempt), a stop's leg and a photo's leg and stop must belong to the same trip (every role). The
+photo update check now also refuses moving a photo onto a trip its author can't contribute to.
+`app.reorder_legs(trip, ids)` is SECURITY DEFINER: it checks `app.can_edit_trip_core`, takes the
+same advisory lock as leg creation, requires every leg exactly once and sets only `sequence`.
 
 **Periodic jobs across users (work-order item 9, T8, D-87).** The worker stays `travel_app`;
 nothing uses BYPASSRLS and there is no extra role. A nightly job first lists the users it

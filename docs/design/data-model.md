@@ -72,10 +72,10 @@ erDiagram
 | `trip_participant` | `trip` · `person` · `added_by` · `public_consent` bool false (§6.6) · unique(trip, person) |
 | `leg_participant_override` | `leg` · `person` · `include` bool · `set_by` · unique(leg, person). Effective leg participants = base set + includes − excludes, where the base set is the trip's participants (`participant_scope = trip`) or just the author's person (`participant_scope = author`, used for a contributor's own leg such as a separate flight home). |
 | `place` | `owner` · `name` · `point` · `address` · `google_place_id` · `geonames_id` · `country_code`, `admin1_code`, `county_geoid` (from local reverse geocoding) · `source` enum(manual, timeline, geocoded). Owner-scoped reusable location. |
-| `stop` | `trip` · `leg` null · `place` · `kind` enum(lodging, destination, visit, waypoint) · `arrive_utc`, `depart_utc`, `tz` · `author` · `source_segment` → timeline_segment null |
+| `stop` | `trip` · `leg` null · `place` · `kind` enum(lodging, destination, visit, waypoint) · `arrive_utc`, `depart_utc`, `tz` · `author` · `source_segment` → timeline_segment null. The place is the editor's own or already on the trip; the leg is one of the trip's (triggers, D-89). |
 | `tag` / `trip_tag` | `tag(owner, name citext unique per owner, color)`; `trip_tag(trip, tag, author)` unique(trip, tag). The owner's tags are the trip's main tags; other participants' tags are attributed and filterable by person. Vehicle and purpose are never tags. |
 | `trip_note` | `trip` · `author` · `body` (markdown) · `public_consent` · timestamps |
-| `track_contribution` | `trip` · `author` · `time_range` · `route` → route (kind gps, built from the author's own points) · `public_consent`. A participant attaching their own GPS track to a shared trip. |
+| `track_contribution` | `trip` · `author` · `time_range` · `route` → route (kind gps, built from the author's own points) · `public_consent`. A participant attaching their own GPS track to a shared trip. Item 13 stores the time range only; `route` stays null until map matching (T22) builds it, after which the range is fixed (D-89). |
 | `review_flag` | `trip` · `reason` enum(source_changed, overlap, flight_unmatched, …) · `details` jsonb · `created_at` · `resolved_at`, `resolved_by` |
 | `rejected_candidate` | `owner` · `fingerprint` · `time_range` · `rejected_at`. Rejected detections never resurface. |
 | `transfer_offer` | `from_user` · `to_user` · `kind` enum(trip, vehicle, home_period) · `object_id` · `status` enum(pending, accepted, declined) · `batch` uuid · timestamps |
