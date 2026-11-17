@@ -641,3 +641,24 @@ def test_key_ranges_cover_the_margin():
     assert inside(tiles.key_range(sub, x * s - 1, y * s - 1)[0])  # north-west corner
     assert len(ranges) <= 21
     assert tiles.key_ranges(0, 0, 0) == [(0, 1 << 40)]
+
+
+def test_morton_compact_inverts_the_key(member):
+    """app.morton_compact() (SQL lookup table, history migration 0012) recovers x and y."""
+    rng = random.Random(12)  # noqa: S311 - synthetic test data
+    pairs = [(rng.randrange(2**20), rng.randrange(2**20)) for _ in range(200)] + [(0, 0)]
+    pairs.append((2**20 - 1, 2**20 - 1))
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT app.morton_compact(k), app.morton_compact(k >> 1) FROM unnest(%s::bigint[]) k",
+            [[tiles.morton(x, y) for x, y in pairs]],
+        )
+        assert cursor.fetchall() == pairs
+
+
+def test_margin_cells_are_the_drawn_ring():
+    depth, cells = tiles._margin_cells(10, 300, 400, 17)
+    assert depth == tiles.MARGIN_CELLS
+    assert len(cells) == (tiles.GRID + 2 * depth) ** 2 - tiles.GRID**2
+    assert tiles._margin_cells(0, 0, 0, 7) == (tiles.MARGIN_CELLS, [])  # nothing beyond the world
+    assert tiles._margin_cells(18, 5, 5, 20)[0] == 0  # 1024-unit cells: centres beyond the buffer

@@ -82,10 +82,13 @@ USE_ROLLUP = True  # tests switch it off to compare against counting raw points
 
 
 def _spread(v: int) -> int:
-    out = 0
-    for bit in range(KEY_ZOOM):
-        out |= ((v >> bit) & 1) << (2 * bit)
-    return out
+    """The 20 low bits of v moved to the even bit positions (as in app.tile_key())."""
+    v &= 0xFFFFF
+    v = (v | (v << 16)) & 0x0000FFFF0000FFFF
+    v = (v | (v << 8)) & 0x00FF00FF00FF00FF
+    v = (v | (v << 4)) & 0x0F0F0F0F0F0F0F0F
+    v = (v | (v << 2)) & 0x3333333333333333
+    return (v | (v << 1)) & 0x5555555555555555
 
 
 def morton(x: int, y: int) -> int:
@@ -224,29 +227,44 @@ SELECT ST_AsMVT(f, 'points', %(extent)s, 'geom') FROM (
 """
 )
 
-# Grid cells are map tiles `grid_bits` zoom levels below the tile (at most zoom KEY_ZOOM), so a
-# cell is a key prefix: counts are summed by prefix from the roll-up (and raw points' keys),
-# without touching geometry. Cells are aligned to one global grid per zoom level, so a cell in a
-# tile's margin is the same cell (and count) the neighbouring tile draws.
-_CELLS = (
-    _ENVELOPE  # noqa: S608
-    + """
-, cells AS (
+# Grid cells are map tiles further down (at most zoom KEY_ZOOM), so a cell is a key prefix:
+# counts are summed by prefix from the roll-up (and raw points' keys), without touching geometry.
+# Cells form one global grid per zoom level, so a cell in a tile's margin is the same cell (and
+# count) the neighbouring tile draws. Only the tile's own cells (one key prefix) and the margin
+# cells listed by `_margin_cells` are placed - straight in tile coordinates, which is what
+# ST_AsMVT takes - so the neighbours' wider key ranges cost no geometry work.
+_CELLS = """
+WITH cells AS (
   SELECT u.c >> %(regroup)s AS c, sum(u.n)::bigint AS n
     FROM ({parts}) u
    GROUP BY 1
 )
 SELECT ST_AsMVT(f, 'points', %(extent)s, 'geom') FROM (
-  SELECT ST_AsMVTGeom(
-           ST_Point(-20037508.342789244 + (app.morton_compact(c.c) + 0.5) * q.cell,
-                    20037508.342789244 - (app.morton_compact(c.c >> 1) + 0.5) * q.cell, 3857),
-           q.tile, %(extent)s, %(buffer)s, true) AS geom,
+  SELECT ST_Point((app.morton_compact(c.c) - %(cx0)s + 0.5) * %(unit)s,
+                  (app.morton_compact(c.c >> 1) - %(cy0)s + 0.5) * %(unit)s) AS geom,
          c.n
-    FROM cells c, q
+    FROM cells c
+   WHERE c.c >> %(inside)s = %(tile)s OR c.c = ANY(%(margin)s::bigint[])
 ) f
--- A cell a rounding error beyond the margin is clipped to NULL by ST_AsMVTGeom (and skipped).
 """
-)
+
+
+def _margin_cells(z: int, x: int, y: int, cell_zoom: int) -> tuple[int, list[int]]:
+    """How many cells a side the margin has (centres within BUFFER of the tile edge), and the
+    keys of those cells around tile z/x/y at `cell_zoom` (inside the world, no wrap-around)."""
+    k = 2 ** (cell_zoom - z)
+    unit = EXTENT // k
+    depth = int(BUFFER / unit + 0.5)
+    n = 2**cell_zoom
+    cells = []
+    for i in range(-depth, k + depth):
+        for j in range(-depth, k + depth):
+            if 0 <= i < k and 0 <= j < k:
+                continue
+            cx, cy = x * k + i, y * k + j
+            if 0 <= cx < n and 0 <= cy < n:
+                cells.append(morton(cx, cy))
+    return depth, cells
 
 
 @dataclass(frozen=True)
@@ -478,8 +496,17 @@ def points_tile(
     # gets 2^(20 - z) cells a side (64 at z14, 16 at z16) instead of GRID.
     cell_zoom = min(z + GRID_BITS, KEY_ZOOM)
     level = next(level for level in ROLLUP_LEVELS if level >= cell_zoom)
-    params["grid"] = 2 ** (cell_zoom - z)
-    params["regroup"] = 2 * (level - cell_zoom)
+    k = 2 ** (cell_zoom - z)
+    params = {
+        "extent": EXTENT,
+        "regroup": 2 * (level - cell_zoom),
+        "cx0": x * k,
+        "cy0": y * k,
+        "unit": EXTENT // k,
+        "inside": 2 * (cell_zoom - z),
+        "tile": morton(x, y),
+        "margin": _margin_cells(z, x, y, cell_zoom)[1],
+    }
     parts = _count_parts(level, key_ranges(z, x, y), start, end, sources, params)
     (data,) = _run(_CELLS.format(parts=parts), params)
     return Tile(bytes(data or b""), aggregated=True)
