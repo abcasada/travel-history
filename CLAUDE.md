@@ -164,7 +164,8 @@ All commands run in containers through `./dev` (see `./dev help`):
   at `/storage/hdd1`. Every native binary must run without AVX. Migration to a Ryzen 5 3600 /
   32 GB host is expected (docs/design/host.md, docs/design/resource-budget.md).
 - Public ingress for the server's sites is a dashboard-managed Cloudflare Tunnel
-  (`~/apps/cloudflared`, host networking); apps bind `127.0.0.1:<port>`. This app uses `8780`.
+  (`~/infra/cloudflared`, host networking); apps bind `127.0.0.1:<port>`. This app uses `8780`
+  for the dev web app and `8783` for the ingest-only tracker service.
   Adding its hostname is a shared-infrastructure change (ask first).
 - Bulk storage for this app: `/storage/hdd1/travel-history/{raw,media,backup-outbox}` → `/bulk`.
 - Docker image tags are pinned; update deliberately and re-run the CPU smoke test.
