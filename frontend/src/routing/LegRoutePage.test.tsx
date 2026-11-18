@@ -1,5 +1,7 @@
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { act } from "react";
+import { useMapStore } from "../map/store";
 import { ME } from "../test/fetch";
 import { lastBody, renderAt, requests } from "../test/render";
 import { EMPTY_MAP, makeDetail, makeLeg, makeStop } from "../test/trips";
@@ -206,4 +208,25 @@ test("viewers and people who can't edit the leg see versions only", async () => 
   renderAt("/trips/10/legs/200/route", routeRoutes([]), { ...ME, role: "viewer" } as typeof ME);
   expect(await screen.findByText("No route saved yet.")).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Propose a route" })).not.toBeInTheDocument();
+});
+
+test("a via point picked on the map goes between start and end", async () => {
+  const user = userEvent.setup();
+  const { fetchMock } = renderAt(
+    "/trips/10/legs/200/route",
+    routeRoutes([{ method: "POST", path: "/api/v1/routing/route", body: PROPOSAL }]),
+  );
+  await user.click(await screen.findByRole("button", { name: "Add a via point" }));
+  act(() => useMapStore.getState().completePick({ lon: -97.4, lat: 38.0 }));
+  expect(await screen.findByText(/Via 1: 38.00000, -97.40000/)).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Propose a route" }));
+  await waitFor(() =>
+    expect(lastBody(fetchMock, "POST", "/api/v1/routing/route")?.waypoints).toEqual([
+      [-97.33, 37.69],
+      [-97.4, 38.0],
+      [-97.61, 38.84],
+    ]),
+  );
+  await user.click(screen.getByRole("button", { name: "Remove via 1" }));
+  expect(screen.queryByText(/Via 1:/)).not.toBeInTheDocument();
 });

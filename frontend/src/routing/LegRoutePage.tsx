@@ -27,6 +27,9 @@ import { ENGINE_LABELS, FIX_THE_MAP_URL, formatDuration, useRoutingStore } from 
 const ROAD_MODES = new Set(["drive", "bus", "other"]);
 const MAX_VIAS = 23; // the proxy takes 2-25 waypoints
 
+type Via = { key: number; point: LngLat };
+let viaSeq = 0;
+
 /**
  * `/trips/:tripId/legs/:legId/route`: a leg's route versions (list pane); the map side is
  * LegRouteLayer. Item 25: "Propose a route" asks `/api/v1/routing/route` for a road route
@@ -121,7 +124,7 @@ function ProposeRoute({ leg }: { leg: LegOut }) {
   const stops = trip.data?.stops ?? [];
   const start = stopPoint(stops, leg.origin_stop_id);
   const end = stopPoint(stops, leg.destination_stop_id);
-  const [vias, setVias] = useState<LngLat[]>([]);
+  const [vias, setVias] = useState<Via[]>([]);
   const [note, setNote] = useState("");
   const noteId = useId();
   const startPick = useMapStore((s) => s.startPick);
@@ -150,7 +153,7 @@ function ProposeRoute({ leg }: { leg: LegOut }) {
 
   const current = shownLeg === leg.id ? proposal : null;
   const route = current?.routes[0];
-  const points = [start, ...vias, end];
+  const points = [start, ...vias.map((v) => v.point), end];
 
   function ask() {
     save.reset();
@@ -182,12 +185,12 @@ function ProposeRoute({ leg }: { leg: LegOut }) {
       <ol className="mb-2 space-y-1 text-sm" aria-label="Waypoints">
         <li>Start: {formatPoint(start)}</li>
         {vias.map((v, i) => (
-          <li key={`${v.lon},${v.lat},${i}`} className="flex items-center gap-2">
-            Via {i + 1}: {formatPoint(v)}
+          <li key={v.key} className="flex items-center gap-2">
+            Via {i + 1}: {formatPoint(v.point)}
             <Button
               variant="link"
               aria-label={`Remove via ${i + 1}`}
-              onClick={() => setVias(vias.filter((_, j) => j !== i))}
+              onClick={() => setVias(vias.filter((other) => other.key !== v.key))}
             >
               Remove
             </Button>
@@ -198,7 +201,12 @@ function ProposeRoute({ leg }: { leg: LegOut }) {
       <div className="mb-3 flex flex-wrap gap-2">
         <Button
           disabled={picking || vias.length >= MAX_VIAS}
-          onClick={() => startPick("a via point", (p) => setVias((old) => [...old, p]))}
+          onClick={() =>
+            startPick("a via point", (point) => {
+              viaSeq += 1;
+              setVias((old) => [...old, { key: viaSeq, point }]);
+            })
+          }
         >
           {picking ? "Click the map…" : "Add a via point"}
         </Button>
@@ -212,7 +220,7 @@ function ProposeRoute({ leg }: { leg: LegOut }) {
         </p>
       )}
       {current && route && (
-        <div className="mb-3 rounded border bg-slate-50 p-2 text-sm" aria-label="Proposal">
+        <section className="mb-3 rounded border bg-slate-50 p-2 text-sm" aria-label="Proposal">
           <p className="font-medium">
             Proposed: {(route.distance / 1000).toFixed(1)} km, {formatDuration(route.duration)}
           </p>
@@ -251,7 +259,7 @@ function ProposeRoute({ leg }: { leg: LegOut }) {
               {routingError(save.error)}
             </p>
           )}
-        </div>
+        </section>
       )}
     </Section>
   );
