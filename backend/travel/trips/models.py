@@ -222,6 +222,9 @@ class Route(models.Model):
     engine = models.CharField(max_length=32, blank=True)
     engine_version = models.CharField(max_length=32, blank=True)
     engine_data_date = models.DateField(null=True, blank=True)
+    # The provider's required credit (routing.md §13.1: ORS is CC-BY-SA), shown wherever the
+    # version is drawn; stored so it survives provider changes.
+    attribution = models.CharField(max_length=200, blank=True, default="")
     produced_at = models.DateTimeField()
     created_by = models.ForeignKey(User, on_delete=models.DO_NOTHING, related_name="+")
     source_time_range = DateTimeRangeField(null=True, blank=True)

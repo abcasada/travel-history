@@ -72,6 +72,14 @@ REGISTRY: dict[str, UserJob] = {
             body="travel.history.uploads.drop_stale_sessions",
             cron="17 2 * * *",
         ),
+        # Expired routing proposals (routing.md §13.1): the user's next proposal also drops
+        # them; this covers users who stop routing, so drawn waypoints don't linger.
+        UserJob(
+            "routing_cache",
+            (Role.ADMIN.value, Role.MEMBER.value),
+            body="travel.routing.services.purge_expired_cache",
+            cron="41 * * * *",
+        ),
         UserJob("coverage_reports", RAW_HISTORY_ROLES, planned="work-order item 12 (T10)"),
         UserJob("trip_detection", RAW_HISTORY_ROLES, planned="phase 4 trip detection (§11)"),
         UserJob(

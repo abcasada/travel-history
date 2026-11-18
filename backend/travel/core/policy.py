@@ -42,6 +42,12 @@ def can_create(user) -> bool:
 # --- Trips ---------------------------------------------------------------------------------
 
 
+def can_propose_route(user) -> bool:
+    """Ask the routing proxy for a proposal (routing.md §13.1). Proposals exist to be saved on a
+    leg, so Viewers (read-only) can't; RLS on the per-user cache says the same."""
+    return can_create(user)
+
+
 def is_person_on_trip(trip: Trip, person_id: int | None) -> bool:
     """An effective participant (§6.2): trip-level, or added to any leg by an include override."""
     from travel.trips.models import LegParticipantOverride, TripParticipant
@@ -197,6 +203,12 @@ def can_edit_leg(user, leg: Leg) -> bool:
     if leg.is_contribution:
         return leg.author_id == user.pk and can_contribute(user, leg.trip)
     return can_edit_trip_core(user, leg.trip)
+
+
+def can_save_route_version(user, leg: Leg) -> bool:
+    """A new frozen route version (rule 5) is an edit of the leg: same people (RLS route_insert
+    checks `app.can_edit_leg`)."""
+    return is_family(user) and can_edit_leg(user, leg)
 
 
 def can_delete_leg(user, leg: Leg) -> bool:

@@ -132,6 +132,12 @@ def propose_route(user, waypoints: list[Waypoint], profile: str = "auto") -> dic
     return {**response, "cached": False}
 
 
+def cached_proposal(user, waypoints: list[Waypoint], profile: str = "auto") -> dict | None:
+    """The user's unexpired proposal for exactly these waypoints, as `propose_route` returned
+    it. Saving a version reads the geometry and provenance from here, never from the client."""
+    return _cached(user, request_key(waypoints, profile), timezone.now())
+
+
 def purge_expired_cache(user_id: int) -> int:
     """Per-user job body (`routing_cache`, travel/core/jobs.py): drop expired proposals."""
     deleted, _ = RouteRequestCache.objects.filter(

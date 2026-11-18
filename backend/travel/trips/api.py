@@ -26,12 +26,15 @@ from travel.core.choices import DatePrecision, TravelMode, Visibility
 from travel.media.models import Media
 from travel.vehicles.models import Vehicle
 
-from . import services
+from travel.routing import services as routing
+
+from . import route_versions, services
 from .models import (
     CabinClass,
     Leg,
     Purpose,
     Route,
+    RouteSimplified,
     Stop,
     Tag,
     TrackContribution,
@@ -274,11 +277,21 @@ class RouteOut(Schema):
     engine: str
     engine_version: str
     engine_data_date: dt.date | None
+    attribution: str = Field(description="the routing provider's credit; show it with the route")
     produced_at: dt.datetime
     created_by: UserRef
     length_m: float
     note: str
     is_current: bool
+
+
+class RouteVersionIn(Schema):
+    waypoints: list[list[float]] = Field(
+        min_length=2,
+        max_length=25,
+        description="the [lon, lat] waypoints of a proposal from POST /routing/route, unchanged",
+    )
+    note: str = Field("", max_length=255)
 
 
 class RouteDetailOut(RouteOut):
@@ -824,6 +837,7 @@ def list_trips(request, params: Query[TripListIn]):
 
 
 MAP_TRIP_LIMIT = 2000
+MAP_ROUTE_ZOOM = 9  # route_simplified bucket for the GeoJSON trip map (~300 m tolerance)
 
 
 def _leg_end(stop: Stop | None, airport) -> list[float] | None:
@@ -834,17 +848,17 @@ def _leg_end(stop: Stop | None, airport) -> list[float] | None:
 # Registered before /trips/{trip_id}.
 @router.get("/trips/map", response=TripMapOut, operation_id="getTripMap")
 def trip_map(request, params: Query[TripFilterIn]):
-    """The filtered trips' stops and legs for the map home (work-order item 20). Legs are
-    straight lines between their end points (stop places, else airports) until routes exist;
-    trip vector tiles from `route_simplified` replace this for routed legs (items 25-26,
-    docs/design/frontend-patterns.md "Map layers")."""
+    """The filtered trips' stops and legs for the map home (work-order item 20). A leg with a
+    current route is drawn from its simplified copy (zoom bucket 9, item 25); others are
+    straight lines between their end points (stop places, else airports). Trip vector tiles
+    from `route_simplified` replace this later (docs/design/frontend-patterns.md "Map layers")."""
     qs = _filtered_trips(request, params).order_by("-start_date", "-pk")
     trips = list(qs[: MAP_TRIP_LIMIT + 1])
     truncated = len(trips) > MAP_TRIP_LIMIT
     trips = trips[:MAP_TRIP_LIMIT]
     ids = [t.pk for t in trips]
     stops = Stop.objects.filter(trip_id__in=ids).select_related("place").order_by("trip_id", "pk")
-    legs = (
+    legs = list(
         Leg.objects.filter(trip_id__in=ids)
         .select_related(
             "origin_stop__place",
@@ -854,8 +868,28 @@ def trip_map(request, params: Query[TripFilterIn]):
         )
         .order_by("trip_id", "sequence", "pk")
     )
+    routed = {
+        s.route_id: [list(c) for line in s.geom.coords for c in line]
+        for s in RouteSimplified.objects.filter(
+            route_id__in=[leg.current_route_id for leg in legs if leg.current_route_id],
+            zoom=MAP_ROUTE_ZOOM,
+        )
+    }
     leg_rows = []
     for leg in legs:
+        line = routed.get(leg.current_route_id)
+        if line and len(line) >= 2:
+            leg_rows.append(
+                {
+                    "id": leg.pk,
+                    "trip_id": leg.trip_id,
+                    "sequence": leg.sequence,
+                    "mode": leg.mode,
+                    "coordinates": line,
+                    "routed": True,
+                }
+            )
+            continue
         start = _leg_end(leg.origin_stop, leg.origin_airport)
         end = _leg_end(leg.destination_stop, leg.destination_airport)
         if start and end:
@@ -1164,6 +1198,7 @@ def _route_row(route: Route, current_id: int | None, creators: dict[int, dict]) 
                 "engine",
                 "engine_version",
                 "engine_data_date",
+                "attribution",
                 "produced_at",
                 "length_m",
                 "note",
@@ -1181,6 +1216,37 @@ def list_leg_routes(request, leg_id: int):
     routes = list(Route.objects.filter(leg=leg).defer("geom").order_by("-version"))
     creators = _directory({r.created_by_id for r in routes})
     return [_route_row(r, leg.current_route_id, creators) for r in routes]
+
+
+@router.post(
+    "/legs/{leg_id}/routes", response={201: RouteDetailOut}, operation_id="saveProposedRoute"
+)
+def save_proposed_route(request, leg_id: int, payload: RouteVersionIn):
+    """Save the caller's recent proposal for these waypoints as the leg's next frozen version
+    (kind `routed`) and make it current. Geometry and provenance come from the server's own
+    proposal cache, never from the client; 409 once the proposal is older than 10 minutes."""
+    leg = _leg(request, leg_id)
+    if not policy.can_save_route_version(request.user, leg):
+        raise HttpError(403, "you cannot edit this leg's route")
+    waypoints = [(float(lon), float(lat)) for lon, lat in payload.waypoints]
+    proposal = routing.cached_proposal(request.user, waypoints)
+    if proposal is None:
+        raise HttpError(409, "that proposal has expired; propose the route again")
+    provenance = proposal["provenance"]
+    try:
+        route = route_versions.save_route_version(
+            request.user,
+            leg,
+            coordinates=proposal["routes"][0]["geometry"]["coordinates"],
+            waypoints=[list(w) for w in waypoints],
+            kind=Route.Kind.ROUTED,
+            provenance=provenance,
+            produced_at=dt.datetime.fromisoformat(provenance["produced_at"]),
+            note=payload.note,
+        )
+    except TripError as error:
+        _fail(error)
+    return Status(201, get_route(request, route.pk))
 
 
 @router.get("/routes/{route_id}", response=RouteDetailOut, operation_id="getRoute")
