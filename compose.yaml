@@ -43,6 +43,9 @@ x-backend-env: &backend-env
   SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
   SMTP_FROM: ${SMTP_FROM:-noreply@adamcasada.com}
   TRAVEL_PUBLIC_BASE_URL: ${TRAVEL_PUBLIC_BASE_URL:-http://localhost:8780}
+  # Self-hosted routing (docs/valhalla.md): the separate `valhalla` project and where it has data.
+  VALHALLA_URL: ${VALHALLA_URL:-http://valhalla:8002}
+  VALHALLA_COVERAGE: ${VALHALLA_COVERAGE:-kansas}
 
 x-backend: &backend
   image: travel-history-backend:${TRAVEL_IMAGE_TAG:-latest}
