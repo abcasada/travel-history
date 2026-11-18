@@ -311,6 +311,8 @@ export interface LegIn {
   cabin_class?: CabinClass | null;
   destination_airport_id?: number | null;
   destination_label?: string | null;
+  /** a stop of the same trip */
+  destination_stop_id?: number | null;
   /** IANA zone name */
   end_tz?: string | null;
   end_utc?: string | null;
@@ -318,6 +320,8 @@ export interface LegIn {
   mode: TravelMode;
   origin_airport_id?: number | null;
   origin_label?: string | null;
+  /** a stop of the same trip */
+  origin_stop_id?: number | null;
   /** core legs only; a contributed leg is always 'author' */
   participant_scope?: ParticipantScope | null;
   seat?: string | null;
@@ -400,6 +404,8 @@ export interface LegPatchIn {
   cabin_class?: CabinClass | null;
   destination_airport_id?: number | null;
   destination_label?: string | null;
+  /** a stop of the same trip */
+  destination_stop_id?: number | null;
   /** IANA zone name */
   end_tz?: string | null;
   end_utc?: string | null;
@@ -407,6 +413,8 @@ export interface LegPatchIn {
   mode?: TravelMode | null;
   origin_airport_id?: number | null;
   origin_label?: string | null;
+  /** a stop of the same trip */
+  origin_stop_id?: number | null;
   /** core legs only; a contributed leg is always 'author' */
   participant_scope?: ParticipantScope | null;
   seat?: string | null;

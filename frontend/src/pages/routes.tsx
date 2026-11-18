@@ -1,15 +1,24 @@
 import { Route, Routes } from "react-router";
+import { LegRoutePage } from "../routing/LegRoutePage";
+import { TripDetailPage } from "../trips/TripDetailPage";
+import { TripEditPage, TripNewPage } from "../trips/TripEditPage";
+import { TripListPage } from "../trips/TripListPage";
 import { AboutPage } from "./About";
 import { HistoryPage } from "./History";
 import { Placeholder } from "./Placeholder";
 import { TrackersPage } from "./Trackers";
 
-/** List-pane content per route; both shells render the same routes. */
+/** List-pane content per route; both shells render the same routes. Paths are built with
+ * trips/paths.ts; the map layers read the same URL (map/MapLayers.tsx). */
 export function ListRoutes() {
   return (
     <Routes>
-      <Route index element={<Placeholder title="Your trips" phase="phase 4 (catalog)" />} />
-      <Route path="trips" element={<Placeholder title="Trips" phase="phase 4" />} />
+      <Route index element={<TripListPage title="Your trips" />} />
+      <Route path="trips" element={<TripListPage />} />
+      <Route path="trips/new" element={<TripNewPage />} />
+      <Route path="trips/:tripId" element={<TripDetailPage />} />
+      <Route path="trips/:tripId/edit" element={<TripEditPage />} />
+      <Route path="trips/:tripId/legs/:legId/route" element={<LegRoutePage />} />
       <Route path="review" element={<Placeholder title="Review queue" phase="phase 4" />} />
       <Route path="stats" element={<Placeholder title="Statistics" phase="phase 6" />} />
       <Route path="vehicles" element={<Placeholder title="Vehicles" phase="phase 4" />} />

@@ -9,7 +9,7 @@ import {
 } from "react-resizable-panels";
 import { NavLink, useNavigate } from "react-router";
 import { BaseMap } from "../map/BaseMap";
-import { HistoryLayers } from "../map/HistoryLayers";
+import { MapLayers } from "../map/MapLayers";
 import { ListRoutes } from "../pages/routes";
 import { useShortcuts } from "../platform/shortcuts";
 import { usePreference } from "../prefs/usePreference";
@@ -102,7 +102,7 @@ export default function DesktopShell() {
         <Separator className="w-1.5 bg-slate-200 outline-none hover:bg-blue-400 focus-visible:bg-blue-500" />
         <Panel id="map">
           <BaseMap>
-            <HistoryLayers />
+            <MapLayers />
           </BaseMap>
         </Panel>
       </Group>

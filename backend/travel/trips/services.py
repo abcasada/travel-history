@@ -354,6 +354,14 @@ def _apply_leg_fields(user, leg: Leg, data: dict[str, Any]) -> None:
         if field in data:
             ref = _lookup(model, data[field], what)
             setattr(leg, field, ref.pk if ref else None)
+    for field in ("origin_stop_id", "destination_stop_id"):
+        if field in data:
+            # A stop of the same trip (row-level security hides others' trips' stops; a stop of
+            # another visible trip gets the same answer). A trigger checks the trip again.
+            stop = _lookup(Stop, data[field], "stop")
+            if stop is not None and stop.trip_id != leg.trip_id:
+                raise invalid("unknown stop")
+            setattr(leg, field, stop.pk if stop else None)
     if "vehicle_id" in data:
         vehicle = _lookup(Vehicle, data["vehicle_id"], "vehicle")
         if vehicle is not None and not policy.can_use_vehicle(user, vehicle):

@@ -949,6 +949,18 @@
             ],
             "title": "Destination Label"
           },
+          "destination_stop_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "a stop of the same trip",
+            "title": "Destination Stop Id"
+          },
           "end_tz": {
             "anyOf": [
               {
@@ -1011,6 +1023,18 @@
               }
             ],
             "title": "Origin Label"
+          },
+          "origin_stop_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "a stop of the same trip",
+            "title": "Origin Stop Id"
           },
           "participant_scope": {
             "anyOf": [
@@ -1431,6 +1455,18 @@
             ],
             "title": "Destination Label"
           },
+          "destination_stop_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "a stop of the same trip",
+            "title": "Destination Stop Id"
+          },
           "end_tz": {
             "anyOf": [
               {
@@ -1500,6 +1536,18 @@
               }
             ],
             "title": "Origin Label"
+          },
+          "origin_stop_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "a stop of the same trip",
+            "title": "Origin Stop Id"
           },
           "participant_scope": {
             "anyOf": [

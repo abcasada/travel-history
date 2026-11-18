@@ -106,7 +106,11 @@ def test_created_person_is_managed_by_its_creator(client, scenario):
 
 @pytest.mark.parametrize(
     "body",
-    [{"display_name": ""}, {"display_name": "x" * 151}, {"display_name": "A", "visibility": "public"}],
+    [
+        {"display_name": ""},
+        {"display_name": "x" * 151},
+        {"display_name": "A", "visibility": "public"},
+    ],
 )
 def test_person_validation(client, scenario, body):
     response = call(as_actor(client, scenario, "alice"), "POST", f"{API}/persons", body)
@@ -235,13 +239,21 @@ def test_airport_search_by_code_then_name(client, scenario):
     f = scenario
     with as_owner():
         Airport.objects.create(
-            ident="KSYN", iata_code="SYN", icao_code="KSYN", type="large_airport",
-            name="Synthetic International", municipality="Synthville", scheduled_service=True,
+            ident="KSYN",
+            iata_code="SYN",
+            icao_code="KSYN",
+            type="large_airport",
+            name="Synthetic International",
+            municipality="Synthville",
+            scheduled_service=True,
             point=Point(-97.0, 37.0),
         )
         Airport.objects.create(
-            ident="XS01", type="small_airport", name="Synthetic Strip SYN",
-            municipality="Elsewhere", point=Point(-98.0, 38.0),
+            ident="XS01",
+            type="small_airport",
+            name="Synthetic Strip SYN",
+            municipality="Elsewhere",
+            point=Point(-98.0, 38.0),
         )
         Airport.objects.create(
             ident="XS02", type="closed", name="Closed Synthetic Field SYN", point=Point(0, 0)
@@ -253,3 +265,48 @@ def test_airport_search_by_code_then_name(client, scenario):
     by_city = call(client, "GET", f"{API}/reference/airports?q=synthv").json()
     assert [r["ident"] for r in by_city] == ["KSYN"]
     assert call(client, "GET", f"{API}/reference/airports?q=s").status_code == 422
+
+
+# --- Legs between stops (what the map draws) ---------------------------------------------------
+
+
+def test_legs_connect_stops_of_their_own_trip_only(client, scenario):
+    f = scenario
+    with as_owner():
+        hidden = Stop.objects.create(
+            trip=f.admin_private_trip,
+            kind="visit",
+            author=f.admin,
+            place=Place.objects.create(owner=f.admin, name="Admin's", point=Point(1, 1)),
+        )
+        other_trip = Stop.objects.create(
+            trip=f.trips["private"],
+            kind="visit",
+            author=f.alice,
+            place=Place.objects.create(owner=f.alice, name="Elsewhere", point=Point(2, 2)),
+        )
+    as_actor(client, f, "alice")
+    fam_stop = f.family_stop.pk
+    created = call(
+        client,
+        "POST",
+        f"{API}/trips/{f.trips['family'].pk}/legs",
+        {"mode": "drive", "origin_stop_id": fam_stop},
+    )
+    assert created.status_code == 201, created.content
+    assert created.json()["origin_stop_id"] == fam_stop
+    leg_path = f"{API}/legs/{f.core_leg.pk}"
+    for stop_id in (hidden.pk, other_trip.pk, 999_999):
+        response = call(client, "PATCH", leg_path, {"destination_stop_id": stop_id})
+        assert response.status_code == 422
+        assert response.json() == {"detail": "unknown stop"}
+    cleared = call(client, "PATCH", leg_path, {"destination_stop_id": fam_stop})
+    assert cleared.json()["destination_stop_id"] == fam_stop
+    assert (
+        call(client, "PATCH", leg_path, {"destination_stop_id": None}).json()["destination_stop_id"]
+        is None
+    )
+    # A contributor's own leg may end at the trip's stops too (the stop itself is untouched).
+    as_actor(client, f, "bob")
+    bobs = call(client, "PATCH", f"{API}/legs/{f.bob_leg.pk}", {"origin_stop_id": fam_stop})
+    assert bobs.status_code == 200 and bobs.json()["origin_stop_id"] == fam_stop

@@ -405,6 +405,8 @@ class LegFieldsIn(Schema):
     time_precision: DatePrecision | None = None
     origin_label: str | None = Field(None, max_length=200)
     destination_label: str | None = Field(None, max_length=200)
+    origin_stop_id: int | None = Field(None, description="a stop of the same trip")
+    destination_stop_id: int | None = Field(None, description="a stop of the same trip")
     vehicle_id: int | None = Field(None, description="a vehicle the caller can see")
     participant_scope: Leg.ParticipantScope | None = Field(
         None, description="core legs only; a contributed leg is always 'author'"
