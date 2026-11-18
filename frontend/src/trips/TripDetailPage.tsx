@@ -74,7 +74,7 @@ function TripDetail({ trip }: { trip: TripDetailOut }) {
       </Link>
       <header className="mt-2 mb-4">
         <div className="flex items-start justify-between gap-2">
-          <h2 className="text-xl font-semibold">{trip.title}</h2>
+          <h2 className="min-w-0 break-words text-xl font-semibold">{trip.title}</h2>
           <div className="flex shrink-0 gap-2">
             {trip.access.edit && (
               <Link

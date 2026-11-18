@@ -53,16 +53,18 @@ export function isValidZone(timeZone: string): boolean {
 
 const LOCAL = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/;
 
-/** "2024-05-01T14:30" in `timeZone` -> ISO UTC instant. In a DST gap the later offset wins. */
+/** "2024-05-01T14:30" in `timeZone` -> ISO UTC instant. */
 export function zonedToUtc(local: string, timeZone: string): string {
   const m = LOCAL.exec(local);
   if (!m) throw new Error(`not a local date-time: ${local}`);
   const [y = 0, mo = 1, d = 1, h = 0, mi = 0] = m.slice(1).map(Number);
   const guess = Date.UTC(y, mo - 1, d, h, mi);
-  const first = offsetMs(guess, timeZone);
-  let utc = guess - first;
-  const second = offsetMs(utc, timeZone);
-  if (second !== first) utc = guess - second;
+  // The offset at the guess may be the wrong side of a DST change; try both candidates. In a
+  // repeated hour the first occurrence wins; in a skipped hour, the instant just after the gap.
+  const a = guess - offsetMs(guess, timeZone);
+  const b = guess - offsetMs(a, timeZone);
+  const exact = [a, b].filter((t) => utcToZoned(new Date(t).toISOString(), timeZone) === local);
+  const utc = exact.length ? Math.min(...exact) : Math.max(a, b);
   return new Date(utc).toISOString().replace(".000Z", "Z");
 }
 

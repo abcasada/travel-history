@@ -86,6 +86,8 @@ function TripLayersInner() {
           filter={isSelected}
           layout={{
             "text-field": ["get", "name"],
+            // A font the basemap's glyph server has (MapLibre's default isn't served there).
+            "text-font": ["Noto Sans Regular"],
             "text-size": 12,
             "text-offset": [0, 1.1],
             "text-anchor": "top",

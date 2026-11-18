@@ -8,11 +8,26 @@ vi.mock("react-map-gl/maplibre", () => ({
   default: ({ children }: { children?: ReactNode }) =>
     createElement("div", { "data-testid": "basemap" }, children),
   NavigationControl: () => null,
-  // Sources expose their tile URLs so tests can check what the map would request.
-  Source: ({ id, tiles, children }: { id: string; tiles?: string[]; children?: ReactNode }) =>
+  // Sources expose their tile URLs, or how many GeoJSON features they hold, so tests can check
+  // what the map would draw.
+  Source: ({
+    id,
+    tiles,
+    data,
+    children,
+  }: {
+    id: string;
+    tiles?: string[];
+    data?: { features?: unknown[] };
+    children?: ReactNode;
+  }) =>
     createElement(
       "div",
-      { "data-testid": `source-${id}`, "data-tiles": tiles?.join(" ") },
+      {
+        "data-testid": `source-${id}`,
+        "data-tiles": tiles?.join(" "),
+        "data-features": data?.features?.length,
+      },
       children,
     ),
   Layer: ({ id }: { id: string }) => createElement("div", { "data-testid": `layer-${id}` }),
