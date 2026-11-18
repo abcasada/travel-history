@@ -296,6 +296,19 @@ def can_view_person(user, person: Person) -> bool:
     return any(can_view_vehicle(user, o.vehicle) for o in owned)
 
 
+def can_create_person(user) -> bool:
+    """Any Member or the Admin adds people (travellers without accounts, e.g. children);
+    Viewers are read-only (§6.3 'Person: create')."""
+    return can_create(user)
+
+
+def can_create_own_person(user) -> bool:
+    """Create a person and link one's own account to it, once: how an account becomes a
+    traveller who can be put on trips. Linking to an existing person stays an Admin task
+    (the SQL guard allows it only for a person the user manages)."""
+    return can_create_person(user) and user.person_id is None
+
+
 def manages_person(user, person: Person) -> bool:
     """The linked account if the person has one, else whoever created the person."""
     from travel.accounts.models import UserDirectory

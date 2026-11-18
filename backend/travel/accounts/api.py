@@ -1,19 +1,23 @@
 import datetime as dt
 import json
 import re
+from enum import StrEnum
 from typing import Any
 
+from django.db import transaction
 from django.utils import timezone
 from django.views.decorators.csrf import ensure_csrf_cookie
-from ninja import Router, Schema
+from ninja import Field, Router, Schema, Status
 from ninja.decorators import decorate_view
 from ninja.errors import HttpError
 
+from travel.core import policy
 from travel.core.choices import DeviceClass
 
-from .models import UserPreference
+from .models import Person, UserDirectory, UserPreference
 
 router = Router(tags=["me"])
+people_router = Router(tags=["people"])
 
 
 class MeOut(Schema):
@@ -78,3 +82,82 @@ def set_preference(request, key: str, payload: PreferenceIn):
         defaults={"value": payload.value},
     )
     return {key: payload.value}
+
+
+# --- People (participant picker; PLAN.md §17 "People") ------------------------------------------
+
+
+class PersonOut(Schema):
+    id: int
+    display_name: str
+    visibility: str
+    is_me: bool = Field(description="the caller's own person")
+    has_account: bool = Field(description="linked to a family account")
+    can_edit: bool = Field(description="the caller manages this person")
+
+
+# Schema names come from class names; Person.Visibility would clash with the trips' Visibility.
+PersonVisibility = StrEnum("PersonVisibility", [(v.upper(), v) for v in Person.Visibility.values])
+
+
+class PersonIn(Schema):
+    display_name: str = Field(min_length=1, max_length=150)
+    visibility: PersonVisibility = PersonVisibility.FAMILY
+
+
+def _people_out(user, people: list[Person]) -> list[dict]:
+    linked = dict(
+        UserDirectory.objects.filter(person_id__in=[p.pk for p in people]).values_list(
+            "person_id", "id"
+        )
+    )
+    return [
+        {
+            "id": p.pk,
+            "display_name": p.display_name,
+            "visibility": p.visibility,
+            "is_me": p.pk == user.person_id,
+            "has_account": p.pk in linked,
+            "can_edit": linked[p.pk] == user.pk if p.pk in linked else p.created_by_id == user.pk,
+        }
+        for p in people
+    ]
+
+
+@people_router.get("/persons", response=list[PersonOut], operation_id="listPersons")
+def list_persons(request):
+    """People the caller can see (row-level security; the policy agrees), own person first."""
+    user = request.user
+    people = [
+        p for p in Person.objects.order_by("display_name", "pk") if policy.can_view_person(user, p)
+    ]
+    people.sort(key=lambda p: p.pk != user.person_id)
+    return _people_out(user, people)
+
+
+@people_router.post("/persons", response={201: PersonOut}, operation_id="createPerson")
+def create_person(request, payload: PersonIn):
+    """A traveller without an account (a child, a friend); the caller manages them."""
+    if not policy.can_create_person(request.user):
+        raise HttpError(403, "your role cannot add people")
+    person = Person.objects.create(
+        display_name=payload.display_name.strip(),
+        visibility=payload.visibility,
+        created_by=request.user,
+    )
+    return Status(201, _people_out(request.user, [person])[0])
+
+
+@router.post("/me/person", response={201: MeOut}, operation_id="createMyPerson")
+def create_my_person(request):
+    """Make the caller a traveller: a new person linked to their account (once). Until then
+    they can't be put on a trip, so trips aren't shared with them as a participant."""
+    user = request.user
+    if not policy.can_create_person(user):
+        raise HttpError(403, "your role cannot add people")
+    if not policy.can_create_own_person(user):
+        raise HttpError(409, "your account already has a person")
+    with transaction.atomic():
+        user.person = Person.objects.create(display_name=user.display_name or "Me", created_by=user)
+        user.save(update_fields=["person"])
+    return Status(201, user)

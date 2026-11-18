@@ -296,6 +296,41 @@ class BulkRefusedOut(Schema):
     refused: list[BulkRefusalOut]
 
 
+class MapTripOut(Schema):
+    id: int
+    title: str
+    start_date: dt.date
+    end_date: dt.date
+    is_owner: bool
+
+
+class MapStopOut(Schema):
+    id: int
+    trip_id: int
+    kind: str
+    name: str
+    lon: float
+    lat: float
+
+
+class MapLegOut(Schema):
+    id: int
+    trip_id: int
+    sequence: int
+    mode: str
+    coordinates: list[list[float]] = Field(
+        description="[lon, lat] pairs; a straight origin-destination pair until routes exist"
+    )
+    routed: bool = Field(description="false: a straight line between the leg's end points")
+
+
+class TripMapOut(Schema):
+    trips: list[MapTripOut]
+    stops: list[MapStopOut]
+    legs: list[MapLegOut]
+    truncated: bool = Field(description="more trips matched than MAP_TRIP_LIMIT; newest kept")
+
+
 # --- Input schemas ----------------------------------------------------------------------------
 
 
@@ -335,7 +370,7 @@ class TripPatchIn(Schema):
     photo_limit_per_contributor: int | None = Field(None, ge=0, le=1000)
 
 
-class TripListIn(Schema):
+class TripFilterIn(Schema):
     """Each list filter (repeat the parameter) matches any of its values; different filters
     must all match."""
 
@@ -355,6 +390,9 @@ class TripListIn(Schema):
         description="minLon,minLat,maxLon,maxLat (WGS84; minLon > maxLon crosses the "
         "antimeridian): a current route, airport or stop inside",
     )
+
+
+class TripListIn(TripFilterIn):
     limit: int = Field(100, ge=1, le=500)
     offset: int = Field(0, ge=0)
 
@@ -748,14 +786,13 @@ class _TripView:
 # --- Trips -----------------------------------------------------------------------------------
 
 
-@router.get("/trips", response=TripPageOut, operation_id="listTrips")
-def list_trips(request, params: Query[TripListIn]):
-    """Trips the caller can see (PLAN.md §6.2), newest first."""
+def _filtered_trips(request, params: TripFilterIn):
+    """Visible trips narrowed by the list filters (shared by the list and the map)."""
     vehicles = None
     if params.vehicle:
         vehicles = services.visible_vehicle_ids(request.user, params.vehicle)
     try:
-        qs = services.filter_trips(
+        return services.filter_trips(
             policy.visible_trips(request.user).select_related("purpose"),
             start=params.start,
             end=params.end,
@@ -771,11 +808,90 @@ def list_trips(request, params: Query[TripListIn]):
         )
     except TripError as error:
         _fail(error)
+
+
+@router.get("/trips", response=TripPageOut, operation_id="listTrips")
+def list_trips(request, params: Query[TripListIn]):
+    """Trips the caller can see (PLAN.md §6.2), newest first."""
+    qs = _filtered_trips(request, params)
     count = qs.count()
     page = list(qs.order_by("-start_date", "-pk")[params.offset : params.offset + params.limit])
     owners = _directory({t.owner_id for t in page})
     tags = _trip_tags(page)
     return {"count": count, "items": [_trip_summary(request.user, t, owners, tags) for t in page]}
+
+
+MAP_TRIP_LIMIT = 2000
+
+
+def _leg_end(stop: Stop | None, airport) -> list[float] | None:
+    point = stop.place.point if stop is not None else airport.point if airport else None
+    return [point.x, point.y] if point is not None else None
+
+
+# Registered before /trips/{trip_id}.
+@router.get("/trips/map", response=TripMapOut, operation_id="getTripMap")
+def trip_map(request, params: Query[TripFilterIn]):
+    """The filtered trips' stops and legs for the map home (work-order item 20). Legs are
+    straight lines between their end points (stop places, else airports) until routes exist;
+    trip vector tiles from `route_simplified` replace this for routed legs (items 25-26,
+    docs/design/frontend-patterns.md "Map layers")."""
+    qs = _filtered_trips(request, params).order_by("-start_date", "-pk")
+    trips = list(qs[: MAP_TRIP_LIMIT + 1])
+    truncated = len(trips) > MAP_TRIP_LIMIT
+    trips = trips[:MAP_TRIP_LIMIT]
+    ids = [t.pk for t in trips]
+    stops = Stop.objects.filter(trip_id__in=ids).select_related("place").order_by("trip_id", "pk")
+    legs = (
+        Leg.objects.filter(trip_id__in=ids)
+        .select_related(
+            "origin_stop__place",
+            "destination_stop__place",
+            "origin_airport",
+            "destination_airport",
+        )
+        .order_by("trip_id", "sequence", "pk")
+    )
+    leg_rows = []
+    for leg in legs:
+        start = _leg_end(leg.origin_stop, leg.origin_airport)
+        end = _leg_end(leg.destination_stop, leg.destination_airport)
+        if start and end:
+            leg_rows.append(
+                {
+                    "id": leg.pk,
+                    "trip_id": leg.trip_id,
+                    "sequence": leg.sequence,
+                    "mode": leg.mode,
+                    "coordinates": [start, end],
+                    "routed": False,
+                }
+            )
+    return {
+        "trips": [
+            {
+                "id": t.pk,
+                "title": t.title,
+                "start_date": t.start_date,
+                "end_date": t.end_date,
+                "is_owner": t.owner_id == request.user.pk,
+            }
+            for t in trips
+        ],
+        "stops": [
+            {
+                "id": s.pk,
+                "trip_id": s.trip_id,
+                "kind": s.kind,
+                "name": s.place.name,
+                "lon": s.place.point.x,
+                "lat": s.place.point.y,
+            }
+            for s in stops
+        ],
+        "legs": leg_rows,
+        "truncated": truncated,
+    }
 
 
 @router.post("/trips", response={201: TripDetailOut}, operation_id="createTrip")

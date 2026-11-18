@@ -89,6 +89,11 @@ def person_of(f, actor):
 # --- Actions: name -> (sql probe, policy probe) --------------------------------------------
 
 
+def _link_new_person(f, actor):
+    person = Person.objects.create(display_name="Me", created_by_id=uid(f, actor))
+    return User.objects.filter(pk=uid(f, actor)).update(person=person) == 1
+
+
 def _trip_actions():
     actions = {}
     for vis in ("private", "participants", "family", "public"):
@@ -645,6 +650,19 @@ ACTIONS = {
     ),
     "view_kid": (lambda f, a: sees(Person, f.kid.pk), None),
     "view_alices_private_person": (lambda f, a: sees(Person, f.alices_private_person.pk), None),
+    # People (work-order item 20): adding a traveller, and making oneself one. Linking an
+    # account to an existing person needs the Admin or that person's managing user.
+    "create_person": (
+        lambda f, a: inserts(
+            lambda: Person.objects.create(display_name="New person", created_by_id=uid(f, a))
+        ),
+        lambda f, u: policy.can_create_person(u),
+    ),
+    "link_own_new_person": (lambda f, a: _rolled_back(lambda: _link_new_person(f, a)), None),
+    "link_own_account_to_kid": (
+        lambda f, a: updates(User, uid(f, a), person=f.kid.pk),
+        None,
+    ),
     **_trips_api_actions(),
     **_contribution_actions(),
 }
@@ -711,6 +729,9 @@ MATRIX = {
     "view_ivan_name":              (T, T, T, T, T, F, F),
     "view_kid":                    (T, T, T, T, T, F, F),
     "view_alices_private_person":  (F, T, F, F, F, F, F),
+    "create_person":               (T, T, T, T, F, F, F),
+    "link_own_new_person":         (T, T, T, T, F, F, F),
+    "link_own_account_to_kid":     (T, F, F, F, F, F, F),
     # Trips API (work-order item 6)
     "view_core_leg":                        (T, T, T, T, T, F, F),
     "view_bob_participation:participants":  (F, T, T, F, F, F, F),

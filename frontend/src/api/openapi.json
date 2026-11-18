@@ -1,6 +1,87 @@
 {
   "components": {
     "schemas": {
+      "AirportOut": {
+        "properties": {
+          "iata_code": {
+            "title": "Iata Code",
+            "type": "string"
+          },
+          "icao_code": {
+            "title": "Icao Code",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "ident": {
+            "title": "Ident",
+            "type": "string"
+          },
+          "iso_country": {
+            "title": "Iso Country",
+            "type": "string"
+          },
+          "lat": {
+            "title": "Lat",
+            "type": "number"
+          },
+          "lon": {
+            "title": "Lon",
+            "type": "number"
+          },
+          "municipality": {
+            "title": "Municipality",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "iata_code",
+          "icao_code",
+          "ident",
+          "name",
+          "municipality",
+          "iso_country",
+          "type",
+          "lon",
+          "lat"
+        ],
+        "title": "AirportOut",
+        "type": "object"
+      },
+      "AirportSearchIn": {
+        "properties": {
+          "limit": {
+            "default": 20,
+            "maximum": 50,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "q": {
+            "description": "code, name or city",
+            "maxLength": 64,
+            "minLength": 2,
+            "title": "Q",
+            "type": "string"
+          }
+        },
+        "required": [
+          "q"
+        ],
+        "title": "AirportSearchIn",
+        "type": "object"
+      },
       "BulkRefusalOut": {
         "properties": {
           "reason": {
@@ -1494,6 +1575,125 @@
         "title": "LegPatchIn",
         "type": "object"
       },
+      "MapLegOut": {
+        "properties": {
+          "coordinates": {
+            "description": "[lon, lat] pairs; a straight origin-destination pair until routes exist",
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "title": "Coordinates",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "mode": {
+            "title": "Mode",
+            "type": "string"
+          },
+          "routed": {
+            "description": "false: a straight line between the leg's end points",
+            "title": "Routed",
+            "type": "boolean"
+          },
+          "sequence": {
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "trip_id": {
+            "title": "Trip Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "trip_id",
+          "sequence",
+          "mode",
+          "coordinates",
+          "routed"
+        ],
+        "title": "MapLegOut",
+        "type": "object"
+      },
+      "MapStopOut": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "lat": {
+            "title": "Lat",
+            "type": "number"
+          },
+          "lon": {
+            "title": "Lon",
+            "type": "number"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "trip_id": {
+            "title": "Trip Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "trip_id",
+          "kind",
+          "name",
+          "lon",
+          "lat"
+        ],
+        "title": "MapStopOut",
+        "type": "object"
+      },
+      "MapTripOut": {
+        "properties": {
+          "end_date": {
+            "format": "date",
+            "title": "End Date",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_owner": {
+            "title": "Is Owner",
+            "type": "boolean"
+          },
+          "start_date": {
+            "format": "date",
+            "title": "Start Date",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "start_date",
+          "end_date",
+          "is_owner"
+        ],
+        "title": "MapTripOut",
+        "type": "object"
+      },
       "MeOut": {
         "properties": {
           "display_name": {
@@ -2036,6 +2236,70 @@
         "title": "ParticipantScope",
         "type": "string"
       },
+      "PersonIn": {
+        "properties": {
+          "display_name": {
+            "maxLength": 150,
+            "minLength": 1,
+            "title": "Display Name",
+            "type": "string"
+          },
+          "visibility": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PersonVisibility"
+              }
+            ],
+            "default": "family"
+          }
+        },
+        "required": [
+          "display_name"
+        ],
+        "title": "PersonIn",
+        "type": "object"
+      },
+      "PersonOut": {
+        "properties": {
+          "can_edit": {
+            "description": "the caller manages this person",
+            "title": "Can Edit",
+            "type": "boolean"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "has_account": {
+            "description": "linked to a family account",
+            "title": "Has Account",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_me": {
+            "description": "the caller's own person",
+            "title": "Is Me",
+            "type": "boolean"
+          },
+          "visibility": {
+            "title": "Visibility",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "display_name",
+          "visibility",
+          "is_me",
+          "has_account",
+          "can_edit"
+        ],
+        "title": "PersonOut",
+        "type": "object"
+      },
       "PersonRef": {
         "properties": {
           "display_name": {
@@ -2053,6 +2317,14 @@
         ],
         "title": "PersonRef",
         "type": "object"
+      },
+      "PersonVisibility": {
+        "enum": [
+          "family",
+          "private"
+        ],
+        "title": "PersonVisibility",
+        "type": "string"
       },
       "PlaceOut": {
         "properties": {
@@ -3251,6 +3523,157 @@
         "title": "TripDetailOut",
         "type": "object"
       },
+      "TripFilterIn": {
+        "description": "Each list filter (repeat the parameter) matches any of its values; different filters\nmust all match.",
+        "properties": {
+          "bbox": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "minLon,minLat,maxLon,maxLat (WGS84; minLon > maxLon crosses the antimeridian): a current route, airport or stop inside",
+            "title": "Bbox"
+          },
+          "from": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "trips ending on or after",
+            "title": "From"
+          },
+          "mode": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/TravelMode"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "trips with a leg of this mode",
+            "title": "Mode"
+          },
+          "person": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "trips this person is on",
+            "title": "Person"
+          },
+          "purpose": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "purpose ids",
+            "title": "Purpose"
+          },
+          "q": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "text in the title",
+            "title": "Q"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Status"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tag": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "tag ids (anyone's tag on the trip)",
+            "title": "Tag"
+          },
+          "to": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "trips starting on or before",
+            "title": "To"
+          },
+          "vehicle": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "trips with a leg in this vehicle",
+            "title": "Vehicle"
+          },
+          "visibility": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Visibility"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "TripFilterIn",
+        "type": "object"
+      },
       "TripIn": {
         "properties": {
           "date_precision": {
@@ -3392,7 +3815,6 @@
         "type": "object"
       },
       "TripListIn": {
-        "description": "Each list filter (repeat the parameter) matches any of its values; different filters\nmust all match.",
         "properties": {
           "bbox": {
             "anyOf": [
@@ -3553,6 +3975,44 @@
           }
         },
         "title": "TripListIn",
+        "type": "object"
+      },
+      "TripMapOut": {
+        "properties": {
+          "legs": {
+            "items": {
+              "$ref": "#/components/schemas/MapLegOut"
+            },
+            "title": "Legs",
+            "type": "array"
+          },
+          "stops": {
+            "items": {
+              "$ref": "#/components/schemas/MapStopOut"
+            },
+            "title": "Stops",
+            "type": "array"
+          },
+          "trips": {
+            "items": {
+              "$ref": "#/components/schemas/MapTripOut"
+            },
+            "title": "Trips",
+            "type": "array"
+          },
+          "truncated": {
+            "description": "more trips matched than MAP_TRIP_LIMIT; newest kept",
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "trips",
+          "stops",
+          "legs",
+          "truncated"
+        ],
+        "title": "TripMapOut",
         "type": "object"
       },
       "TripOut": {
@@ -4864,6 +5324,37 @@
         ]
       }
     },
+    "/api/v1/me/person": {
+      "post": {
+        "description": "Make the caller a traveller: a new person linked to their account (once). Until then\nthey can't be put on a trip, so trips aren't shared with them as a participant.",
+        "operationId": "createMyPerson",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeOut"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Create My Person",
+        "tags": [
+          "me"
+        ]
+      }
+    },
     "/api/v1/me/privacy-ack": {
       "post": {
         "description": "The honesty notice (PLAN.md \u00a76.7) is acknowledged once.",
@@ -5058,6 +5549,80 @@
         ]
       }
     },
+    "/api/v1/persons": {
+      "get": {
+        "description": "People the caller can see (row-level security; the policy agrees), own person first.",
+        "operationId": "listPersons",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PersonOut"
+                  },
+                  "title": "Response",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "List Persons",
+        "tags": [
+          "people"
+        ]
+      },
+      "post": {
+        "description": "A traveller without an account (a child, a friend); the caller manages them.",
+        "operationId": "createPerson",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PersonIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonOut"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Create Person",
+        "tags": [
+          "people"
+        ]
+      }
+    },
     "/api/v1/preferences": {
       "get": {
         "description": "Values for `any`, overridden by values stored for the given device class.",
@@ -5195,6 +5760,67 @@
         "summary": "List Purposes",
         "tags": [
           "trips"
+        ]
+      }
+    },
+    "/api/v1/reference/airports": {
+      "get": {
+        "description": "Airports by code (IATA, ICAO, ident: exact) or name/city (contains), for flight legs and\nstops. Exact code matches first, then airports with scheduled service, then by name.",
+        "operationId": "searchAirports",
+        "parameters": [
+          {
+            "description": "code, name or city",
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "description": "code, name or city",
+              "maxLength": 64,
+              "minLength": 2,
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 50,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AirportOut"
+                  },
+                  "title": "Response",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Search Airports",
+        "tags": [
+          "flights"
         ]
       }
     },
@@ -6051,6 +6677,246 @@
           }
         ],
         "summary": "Bulk Edit Trips",
+        "tags": [
+          "trips"
+        ]
+      }
+    },
+    "/api/v1/trips/map": {
+      "get": {
+        "description": "The filtered trips' stops and legs for the map home (work-order item 20). Legs are\nstraight lines between their end points (stop places, else airports) until routes exist;\ntrip vector tiles from `route_simplified` replace this for routed legs (items 25-26,\ndocs/design/frontend-patterns.md \"Map layers\").",
+        "operationId": "getTripMap",
+        "parameters": [
+          {
+            "description": "trips ending on or after",
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "trips ending on or after",
+              "title": "From"
+            }
+          },
+          {
+            "description": "trips starting on or before",
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "trips starting on or before",
+              "title": "To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "visibility",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Visibility"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Status"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          {
+            "description": "trips this person is on",
+            "in": "query",
+            "name": "person",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "trips this person is on",
+              "title": "Person"
+            }
+          },
+          {
+            "description": "text in the title",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "text in the title",
+              "title": "Q"
+            }
+          },
+          {
+            "description": "purpose ids",
+            "in": "query",
+            "name": "purpose",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "integer"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "purpose ids",
+              "title": "Purpose"
+            }
+          },
+          {
+            "description": "tag ids (anyone's tag on the trip)",
+            "in": "query",
+            "name": "tag",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "integer"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "tag ids (anyone's tag on the trip)",
+              "title": "Tag"
+            }
+          },
+          {
+            "description": "trips with a leg in this vehicle",
+            "in": "query",
+            "name": "vehicle",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "integer"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "trips with a leg in this vehicle",
+              "title": "Vehicle"
+            }
+          },
+          {
+            "description": "trips with a leg of this mode",
+            "in": "query",
+            "name": "mode",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/components/schemas/TravelMode"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "trips with a leg of this mode",
+              "title": "Mode"
+            }
+          },
+          {
+            "description": "minLon,minLat,maxLon,maxLat (WGS84; minLon > maxLon crosses the antimeridian): a current route, airport or stop inside",
+            "in": "query",
+            "name": "bbox",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "minLon,minLat,maxLon,maxLat (WGS84; minLon > maxLon crosses the antimeridian): a current route, airport or stop inside",
+              "title": "Bbox"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TripMapOut"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Trip Map",
         "tags": [
           "trips"
         ]

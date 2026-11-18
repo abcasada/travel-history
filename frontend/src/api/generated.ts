@@ -24,6 +24,33 @@ import type {
 } from '@tanstack/react-query';
 
 import { apiFetch } from './client';
+export interface AirportOut {
+  iata_code: string;
+  icao_code: string;
+  id: number;
+  ident: string;
+  iso_country: string;
+  lat: number;
+  lon: number;
+  municipality: string;
+  name: string;
+  type: string;
+}
+
+export interface AirportSearchIn {
+  /**
+     * @minimum 1
+     * @maximum 50
+     */
+  limit?: number;
+  /**
+     * code, name or city
+     * @minLength 2
+     * @maxLength 64
+     */
+  q: string;
+}
+
 export interface BulkRefusalOut {
   reason: string;
   trip_id: number;
@@ -391,6 +418,34 @@ export interface LegPatchIn {
   vehicle_id?: number | null;
 }
 
+export interface MapLegOut {
+  /** [lon, lat] pairs; a straight origin-destination pair until routes exist */
+  coordinates: number[][];
+  id: number;
+  mode: string;
+  /** false: a straight line between the leg's end points */
+  routed: boolean;
+  sequence: number;
+  trip_id: number;
+}
+
+export interface MapStopOut {
+  id: number;
+  kind: string;
+  lat: number;
+  lon: number;
+  name: string;
+  trip_id: number;
+}
+
+export interface MapTripOut {
+  end_date: string;
+  id: number;
+  is_owner: boolean;
+  start_date: string;
+  title: string;
+}
+
 export interface MeOut {
   display_name: string;
   email: string;
@@ -519,6 +574,35 @@ export interface ParticipantOut {
   person: PersonRef;
   /** null unless on_trip */
   public_consent: boolean | null;
+}
+
+export type PersonVisibility = typeof PersonVisibility[keyof typeof PersonVisibility];
+
+
+export const PersonVisibility = {
+  family: 'family',
+  private: 'private',
+} as const;
+
+export interface PersonIn {
+  /**
+     * @minLength 1
+     * @maxLength 150
+     */
+  display_name: string;
+  visibility?: PersonVisibility;
+}
+
+export interface PersonOut {
+  /** the caller manages this person */
+  can_edit: boolean;
+  display_name: string;
+  /** linked to a family account */
+  has_account: boolean;
+  id: number;
+  /** the caller's own person */
+  is_me: boolean;
+  visibility: string;
 }
 
 export interface PlaceOut {
@@ -798,6 +882,33 @@ export interface TripDetailOut {
   visibility: string;
 }
 
+/**
+ * Each list filter (repeat the parameter) matches any of its values; different filters
+ * must all match.
+ */
+export interface TripFilterIn {
+  /** minLon,minLat,maxLon,maxLat (WGS84; minLon > maxLon crosses the antimeridian): a current route, airport or stop inside */
+  bbox?: string | null;
+  /** trips ending on or after */
+  from?: string | null;
+  /** trips with a leg of this mode */
+  mode?: TravelMode[] | null;
+  /** trips this person is on */
+  person?: number | null;
+  /** purpose ids */
+  purpose?: number[] | null;
+  /** text in the title */
+  q?: string | null;
+  status?: Status | null;
+  /** tag ids (anyone's tag on the trip) */
+  tag?: number[] | null;
+  /** trips starting on or before */
+  to?: string | null;
+  /** trips with a leg in this vehicle */
+  vehicle?: number[] | null;
+  visibility?: Visibility | null;
+}
+
 export interface TripIn {
   date_precision?: DatePrecision | null;
   end_date: string;
@@ -820,10 +931,6 @@ export interface TripIn {
   visibility?: Visibility | null;
 }
 
-/**
- * Each list filter (repeat the parameter) matches any of its values; different filters
- * must all match.
- */
 export interface TripListIn {
   /** minLon,minLat,maxLon,maxLat (WGS84; minLon > maxLon crosses the antimeridian): a current route, airport or stop inside */
   bbox?: string | null;
@@ -852,6 +959,14 @@ export interface TripListIn {
   /** trips with a leg in this vehicle */
   vehicle?: number[] | null;
   visibility?: Visibility | null;
+}
+
+export interface TripMapOut {
+  legs: MapLegOut[];
+  stops: MapStopOut[];
+  trips: MapTripOut[];
+  /** more trips matched than MAP_TRIP_LIMIT; newest kept */
+  truncated: boolean;
 }
 
 export interface TripOut {
@@ -983,6 +1098,20 @@ export type ListPreferences200 = { [key: string]: unknown };
 
 export type SetPreference200 = { [key: string]: unknown };
 
+export type SearchAirportsParams = {
+/**
+ * code, name or city
+ * @minLength 2
+ * @maxLength 64
+ */
+q: string;
+/**
+ * @minimum 1
+ * @maximum 50
+ */
+limit?: number;
+};
+
 export type ListTripsParams = {
 /**
  * trips ending on or after
@@ -1031,6 +1160,47 @@ limit?: number;
  * @minimum 0
  */
 offset?: number;
+};
+
+export type GetTripMapParams = {
+/**
+ * trips ending on or after
+ */
+from?: string | null;
+/**
+ * trips starting on or before
+ */
+to?: string | null;
+visibility?: Visibility | null;
+status?: Status | null;
+/**
+ * trips this person is on
+ */
+person?: number | null;
+/**
+ * text in the title
+ */
+q?: string | null;
+/**
+ * purpose ids
+ */
+purpose?: number[] | null;
+/**
+ * tag ids (anyone's tag on the trip)
+ */
+tag?: number[] | null;
+/**
+ * trips with a leg in this vehicle
+ */
+vehicle?: number[] | null;
+/**
+ * trips with a leg of this mode
+ */
+mode?: TravelMode[] | null;
+/**
+ * minLon,minLat,maxLon,maxLat (WGS84; minLon > maxLon crosses the antimeridian): a current route, airport or stop inside
+ */
+bbox?: string | null;
 };
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
@@ -2393,6 +2563,82 @@ export function useGetMe<TData = Awaited<ReturnType<typeof getMe>>, TError = unk
 
 
 
+export const getCreateMyPersonUrl = () => {
+
+
+
+
+  return `/api/v1/me/person`
+}
+
+/**
+ * Make the caller a traveller: a new person linked to their account (once). Until then
+ * they can't be put on a trip, so trips aren't shared with them as a participant.
+ * @summary Create My Person
+ */
+export const createMyPerson = async ( options?: Parameters<typeof apiFetch>[1]): Promise<MeOut> => {
+
+  return apiFetch<MeOut>(getCreateMyPersonUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getCreateMyPersonMutationKey = () => ['createMyPerson'] as const;
+
+export const getCreateMyPersonMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createMyPerson>>, TError,void, TContext>, request?: SecondParameter<typeof apiFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createMyPerson>>, TError,void, TContext> => {
+
+const mutationKey = getCreateMyPersonMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createMyPerson>>, void> = () => {
+
+
+          return  createMyPerson(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateMyPersonMutationResult = NonNullable<Awaited<ReturnType<typeof createMyPerson>>>
+
+    export type CreateMyPersonMutationError = unknown
+
+
+    /**
+ * @summary Create My Person
+ */
+export const useCreateMyPerson = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createMyPerson>>, TError,void, TContext>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof createMyPerson>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getCreateMyPersonMutationOptions(options), queryClient);
+    }
+
 export const getAcknowledgePrivacyNoticeUrl = () => {
 
 
@@ -2796,6 +3042,197 @@ export const useUpdateNote = <TError = unknown,
       return useMutation(getUpdateNoteMutationOptions(options), queryClient);
     }
 
+export const getListPersonsUrl = () => {
+
+
+
+
+  return `/api/v1/persons`
+}
+
+/**
+ * People the caller can see (row-level security; the policy agrees), own person first.
+ * @summary List Persons
+ */
+export const listPersons = async ( options?: Parameters<typeof apiFetch>[1]): Promise<PersonOut[]> => {
+
+  return apiFetch<PersonOut[]>(getListPersonsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListPersonsQueryKey = () => {
+    return [
+    `/api/v1/persons`
+    ] as const;
+    }
+
+
+export const getListPersonsQueryOptions = <TData = Awaited<ReturnType<typeof listPersons>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listPersons>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListPersonsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listPersons>>> = ({ signal }) => listPersons({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listPersons>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListPersonsQueryResult = NonNullable<Awaited<ReturnType<typeof listPersons>>>
+export type ListPersonsQueryError = unknown
+
+
+export function useListPersons<TData = Awaited<ReturnType<typeof listPersons>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listPersons>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listPersons>>,
+          TError,
+          Awaited<ReturnType<typeof listPersons>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListPersons<TData = Awaited<ReturnType<typeof listPersons>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listPersons>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listPersons>>,
+          TError,
+          Awaited<ReturnType<typeof listPersons>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListPersons<TData = Awaited<ReturnType<typeof listPersons>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listPersons>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List Persons
+ */
+
+export function useListPersons<TData = Awaited<ReturnType<typeof listPersons>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listPersons>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListPersonsQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreatePersonUrl = () => {
+
+
+
+
+  return `/api/v1/persons`
+}
+
+/**
+ * A traveller without an account (a child, a friend); the caller manages them.
+ * @summary Create Person
+ */
+export const createPerson = async (personIn: PersonIn, options?: Parameters<typeof apiFetch>[1]): Promise<PersonOut> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return apiFetch<PersonOut>(getCreatePersonUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(personIn)
+  }
+);}
+
+
+
+
+
+export const getCreatePersonMutationKey = () => ['createPerson'] as const;
+
+export const getCreatePersonMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPerson>>, TError,CreatePersonMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createPerson>>, TError,CreatePersonMutationVariables, TContext> => {
+
+const mutationKey = getCreatePersonMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createPerson>>, CreatePersonMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createPerson(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreatePersonMutationResult = NonNullable<Awaited<ReturnType<typeof createPerson>>>
+    export type CreatePersonMutationBody = PersonIn
+    export type CreatePersonMutationError = unknown
+    export type CreatePersonMutationVariables = {data: PersonIn}
+
+    /**
+ * @summary Create Person
+ */
+export const useCreatePerson = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPerson>>, TError,CreatePersonMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof createPerson>>,
+        TError,
+        CreatePersonMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreatePersonMutationOptions(options), queryClient);
+    }
+
 export const getListPreferencesUrl = (params?: ListPreferencesParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -3084,6 +3521,116 @@ export function useListPurposes<TData = Awaited<ReturnType<typeof listPurposes>>
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getListPurposesQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getSearchAirportsUrl = (params: SearchAirportsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/reference/airports?${stringifiedParams}` : `/api/v1/reference/airports`
+}
+
+/**
+ * Airports by code (IATA, ICAO, ident: exact) or name/city (contains), for flight legs and
+ * stops. Exact code matches first, then airports with scheduled service, then by name.
+ * @summary Search Airports
+ */
+export const searchAirports = async (params: SearchAirportsParams, options?: Parameters<typeof apiFetch>[1]): Promise<AirportOut[]> => {
+
+  return apiFetch<AirportOut[]>(getSearchAirportsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getSearchAirportsQueryKey = (params?: SearchAirportsParams,) => {
+    return [
+    `/api/v1/reference/airports`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getSearchAirportsQueryOptions = <TData = Awaited<ReturnType<typeof searchAirports>>, TError = unknown>(params: SearchAirportsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchAirports>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getSearchAirportsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof searchAirports>>> = ({ signal }) => searchAirports(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof searchAirports>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type SearchAirportsQueryResult = NonNullable<Awaited<ReturnType<typeof searchAirports>>>
+export type SearchAirportsQueryError = unknown
+
+
+export function useSearchAirports<TData = Awaited<ReturnType<typeof searchAirports>>, TError = unknown>(
+ params: SearchAirportsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchAirports>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof searchAirports>>,
+          TError,
+          Awaited<ReturnType<typeof searchAirports>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useSearchAirports<TData = Awaited<ReturnType<typeof searchAirports>>, TError = unknown>(
+ params: SearchAirportsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchAirports>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof searchAirports>>,
+          TError,
+          Awaited<ReturnType<typeof searchAirports>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useSearchAirports<TData = Awaited<ReturnType<typeof searchAirports>>, TError = unknown>(
+ params: SearchAirportsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchAirports>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Search Airports
+ */
+
+export function useSearchAirports<TData = Awaited<ReturnType<typeof searchAirports>>, TError = unknown>(
+ params: SearchAirportsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchAirports>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getSearchAirportsQueryOptions(params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -4539,6 +5086,126 @@ export const useBulkEditTrips = <TError = BulkRefusedOut,
       > => {
       return useMutation(getBulkEditTripsMutationOptions(options), queryClient);
     }
+
+export const getGetTripMapUrl = (params?: GetTripMapParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    const explodeParameters = ["purpose","tag","vehicle","mode"];
+
+    if (Array.isArray(value) && explodeParameters.includes(key)) {
+      value.forEach((v) => {
+        normalizedParams.append(key, v === null ? 'null' : String(v));
+      });
+      return;
+    }
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/trips/map?${stringifiedParams}` : `/api/v1/trips/map`
+}
+
+/**
+ * The filtered trips' stops and legs for the map home (work-order item 20). Legs are
+ * straight lines between their end points (stop places, else airports) until routes exist;
+ * trip vector tiles from `route_simplified` replace this for routed legs (items 25-26,
+ * docs/design/frontend-patterns.md "Map layers").
+ * @summary Trip Map
+ */
+export const getTripMap = async (params?: GetTripMapParams, options?: Parameters<typeof apiFetch>[1]): Promise<TripMapOut> => {
+
+  return apiFetch<TripMapOut>(getGetTripMapUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetTripMapQueryKey = (params?: GetTripMapParams,) => {
+    return [
+    `/api/v1/trips/map`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetTripMapQueryOptions = <TData = Awaited<ReturnType<typeof getTripMap>>, TError = unknown>(params?: GetTripMapParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTripMap>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetTripMapQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTripMap>>> = ({ signal }) => getTripMap(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTripMap>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetTripMapQueryResult = NonNullable<Awaited<ReturnType<typeof getTripMap>>>
+export type GetTripMapQueryError = unknown
+
+
+export function useGetTripMap<TData = Awaited<ReturnType<typeof getTripMap>>, TError = unknown>(
+ params: undefined |  GetTripMapParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTripMap>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getTripMap>>,
+          TError,
+          Awaited<ReturnType<typeof getTripMap>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetTripMap<TData = Awaited<ReturnType<typeof getTripMap>>, TError = unknown>(
+ params?: GetTripMapParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTripMap>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getTripMap>>,
+          TError,
+          Awaited<ReturnType<typeof getTripMap>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetTripMap<TData = Awaited<ReturnType<typeof getTripMap>>, TError = unknown>(
+ params?: GetTripMapParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTripMap>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Trip Map
+ */
+
+export function useGetTripMap<TData = Awaited<ReturnType<typeof getTripMap>>, TError = unknown>(
+ params?: GetTripMapParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTripMap>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetTripMapQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getDeleteTripUrl = (tripId: number,) => {
 

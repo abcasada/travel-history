@@ -5,11 +5,12 @@ rows (the queries never filter by owner for permission purposes)."""
 
 import datetime as dt
 
-from ninja import Router, Schema
+from django.db.models import Case, IntegerField, Q, Value, When
+from ninja import Field, Query, Router, Schema
 from ninja.errors import HttpError
 
 from travel.core import policy
-from travel.geo.models import DatasetVersion
+from travel.geo.models import Airport, DatasetVersion
 
 from .models import FlightRecord
 
@@ -109,3 +110,62 @@ def list_datasets(request):
     if not policy.is_family(request.user):
         raise HttpError(403, "not allowed")
     return DatasetVersion.objects.order_by("name")
+
+
+class AirportOut(Schema):
+    id: int
+    iata_code: str
+    icao_code: str
+    ident: str
+    name: str
+    municipality: str
+    iso_country: str
+    type: str
+    lon: float
+    lat: float
+
+
+class AirportSearchIn(Schema):
+    q: str = Field(min_length=2, max_length=64, description="code, name or city")
+    limit: int = Field(20, ge=1, le=50)
+
+
+@router.get("/reference/airports", response=list[AirportOut], operation_id="searchAirports")
+def search_airports(request, params: Query[AirportSearchIn]):
+    """Airports by code (IATA, ICAO, ident: exact) or name/city (contains), for flight legs and
+    stops. Exact code matches first, then airports with scheduled service, then by name."""
+    if not policy.is_family(request.user):
+        raise HttpError(403, "not allowed")
+    term = params.q.strip()
+    code = term.upper()
+    exact = Q(iata_code=code) | Q(icao_code=code) | Q(ident=code)
+    rows = (
+        Airport.objects.filter(exact | Q(name__icontains=term) | Q(municipality__icontains=term))
+        .exclude(type="closed", iata_code="")
+        .annotate(
+            exact_rank=Case(
+                When(exact, then=Value(0)), default=Value(1), output_field=IntegerField()
+            )
+        )
+        .order_by("exact_rank", "-scheduled_service", "name")[: params.limit]
+    )
+    return [
+        {
+            **{
+                f: getattr(a, f)
+                for f in (
+                    "id",
+                    "iata_code",
+                    "icao_code",
+                    "ident",
+                    "name",
+                    "municipality",
+                    "iso_country",
+                    "type",
+                )
+            },
+            "lon": a.point.x,
+            "lat": a.point.y,
+        }
+        for a in rows
+    ]
