@@ -7,6 +7,8 @@ const context = await browser.newContext({ viewport: { width: 1400, height: 850 
 const page = await context.newPage();
 const log = [];
 page.on("console", (m) => { if (m.type() === "error") log.push(m.text()); });
+// Name the URL of any 404, since the console line alone doesn't say which request failed.
+page.on("response", (r) => { if (r.status() === 404) log.push(`404 ${new URL(r.url()).pathname}`); });
 try {
 await page.goto(`${base}/app/`);
 // Production redirects straight to the provider (login wall); the dev server shows the SPA's link.
@@ -39,7 +41,7 @@ await page.keyboard.press("Escape");
 const tripRequests = [];
 page.on("response", (r) => {
   const path = new URL(r.url()).pathname;
-  if (/^\/api\/v1\/(trips|legs|stops|persons|me\/person)/.test(path)) tripRequests.push([r.request().method(), path, r.status()]);
+  if (/^\/api\/v1\/(trips|legs|stops|persons|me\/person|routing)/.test(path)) tripRequests.push([r.request().method(), path, r.status()]);
 });
 const title = `E2E trip ${Date.now()}`;
 await page.getByRole("link", { name: "Trips" }).click();
@@ -68,18 +70,40 @@ await page.mouse.click(canvas.x + canvas.width * 0.6, canvas.y + canvas.height *
 await page.getByTestId("place-point").filter({ hasText: /\d+\.\d+, -?\d+\.\d+/ }).waitFor();
 await page.getByRole("form", { name: "New stop" }).getByRole("button", { name: "Add stop" }).click();
 await page.getByText("E2E End", { exact: true }).waitFor();
+// A third stop in Kansas (synthetic: Salina's town centre), so the leg can be routed below.
+await page.getByRole("button", { name: "Add stop" }).click();
+await page.getByLabel("Place name").fill("E2E Kansas");
+await page.getByLabel("Coordinates for the new stop").fill("38.8403, -97.6114");
+await page.getByRole("button", { name: "Use", exact: true }).click();
+await page.getByRole("form", { name: "New stop" }).getByRole("button", { name: "Add stop" }).click();
+await page.getByText("E2E Kansas", { exact: true }).waitFor();
 await page.getByRole("button", { name: "Add leg" }).click();
 await page.getByLabel("From stop").selectOption({ label: "E2E Start" });
-await page.getByLabel("To stop").selectOption({ label: "E2E End" });
+await page.getByLabel("To stop").selectOption({ label: "E2E Kansas" });
 await page.getByRole("form", { name: "New leg" }).getByRole("button", { name: "Add leg" }).click();
-await page.getByText(/Drive\s+E2E Start\s+→\s+E2E End/).first().waitFor();
+await page.getByText(/Drive\s+E2E Start\s+→\s+E2E Kansas/).first().waitFor();
 await page.getByRole("link", { name: "Done" }).click();
 await page.waitForURL(new RegExp(`/app/trips/${tripId}$`));
 await page.getByRole("heading", { name: title }).waitFor();
 await page.getByRole("region", { name: "Who went" }).getByText("Dev Member").waitFor();
-await page.getByRole("region", { name: "Itinerary" }).getByText(/E2E Start → E2E End/).waitFor();
+await page.getByRole("region", { name: "Itinerary" }).getByText(/E2E Start → E2E Kansas/).waitFor();
 await page.waitForTimeout(2000);
 await page.screenshot({ path: "out/trip-detail.png" });
+// Routing (work-order item 25): propose a road route for the Kansas leg through the routing
+// proxy, which must answer from the self-hosted Valhalla; save it as the leg's first version.
+await page.getByRole("region", { name: "Itinerary" }).getByRole("link", { name: "Route" }).first().click();
+await page.getByRole("button", { name: "Propose a route" }).click();
+await page.getByText(/^Proposed: \d+\.\d km/).waitFor({ timeout: 30000 });
+await page.getByText(/^By Valhalla \(self-hosted\)/).waitFor();
+await page.getByTestId("route-attribution").getByText(/OpenStreetMap/).waitFor();
+await page.waitForTimeout(1500);
+await page.screenshot({ path: "out/route-proposal.png" });
+await page.getByLabel("Note for this version").fill("E2E proposal");
+await page.getByRole("button", { name: "Save as a new version" }).click();
+await page.getByText(/Version 1 · routed · \d+\.\d km \(current\)/).waitFor();
+await page.getByText(/Valhalla \(self-hosted\) [\d.]+.*OpenStreetMap/).waitFor();
+await page.getByRole("link", { name: /Back to the trip/ }).click();
+await page.getByRole("heading", { name: title }).waitFor();
 await page.getByRole("link", { name: "Edit" }).click();
 await page.getByRole("heading", { name: "Edit trip" }).waitFor();
 await page.getByLabel("Title", { exact: true }).fill(`${title} (edited)`);
@@ -92,7 +116,8 @@ await page.getByRole("button", { name: "Delete" }).click();
 await page.waitForURL(/\/app\/trips$/);
 const failedTrips = tripRequests.filter(([, , status]) => status >= 400);
 const sawMap = tripRequests.some(([, path]) => path === "/api/v1/trips/map");
-if (failedTrips.length || !sawMap) throw new Error(`trip requests: ${JSON.stringify(tripRequests.slice(0, 20))}`);
+const routed = tripRequests.some(([m, path, status]) => m === "POST" && path === "/api/v1/routing/route" && status === 200);
+if (failedTrips.length || !sawMap || !routed) throw new Error(`trip requests: ${JSON.stringify(tripRequests.slice(0, 20))}`);
 // The raw-history map (milestone 2.3): point and segment tiles and the coverage strip load for
 // the signed-in user, with no failed history requests.
 const historyRequests = [];
