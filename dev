@@ -140,6 +140,42 @@ case "$cmd" in
       *)     echo "./dev tracker deploy | stop | logs | ps | smoke [https://<public host>] [--store]" ;;
     esac
     ;;
+  valhalla)
+    # Valhalla is its own compose project (valhalla/compose.yaml, docs/valhalla.md); the app
+    # reaches it as http://valhalla:8002 over the shared `valhalla` network.
+    vc() { docker compose -f valhalla/compose.yaml "$@"; }
+    sub="${1:-help}"; shift || true
+    case "$sub" in
+      build)
+        docker network inspect valhalla >/dev/null 2>&1 || docker network create valhalla >/dev/null
+        mkdir -p valhalla/data
+        VALHALLA_UID="$(id -u)" VALHALLA_GID="$(id -g)" vc run --rm build
+        # Load the new tiles if the service is already running.
+        if [ -n "$(vc ps -q valhalla 2>/dev/null)" ]; then vc restart valhalla; fi
+        ;;
+      up)
+        [ -e valhalla/data/current/valhalla.json ] || { echo "no tiles yet: run ./dev valhalla build first" >&2; exit 1; }
+        VALHALLA_UID="$(id -u)" VALHALLA_GID="$(id -g)" vc up -d valhalla
+        printf 'waiting for valhalla to be healthy'
+        for _ in $(seq 1 30); do
+          state="$(docker inspect -f '{{.State.Health.Status}}' "$(vc ps -q valhalla)" 2>/dev/null || true)"
+          [ "$state" = healthy ] && break
+          printf '.'; sleep 2
+        done
+        echo " ${state:-not running}"
+        [ "$state" = healthy ] || { vc logs --tail=30 valhalla; exit 1; }
+        ;;
+      down)   vc down ;;
+      logs)   vc logs -f --tail=100 valhalla ;;
+      status)
+        vc ps valhalla
+        cat valhalla/data/current/BUILD_INFO.json 2>/dev/null || echo "no build yet"
+        vc exec valhalla curl -fsS http://127.0.0.1:8002/status && echo
+        ;;
+      smoke)  compose run --rm --no-deps tools python manage.py valhalla_smoke "$@" ;;
+      *)      echo "./dev valhalla build | up | down | status | logs | smoke" ;;
+    esac
+    ;;
   npm)      node_run npm "$@" ;;
   e2e)
     # Headless Chrome (host network: containers can't reach the host's LAN address otherwise).
@@ -179,6 +215,9 @@ case "$cmd" in
 ./dev tracker deploy      build + (re)start the internet-facing tracker endpoint (127.0.0.1:8783), then smoke-test it
 ./dev tracker stop|logs|ps   stop it / follow its log / show it (./dev up and ./dev down leave it alone)
 ./dev tracker smoke [url] [--store]  smoke test (default the local service; https://<public host> through the tunnel)
+./dev valhalla build      download the extract (default Kansas) and build routing tiles (docs/valhalla.md)
+./dev valhalla up|down|status|logs   run / stop / inspect the Valhalla service (valhalla:8002, no ports)
+./dev valhalla smoke      route + map-match through http://valhalla:8002 from the app's network
 HELP
     ;;
 esac

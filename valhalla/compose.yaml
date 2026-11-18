@@ -1,0 +1,66 @@
+# Valhalla routing engine: its own compose project (D-29, docs/design/routing.md §13.5).
+# Shared by the travel app over the external `valhalla` network (created by ./dev setup), which
+# reaches it as http://valhalla:8002. No ports are published; see docs/valhalla.md for an
+# optional 127.0.0.1 debug port. Use `./dev valhalla build|up|down|status|smoke|logs`.
+name: valhalla
+
+x-image: &image
+  # 3.9.1 released 2026-10-06; pinned by digest (D-78). Smoke-tested on the non-AVX Xeon.
+  ghcr.io/valhalla/valhalla-scripted:3.9.1@sha256:6238809f9dc3057743d70a20efd3911ec38e458bfa13a0601909b58f68dfd956
+
+x-hardening: &hardening
+  user: "${VALHALLA_UID:-1000}:${VALHALLA_GID:-1000}"
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "3" }
+
+services:
+  valhalla:
+    <<: *hardening
+    image: *image
+    # Serve whatever build `current` points at; the image's own entrypoint would try to
+    # (re)build as root on start, which we don't want.
+    entrypoint: ["valhalla_service", "/data/current/valhalla.json", "${VALHALLA_SERVER_THREADS:-2}"]
+    read_only: true
+    tmpfs: ["/tmp"]          # prime_server's ipc sockets (loopback, interrupt)
+    volumes:
+      - ./data:/data:ro
+    networks: [valhalla]
+    mem_limit: ${VALHALLA_MEM_LIMIT:-1g}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:8002/status"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+  # One-off tile build: `./dev valhalla build`. Downloads the extract (generic User-Agent),
+  # builds into data/builds/<timestamp>/ and switches data/current only after it succeeds, so
+  # the running service keeps the old tiles until it is restarted.
+  build:
+    <<: *hardening
+    image: *image
+    profiles: ["build"]
+    entrypoint: ["bash", "/scripts/build.sh"]
+    working_dir: /data
+    environment:
+      HOME: /tmp
+      CURL_HOME: /scripts        # every curl call (ours and valhalla_build_timezones') reads .curlrc
+      VALHALLA_PBF_URL: ${VALHALLA_PBF_URL:-https://download.geofabrik.de/north-america/us/kansas-latest.osm.pbf}
+      VALHALLA_BUILD_THREADS: ${VALHALLA_BUILD_THREADS:-2}
+      VALHALLA_SKIP_DOWNLOAD: ${VALHALLA_SKIP_DOWNLOAD:-0}
+    volumes:
+      - ./data:/data
+      - ./build.sh:/scripts/build.sh:ro
+      - ./curlrc:/scripts/.curlrc:ro
+    networks: [egress]
+    mem_limit: ${VALHALLA_BUILD_MEM_LIMIT:-4g}
+
+networks:
+  valhalla:
+    external: true
+    name: valhalla
+  egress: {}
