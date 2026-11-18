@@ -31,11 +31,30 @@ Provider chain:
   MapLibre/OpenFreeMap and store routes permanently, so Google is incompatible. (Google place IDs
   from Timeline may be stored indefinitely: SST §A.3.)
 
+**As built (item 25, D-92):** `travel/routing/` — `providers.py` (the only code that builds
+outbound requests: headers are the generic `ROUTING_USER_AGENT`, `Accept` and, for ORS only, the
+key; bodies carry only the waypoints rounded to 6 decimals), `services.py` (chain, throttles,
+cache), `api.py`. The answer adds `provenance.attribution` and `produced_at`, and `cached`.
+A provider that answers "no route" ends the chain (422) so the waypoints don't go to the next
+provider; "unavailable" (5xx, 401/403/429, timeout, no key) tries the next one. Limits: per user
+10/10 s and 5/2 s (429 + Retry-After); ORS 40/min and 2,000/day and FOSSGIS 1/s counted for the
+whole server (503, with Retry-After when FOSSGIS is only busy). The cache
+(`routing_routerequestcache`) is per user under RLS (own rows only; Members and the Admin may
+write) and purged hourly by the `routing_cache` user job. Settings: `VALHALLA_DATA_DATE`
+(else the tile build time from `/status`), `ORS_API_KEY` (empty = ORS skipped), `ORS_URL`,
+`FOSSGIS_OSRM_URL`, `ROUTING_FOSSGIS_ENABLED`, `ROUTING_TIMEOUT`, `ROUTING_CACHE_SECONDS`.
+Saving: `POST /legs/{leg_id}/routes {waypoints, note}` takes geometry and provenance from the
+caller's own cached proposal for exactly those waypoints (409 once it expired), never from the
+client; only drive, bus and other legs take a road route (422). The hand-edited geometry of the
+drag editor (item 26) will extend this endpoint.
+
 ### 13.2 Saved routes are frozen
 
-A saved route stores geometry, control waypoints, kind, engine, engine version, data date and
-time. It is **never recomputed**: there is no code path that re-routes a saved version; a DB
-trigger rejects `UPDATE` on `route`; the editor always creates a new version. Routing uses
+A saved route stores geometry, control waypoints, kind, engine, engine version, data date,
+attribution and time. It is **never recomputed**: there is no code path that re-routes a saved version; a DB
+trigger rejects `UPDATE` on `route`; the editor always creates a new version. Saving inserts version n+1 (leg row locked), its
+`route_simplified` copies (zoom buckets 3/6/9/12, `ST_SimplifyPreserveTopology` at about one
+pixel), and moves `leg.current_route` and `leg.distance_m` (`travel/trips/route_versions.py`). Routing uses
 today's road network; dragging is how old trips get fixed.
 
 ### 13.3 Map matching (Timeline drive legs)

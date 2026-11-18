@@ -158,19 +158,19 @@ No form library. Every editor follows the same shape (see `TripFieldsForm`, `Sto
 - **Symbol layers** must set `"text-font": ["Noto Sans Regular"]`: the basemap's glyph server
   doesn't have MapLibre's default font (a 404 in the console otherwise).
 - **Where routed lines plug in (items 25-26)**:
-  - First step (item 25, backend only): in `trip_map` (backend/travel/trips/api.py), a leg with
-    a current route returns that route's simplified geometry as `coordinates` with
-    `routed: true` (from `route_simplified` at a coarse zoom bucket, or the route itself
-    simplified). The frontend needs no change: the line turns solid by itself.
+  - Done in item 25: in `trip_map` (backend/travel/trips/api.py), a leg with a current route
+    returns its `route_simplified` zoom-9 copy as `coordinates` with `routed: true`; the line
+    turns solid by itself.
   - Map at scale (T19's trip MVT): add `GET /tiles/trips/{z}/{x}/{y}.mvt` reading
     `route_simplified` under RLS (map-rendering.md §14) and replace the `trip-legs` GeoJSON source
     with a vector source of the same layer id and properties (`trip_id`, `leg_id`, `mode`,
     `routed`); keep the stops source. Clicks and highlighting keep working because they use
     the same property names.
   - The leg's route view `/trips/:tripId/legs/:legId/route` is the editor's slot:
-    `routing/LegRoutePage.tsx` (controls, versions; "Propose a route" from item 25) and
-    `routing/LegRouteLayer.tsx` (map: today the current version; item 26 adds anchors and the
-    live route). Item 26 lazy-loads its editor component there, desktop only. Saving always
+    `routing/LegRoutePage.tsx` (controls, versions; "Propose a route" with via points from
+    item 25) and `routing/LegRouteLayer.tsx` (map: the current version, and the unsaved proposal
+    from `routing/store.ts`, a zustand store shared across the panels; item 26 adds anchors and
+    the live route). A proposal always shows its provider and attribution. Item 26 lazy-loads its editor component there, desktop only. Saving always
     creates a new version (rule 5); nothing re-routes a saved one.
 
 ## 6. Shells and platform code

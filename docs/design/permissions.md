@@ -49,6 +49,8 @@ object under §6.2. "Participant" means a Member whose person participates in th
 | Participants: add (only people the editor can see) / remove | vis | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Notes, photos, own legs, own tags, own GPS track: add | vis + participant | ✅ | ✅ | ❌ | ❌ | ❌ |
 | Contributions: edit / delete (while the author may still contribute, D-89) | own | own | own | ❌ | ❌ | ❌ |
+| A leg's route: save a new version (never change one, rule 5) | as editing the leg | same | own contributed legs | ❌ | ❌ | ❌ |
+| Routing proposals (`POST /routing/route`) and their 10-minute cache | own | own | own | own | ❌ | ❌ |
 | Contributions of someone no longer on the trip: delete (not edit; Q-16) | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Stops: add / edit / delete (place: own, or already on the trip) | vis | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Leg order (every leg, contributed ones included) | vis | ✅ | ❌ | ❌ | ❌ | ❌ |
@@ -180,6 +182,19 @@ Notes:
     the matrix rows `create_person`, `link_own_new_person`, `link_own_account_to_kid` (now
     98 actions × 7 actors).
 
+- Routing (work-order item 25, D-92; endpoints in [api.md](api.md) §17):
+  - `POST /routing/route` needs `policy.can_propose_route` (Admin/Member; Viewers are
+    read-only, 403). Proposals are cached per user in `routing_routerequestcache`: RLS shows and
+    deletes only the caller's own rows, and only Admins/Members may write them.
+  - `POST /legs/{id}/routes` needs `policy.can_save_route_version` (= editing the leg); RLS
+    `route_insert`, `routesimp_insert` and `leg_update` check it again. The geometry comes from
+    the caller's own cached proposal, so one user can't save another's drawing; a leg the caller
+    can't see answers 404.
+  - Tests: `tests/permissions/test_routing_api.py` (both endpoints × every actor, the
+    own-proposal rule, versions never changed) and the matrix rows `propose_route`,
+    `view_alice_route_cache`, `delete_alice_route_cache`, `save_route_version_on_bobs_leg`
+    (now 102 actions × 7 actors).
+
 ### 6.4 Row-level security policies
 
 Every table with an owner/author column has RLS enabled. A test enumerates all tables in the
@@ -190,6 +205,7 @@ schema and fails if any user-owned table lacks RLS or a policy for each command.
 | `location_point`, `point_rollup`, `timeline_segment`, `raw_file`, `import_batch`, `flight_record`, `coverage_report`, `detection_run`, `rejected_candidate`, `device_token`, `push_subscription`, `integration_setting`, `user_preference`, `tag` | `owner = app.user_id()`; `device_token` also by hash in the `ingest` context | same; points: Admin/Member only, and a named device must be the owner's unrevoked token | same (points/raw files: never, trigger; tokens: name and counters only, revocation final) | owner (points: purge only) |
 | `trip` | `app.can_view_trip(id)` | `owner = me AND app.can_create()` | `app.can_edit_trip_core(id)` | `owner = me` |
 | `leg`, `route` | `app.can_view_trip(trip)` | core editor, or contributor with `author = me` | core editor on core legs, author on own (while they may contribute) | same as update; legs also the trip owner once a contributor left the trip (Q-16) |
+| `routing_routerequestcache` | `owner = me AND app.is_family()` | `owner = me AND app.can_create()` | same | same as select |
 | `stop` | view trip | core editor; the place the editor's own or already on the trip (trigger) | core editor | core editor |
 | `trip_participant` | view trip | core editor, and the person is visible to them | core editor; own `public_consent` via function; the person stays visible | core editor |
 | `leg_participant_override` | view trip | core editor, or a person I manage who may contribute; the person visible to me | same | same |

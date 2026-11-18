@@ -9,7 +9,7 @@
 milestones 2.1–2.4 done (2.4 tracker ingestion built and tested locally). Work-order item 8
 (tracker exposure) is prepared: the `ingest` service runs on `127.0.0.1:8783` with the exposure
 guard and production settings; the tunnel route waits for Adam's "go"
-([docs/tracking/exposure.md](docs/tracking/exposure.md)). Phase 4: the trips API (T18) is done (item 13, 2026-11-19); the catalog UI's first slice (T19 session 1, item 20, 2026-11-19) lets you add, view and edit trips with legs, stops and people, on the map; patterns in [docs/design/frontend-patterns.md](docs/design/frontend-patterns.md). Milestone 4.1 (item 17, 2026-11-18): self-hosted Valhalla 3.9.1 with Kansas tiles runs as its own compose project on the `valhalla` network ([docs/valhalla.md](docs/valhalla.md)); routing proxy next (item 25). Work now follows the
+([docs/tracking/exposure.md](docs/tracking/exposure.md)). Phase 4: the trips API (T18) is done (item 13, 2026-11-19); the catalog UI's first slice (T19 session 1, item 20, 2026-11-19) lets you add, view and edit trips with legs, stops and people, on the map; patterns in [docs/design/frontend-patterns.md](docs/design/frontend-patterns.md). Milestone 4.1 (item 17, 2026-11-18): self-hosted Valhalla 3.9.1 with Kansas tiles runs as its own compose project on the `valhalla` network ([docs/valhalla.md](docs/valhalla.md)); routing proxy and manual routed legs done (item 25, 2026-11-19: Valhalla in Kansas, ORS once `ORS_API_KEY` is set, FOSSGIS fallback; D-92). Work now follows the
 orchestrated work order in [docs/ROADMAP.md](docs/ROADMAP.md) (process:
 [docs/ORCHESTRATION.md](docs/ORCHESTRATION.md)).
 
@@ -19,7 +19,7 @@ orchestrated work order in [docs/ROADMAP.md](docs/ROADMAP.md) (process:
 | 1 Skeleton | ✅ 2026-10-20 | [phases](docs/design/phases.md) |
 | 2 Timeline and tracking | 🔄 2.1–2.4 done | [phases](docs/design/phases.md) |
 | 3 Flights | 🔄 3.1–3.2 done (synthetic) | [phases](docs/design/phases.md) |
-| 4 Catalog · 5 Routes · 6 Statistics | ⏳ (4: trips API done, T18; catalog UI first slice, T19; 4.1 Valhalla Kansas done) | [phases](docs/design/phases.md) |
+| 4 Catalog · 5 Routes · 6 Statistics | ⏳ (4: trips API done, T18; catalog UI first slice, T19; 4.1 Valhalla Kansas done; 5.1 routing proxy and 5.2 manual routed legs done) | [phases](docs/design/phases.md) |
 | 7 Mobile and photos · 8 Family and public · 9 Android · 10 Later | ⏳ | [phases](docs/design/phases.md) |
 
 ## Section map
@@ -155,6 +155,7 @@ Frontend conventions: [docs/design/frontend-patterns.md](docs/design/frontend-pa
 - D-89 Rest of the trips API: contributions editable by their author only while on the trip; the trip owner may delete a removed participant's contributions (Q-16); stop places own or already on the trip; all-or-nothing bulk edit; hidden vehicles filter like missing ones; merge left to T35 (pending Adam)
 - D-90 Catalog UI architecture: URL as state, generated hooks only, no form library, trip map from `GET /trips/map` until routes exist, stops by map/airport/coordinates, "Add me" creates the own person (pending Adam)
 - D-91 Valhalla: own build script on the pinned 3.9.1 image (non-root, generic User-Agent, md5 check, atomic `current` switch), Kansas coverage polygon with the Missouri corner cut, no default speeds; dev web `DB_CONN_MAX_AGE=0` (pending Adam)
+- D-92 Routing proxy: "no route" ends the chain; ORS/FOSSGIS limits server-wide; per-user proposal cache under RLS; saving uses the server's cached proposal, stores attribution and simplified copies; road modes only
 
 ## 25. Open questions (for Adam, answer whenever — nothing is blocked on these)
 
@@ -168,7 +169,7 @@ Frontend conventions: [docs/design/frontend-patterns.md](docs/design/frontend-pa
 | Q-6 | Should Viewers be able to contribute (notes/photos) to trips they're on, or stay read-only? | **Answered 2026-11-10:** read-only. |
 | Q-7 | For participants without accounts (e.g. kids), who decides whether their name/legs appear on public pages? | **Answered 2026-11-10:** the managing user decides. |
 | Q-8 | PWA install/service-worker testing needs HTTPS. Over plain LAN HTTP it won't install. Options: (a) SSH port-forward to `localhost`, (b) a dev hostname through the tunnel behind Cloudflare Access (that's exposure → your call), (c) a local CA. | **Answered 2026-11-10:** (a) SSH port-forward to localhost. |
-| Q-9 | OpenRouteService's terms prohibit transmitting personal data. OK to send only user-drawn waypoints (outside NA / Valhalla down), or skip ORS and use only the FOSSGIS fallback there? | **Answered 2026-11-10:** user-drawn waypoints only, no identity. No ORS key yet; Valhalla only with the ORS fallback stubbed until a key is added. |
+| Q-9 | OpenRouteService's terms prohibit transmitting personal data. OK to send only user-drawn waypoints (outside NA / Valhalla down), or skip ORS and use only the FOSSGIS fallback there? | **Answered 2026-11-10:** user-drawn waypoints only, no identity. No ORS key yet; Valhalla only with the ORS fallback stubbed until a key is added. Item 25 built the ORS path (tested against mocks); it goes live when `ORS_API_KEY` is set. |
 | Q-10 | Email: Resend (recommended) or SMTP2GO? Is Cloudflare Email Routing active on adamcasada.com (so I can double-check the SPF/DMARC records)? | **Answered 2026-11-17:** Resend. |
 | Q-11 | Defaults OK? Privacy-zone radius 1 km; public pages show dates only; home addresses private by default. | **Still open (2026-11-10):** 1 km is the default for now, but Adam may revisit the radius soon; keep it a single setting that is easy to change. Dates-only and private home addresses assumed yes. |
 | Q-12 | Switch the secret scanner from gitleaks (now security-patches-only) to its successor Betterleaks? | **Answered 2026-11-17:** keep gitleaks; item 41 (the security review) tries Betterleaks. |

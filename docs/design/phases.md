@@ -68,8 +68,8 @@ Status markers: ✅ done · 🔄 in progress · ⏳ not started · ⛔ blocked o
 
 | Milestone | Acceptance criteria |
 |---|---|
-| 5.1 Routing proxy | Valhalla → ORS → FOSSGIS chain; OSRM-format normalization; throttle/debounce; provider policy compliance; provenance recorded |
-| 5.2 Manual trips | Start/end/waypoints → proposed route → accept |
+| 5.1 Routing proxy ✅ 2026-11-19 | Valhalla → ORS → FOSSGIS chain; OSRM-format normalization; throttle/debounce; provider policy compliance; provenance recorded. Item 25: `POST /api/v1/routing/route` (`travel/routing/`: providers, chain, per-user throttle, 10-minute per-user cache under RLS, ORS/FOSSGIS server-wide limits); ORS built and tested against mocks, live once `ORS_API_KEY` is set; FOSSGIS 1 req/s server-wide (D-92) |
+| 5.2 Manual trips ✅ 2026-11-19 | Start/end/waypoints → proposed route → accept. Item 25: the leg route page proposes a route from the leg's stops through optional via points, shows provider, road-data date and attribution, and saves it (`POST /legs/{id}/routes`) as a new frozen version with simplified copies; routed legs draw solid on the trip map; e2e routes a Kansas leg through Valhalla |
 | 5.3 Drag-to-reshape | Anchor-point editing per §13; saved as a new frozen version; never recomputed (test) |
 
 ### Phase 6 — Statistics ⏳
