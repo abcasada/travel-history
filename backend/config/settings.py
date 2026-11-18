@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     "travel.media",
     "travel.public",
     "travel.tracking",
+    "travel.routing",
 ]
 
 MIDDLEWARE = [
@@ -133,6 +134,12 @@ LOGIN_URL = "/auth/login"
 # Header with the real client address when every request arrives through a proxy (e.g.
 # "CF-Connecting-IP" behind the Cloudflare Tunnel); empty = use the socket address.
 RATELIMIT_CLIENT_IP_HEADER = env.str("RATELIMIT_CLIENT_IP_HEADER", "")
+
+# --- Routing (docs/design/routing.md §13) ---------------------------------------------------
+# The self-hosted Valhalla (separate compose project, shared `valhalla` network) and the polygon
+# where it has data (travel/routing/coverage/<name>.geojson, or a path to a .geojson file).
+VALHALLA_URL = env.str("VALHALLA_URL", "http://valhalla:8002")
+VALHALLA_COVERAGE = env.str("VALHALLA_COVERAGE", "kansas")
 
 # --- Tracker ingestion (PLAN.md §9.1) -------------------------------------------------------
 # Public origin trackers post to (e.g. https://travel.example.org, item 8); empty = the address

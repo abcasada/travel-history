@@ -1,0 +1,18 @@
+{
+  "type": "Feature",
+  "properties": {
+    "name": "kansas",
+    "note": "Where the self-hosted Valhalla (Geofabrik Kansas extract) routes. Hand-drawn from the state's straight borders; the north-east corner is cut along a line inside the Missouri River so towns across the river (St. Joseph, Kansas City MO) go to the fallback provider. The extract carries a buffer beyond the border, so routes near the edges still have their roads. docs/design/routing.md §13.5."
+  },
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [[
+      [-102.0517, 36.9931],
+      [-94.6177, 36.9931],
+      [-94.6077, 39.115],
+      [-95.308, 40.0],
+      [-102.0517, 40.0034],
+      [-102.0517, 36.9931]
+    ]]
+  }
+}
