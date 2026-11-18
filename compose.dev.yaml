@@ -25,6 +25,9 @@ services:
     environment:
       DJANGO_DEBUG: "true"
       DJANGO_SECURE_COOKIES: "false"   # plain HTTP on the LAN; production is HTTPS-only
+      # runserver uses a thread per request; with persistent connections each finished thread
+      # left one idle (≈40 after e2e runs), starving the tests' connection slots.
+      DB_CONN_MAX_AGE: "0"
       # Containers can't reach the host's LAN address (host firewall), so server-to-server
       # OIDC calls go to the mock provider directly (travel/accounts/oidc.py).
       OIDC_BACKCHANNEL_URL: http://oidc:8080
