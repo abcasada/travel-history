@@ -4,7 +4,7 @@ Only the orchestrator and the planner edit this file. Status values: todo · in 
 
 ## Work order
 
-> **Execution order (2026-11-19, Adam):** 20 → 21 → 17 → 25 → 26, then 11, 12, 14… Item 4 (real Timeline import) jumps the queue as soon as AGE_RECIPIENT and the export are both present. Item 25 reads the ORS key from `ORS_API_KEY` in `.env` (Adam is getting a key) and must work worldwide through ORS while Valhalla covers only Kansas. Location tracking (item 8 onwards) is on hold.
+> **Execution order (2026-11-19, Adam; updated after item 20):** 17 → 25 → 26 → 21 (21a list tools, 21b trip page; scopes in docs/design/frontend-patterns.md §8) → pause B, then 11, 12, 14… Item 4 (real Timeline import) jumps the queue as soon as AGE_RECIPIENT and the export are both present. Item 25 reads the ORS key from `ORS_API_KEY` in `.env` (Adam is getting a key) and must work worldwide through ORS while Valhalla covers only Kansas. Location tracking (item 8 onwards) is on hold.
 >
 > **Earlier override (2026-11-18, Adam: "start viewing everything so I can explore, on the soon side"):** after item 10, run **13 → 20 → 21** (the rest of the trips API, then the catalog UI), then continue with 11, 12, 14… in order. Item numbers stay the same. Review pause B (after 21) now comes before pause A (after 12). Item 4 (the real import) jumps the queue as soon as AGE_RECIPIENT and the export are both present. **Item 8: Adam said "go" on 2026-11-18.** Its last step (the outside test, then phone setup) runs right after item 10, then 13 → 20 → 21. Adam makes the Cloudflare tunnel change himself per docs/tracking/exposure.md, so check it's in place before dispatching.
 Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhigh. Task IDs (T1…T46) and finding numbers (#1…#16) are from the 2026-10-21 audit; their descriptions and dependencies are in the Task reference below. Each item is one dispatch unless noted.
@@ -90,13 +90,13 @@ Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhi
 16. **[M] T9:** the review UI and manual entry.
     - Status: todo
 17. **[M] T17:** Valhalla with a Kansas extract. Check free disk first.
-    - Status: todo
+    - Status: in progress (dispatched 2026-11-19)
 18. **[X] T20 core:** trip detection and data integrity, including the locking of confirmed trips.
     - Status: todo
 19. **[H] T20:** the review queue.
     - Status: todo
 20. **[H] T19 session 1:** catalog UI architecture plus `docs/design/frontend-patterns.md`.
-    - Status: in progress (dispatched 2026-11-19)
+    - Status: done (2026-11-19)
 21. **[M] The rest of T19,** following the patterns doc (2 dispatches).
     - Status: todo
     - **→ Review pause B:** the desktop catalog UI.
@@ -255,3 +255,4 @@ Nature: mech = mechanical, mod = moderate, hard. Size is S/M/L/XL with approxima
 - 2026-11-19: tunnel route live (Adam). The outside smoke test passed except two Cloudflare-side items: its managed /robots.txt answers 200, and Cloudflare's own 404s carry no app headers because the path rule never forwards those paths. Fix the smoke script's expectations in a later fix item. At Adam's request, added trips.adamcasada.com as a second public host (`.env` TRAVEL_PUBLIC_HOSTS; ingest recreated; it answers like travel.*). Adam adds its tunnel route. TRACKER_BASE_URL stays travel.*. Before go-live (T38), pick one canonical host for the web app (Authentik redirect URIs, one login) and redirect the other.
 - Item 4 note: the synthetic-data wipe must keep the phone's tracker points and tokens (stored under dev-admin until Authentik is live).
 - 2026-11-19: item 13 done and verified (`./dev test-quick` 2044 + 32 passed; matrix 665 cases). D-89 is waiting for Adam. Reordered at Adam's request so manual trips with road routes come sooner: 20 → 21 → 17 → 25 → 26. Tracking is on hold and the ingest service is stopped.
+- 2026-11-19: item 20 done and verified (`./dev test-quick` 2117 + 72 passed; e2e covers creating, editing and deleting a trip). Adam can now enter trips, stops, legs and people. D-90 is waiting for Adam. Moved item 21 after 26, because item 20 already covers manual entry and Adam's priority is road-routed legs. Item 17 dispatched.
