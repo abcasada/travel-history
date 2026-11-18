@@ -107,4 +107,3 @@ def save_route_version(
     if not leg.is_contribution:
         touch(leg.trip)
     return route
-

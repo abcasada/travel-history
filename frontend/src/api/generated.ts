@@ -636,6 +636,28 @@ export interface PreferenceIn {
   value: unknown;
 }
 
+export interface RouteGeometry {
+  coordinates: number[][];
+  type: 'LineString';
+}
+
+export interface RouteLegOut {
+  /** metres */
+  distance: number;
+  /** seconds */
+  duration: number;
+  summary: string;
+}
+
+export interface ProposedRoute {
+  /** metres */
+  distance: number;
+  /** seconds */
+  duration: number;
+  geometry: RouteGeometry;
+  legs: RouteLegOut[];
+}
+
 export type PublicMode = typeof PublicMode[keyof typeof PublicMode];
 
 
@@ -660,6 +682,8 @@ export interface PurposeRef {
 export type RouteDetailOutWaypointsItem = { [key: string]: unknown };
 
 export interface RouteDetailOut {
+  /** the routing provider's credit; show it with the route */
+  attribution: string;
   created_by: UserRef;
   engine: string;
   engine_data_date: string | null;
@@ -681,6 +705,8 @@ export interface RouteDetailOut {
  * One frozen version of a leg's route (never recomputed or changed, rule 5).
  */
 export interface RouteOut {
+  /** the routing provider's credit; show it with the route */
+  attribution: string;
   created_by: UserRef;
   engine: string;
   engine_data_date: string | null;
@@ -693,6 +719,57 @@ export interface RouteOut {
   note: string;
   produced_at: string;
   version: number;
+}
+
+export interface RouteProvenance {
+  /** must be shown wherever this route is drawn */
+  attribution: string;
+  /** YYYY-MM-DD of the road data, when known */
+  data_date: string | null;
+  /** valhalla, ors or osrm-fossgis */
+  engine: string;
+  engine_version: string;
+  produced_at: string;
+}
+
+export interface SnappedWaypoint {
+  /** [lon, lat] on the road network */
+  location: number[];
+  name: string;
+}
+
+export interface RouteProposalOut {
+  /** served from the 10-minute cache of identical requests */
+  cached: boolean;
+  code: 'Ok';
+  provenance: RouteProvenance;
+  routes: ProposedRoute[];
+  waypoints: SnappedWaypoint[];
+}
+
+export interface RouteRequestIn {
+  profile?: 'auto';
+  /**
+     * [lon, lat] pairs in order, 2-25; only these points leave the server
+     * @minItems 2
+     * @maxItems 25
+     */
+  waypoints: number[][];
+}
+
+export interface RouteVersionIn {
+  /** @maxLength 255 */
+  note?: string;
+  /**
+     * the [lon, lat] waypoints of a proposal from POST /routing/route, unchanged
+     * @minItems 2
+     * @maxItems 25
+     */
+  waypoints: number[][];
+}
+
+export interface RoutingErrorOut {
+  detail: string;
 }
 
 export type Status = typeof Status[keyof typeof Status];
@@ -2470,6 +2547,98 @@ export function useListLegRoutes<TData = Awaited<ReturnType<typeof listLegRoutes
 
 
 
+export const getSaveProposedRouteUrl = (legId: number,) => {
+
+
+
+
+  return `/api/v1/legs/${legId}/routes`
+}
+
+/**
+ * Save the caller's recent proposal for these waypoints as the leg's next frozen version
+ * (kind `routed`) and make it current. Geometry and provenance come from the server's own
+ * proposal cache, never from the client; 409 once the proposal is older than 10 minutes.
+ * @summary Save Proposed Route
+ */
+export const saveProposedRoute = async (legId: number,
+    routeVersionIn: RouteVersionIn, options?: Parameters<typeof apiFetch>[1]): Promise<RouteDetailOut> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return apiFetch<RouteDetailOut>(getSaveProposedRouteUrl(legId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(routeVersionIn)
+  }
+);}
+
+
+
+
+
+export const getSaveProposedRouteMutationKey = () => ['saveProposedRoute'] as const;
+
+export const getSaveProposedRouteMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveProposedRoute>>, TError,SaveProposedRouteMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof saveProposedRoute>>, TError,SaveProposedRouteMutationVariables, TContext> => {
+
+const mutationKey = getSaveProposedRouteMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof saveProposedRoute>>, SaveProposedRouteMutationVariables> = (props) => {
+          const {legId,data} = props ?? {};
+
+          return  saveProposedRoute(legId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SaveProposedRouteMutationResult = NonNullable<Awaited<ReturnType<typeof saveProposedRoute>>>
+    export type SaveProposedRouteMutationBody = RouteVersionIn
+    export type SaveProposedRouteMutationError = unknown
+    export type SaveProposedRouteMutationVariables = {legId: number;data: RouteVersionIn}
+
+    /**
+ * @summary Save Proposed Route
+ */
+export const useSaveProposedRoute = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveProposedRoute>>, TError,SaveProposedRouteMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof saveProposedRoute>>,
+        TError,
+        SaveProposedRouteMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSaveProposedRouteMutationOptions(options), queryClient);
+    }
+
 export const getGetMeUrl = () => {
 
 
@@ -3855,6 +4024,97 @@ export function useGetRoute<TData = Awaited<ReturnType<typeof getRoute>>, TError
 
 
 
+export const getProposeRouteUrl = () => {
+
+
+
+
+  return `/api/v1/routing/route`
+}
+
+/**
+ * Propose a road route through the waypoints (not saved). 429 with Retry-After when the
+ * caller routes too fast; 422 when no road connects the points; 503 when no provider can
+ * answer (Retry-After when the fallback is only busy).
+ * @summary Propose Route
+ */
+export const proposeRoute = async (routeRequestIn: RouteRequestIn, options?: Parameters<typeof apiFetch>[1]): Promise<RouteProposalOut> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return apiFetch<RouteProposalOut>(getProposeRouteUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(routeRequestIn)
+  }
+);}
+
+
+
+
+
+export const getProposeRouteMutationKey = () => ['proposeRoute'] as const;
+
+export const getProposeRouteMutationOptions = <TError = RoutingErrorOut,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof proposeRoute>>, TError,ProposeRouteMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof proposeRoute>>, TError,ProposeRouteMutationVariables, TContext> => {
+
+const mutationKey = getProposeRouteMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof proposeRoute>>, ProposeRouteMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  proposeRoute(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ProposeRouteMutationResult = NonNullable<Awaited<ReturnType<typeof proposeRoute>>>
+    export type ProposeRouteMutationBody = RouteRequestIn
+    export type ProposeRouteMutationError = RoutingErrorOut
+    export type ProposeRouteMutationVariables = {data: RouteRequestIn}
+
+    /**
+ * @summary Propose Route
+ */
+export const useProposeRoute = <TError = RoutingErrorOut,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof proposeRoute>>, TError,ProposeRouteMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof proposeRoute>>,
+        TError,
+        ProposeRouteMutationVariables,
+        TContext
+      > => {
+      return useMutation(getProposeRouteMutationOptions(options), queryClient);
+    }
+
 export const getDeleteStopUrl = (stopId: number,) => {
 
 
@@ -5119,10 +5379,10 @@ export const getGetTripMapUrl = (params?: GetTripMapParams,) => {
 }
 
 /**
- * The filtered trips' stops and legs for the map home (work-order item 20). Legs are
- * straight lines between their end points (stop places, else airports) until routes exist;
- * trip vector tiles from `route_simplified` replace this for routed legs (items 25-26,
- * docs/design/frontend-patterns.md "Map layers").
+ * The filtered trips' stops and legs for the map home (work-order item 20). A leg with a
+ * current route is drawn from its simplified copy (zoom bucket 9, item 25); others are
+ * straight lines between their end points (stop places, else airports). Trip vector tiles
+ * from `route_simplified` replace this later (docs/design/frontend-patterns.md "Map layers").
  * @summary Trip Map
  */
 export const getTripMap = async (params?: GetTripMapParams, options?: Parameters<typeof apiFetch>[1]): Promise<TripMapOut> => {

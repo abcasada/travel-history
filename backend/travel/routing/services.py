@@ -52,7 +52,11 @@ class RoutingFailed(Exception):
 
 def request_key(waypoints: list[Waypoint], profile: str) -> str:
     canonical = json.dumps(
-        {"v": 1, "profile": profile, "waypoints": [[round(x, 6), round(y, 6)] for x, y in waypoints]},
+        {
+            "v": 1,
+            "profile": profile,
+            "waypoints": [[round(x, 6), round(y, 6)] for x, y in waypoints],
+        },
         separators=(",", ":"),
     )
     return hashlib.sha256(canonical.encode()).hexdigest()

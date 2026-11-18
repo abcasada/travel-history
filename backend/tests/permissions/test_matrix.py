@@ -22,6 +22,7 @@ from travel.core.rls import set_context
 from travel.flights.models import FlightRecord
 from travel.history.models import HomePeriod, LocationPoint, RawFile, TimelineSegment
 from travel.media.models import Media
+from travel.routing.models import RouteRequestCache
 from travel.trips.models import (
     Leg,
     LegParticipantOverride,
@@ -446,7 +447,39 @@ ACTIONS = {
                 length_m=1.0,
             )
         ),
-        lambda f, u: policy.can_edit_leg(u, f.core_leg),
+        lambda f, u: policy.can_save_route_version(u, f.core_leg),
+    ),
+    "save_route_version_on_bobs_leg": (
+        lambda f, a: inserts(
+            lambda: Route.objects.create(
+                leg=f.bob_leg,
+                version=1,
+                geom=f.route.geom,
+                kind="routed",
+                produced_at=f.now,
+                created_by_id=uid(f, a),
+                length_m=1.0,
+            )
+        ),
+        lambda f, u: policy.can_save_route_version(u, f.bob_leg),
+    ),
+    # Routing proposals (work-order item 25): a per-user cache of drawn waypoints.
+    "propose_route": (
+        lambda f, a: inserts(
+            lambda: RouteRequestCache.objects.create(
+                owner_id=uid(f, a),
+                key="d" * 64,
+                response={},
+                created_at=f.now,
+                expires_at=f.now,
+            )
+        ),
+        lambda f, u: policy.can_propose_route(u),
+    ),
+    "view_alice_route_cache": (lambda f, a: sees(RouteRequestCache, f.alice_route_cache.pk), None),
+    "delete_alice_route_cache": (
+        lambda f, a: deletes(RouteRequestCache, f.alice_route_cache.pk),
+        None,
     ),
     "update_route": (
         lambda f, a: updates(Route, f.route.pk, note="x"),
@@ -692,6 +725,10 @@ MATRIX = {
     "delete_bobs_leg":             (F, F, T, F, F, F, F),
     "add_route_version":           (T, T, F, F, F, F, F),
     "update_route":                (F, F, F, F, F, F, F),
+    "save_route_version_on_bobs_leg": (F, F, T, F, F, F, F),
+    "propose_route":               (T, T, T, T, F, F, F),
+    "view_alice_route_cache":      (F, T, F, F, F, F, F),
+    "delete_alice_route_cache":    (F, T, F, F, F, F, F),
     "set_own_leg_participation":   (T, T, T, F, F, F, F),
     "set_kid_leg_participation":   (T, T, F, F, F, F, F),
     "set_bob_consent":             (F, F, T, F, F, F, F),

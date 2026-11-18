@@ -36,6 +36,7 @@ from travel.accounts.models import AccessRequest, DeviceToken, Person, Role, Use
 from travel.flights.models import FlightRecord
 from travel.history.models import HomePeriod, LocationPoint, RawFile, TimelineSegment
 from travel.media.models import Media
+from travel.routing.models import RouteRequestCache
 from travel.trips.models import (
     Leg,
     LegParticipantOverride,
@@ -157,6 +158,14 @@ def build_family() -> SimpleNamespace:
             valid_from=dt.date(2000, 1, 1),
         )
 
+        # A routing proposal alice drew (work-order item 25): her waypoints, hers alone.
+        f.alice_route_cache = RouteRequestCache.objects.create(
+            owner=f.alice,
+            key="c" * 64,
+            response={"code": "Ok", "routes": [], "waypoints": []},
+            created_at=timezone.now(),
+            expires_at=timezone.now() + dt.timedelta(minutes=10),
+        )
         f.alice_point = LocationPointFactory(owner=f.alice)
         f.bob_point = LocationPointFactory(owner=f.bob)
         f.alice_segment = TimelineSegmentFactory(owner=f.alice)
@@ -240,7 +249,7 @@ def _row_counts():
         Trip, TripParticipant, TripNote, Leg, LegParticipantOverride, Route, LocationPoint,
         TimelineSegment, RawFile, HomePeriod, Vehicle, VehiclePrivate, Person, User,
         DeviceToken, AccessRequest, Purpose, Media, TripTag, FlightRecord, Tag,
-        TrackContribution, Stop, Place,
+        TrackContribution, Stop, Place, RouteRequestCache,
     )  # fmt: skip
     # One round trip per case: SELECT (SELECT count(*) FROM a), (SELECT count(*) FROM b), ...
     # Table names come from model metadata, never from input.

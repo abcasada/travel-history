@@ -6,6 +6,8 @@ the owner role (pytest-django's setup); fixtures that need to bypass RLS to buil
 import pytest
 from django.db import connections
 
+from tests.routing_fakes import fake  # noqa: F401 (fixture: fake routing providers)
+
 RATELIMIT_ALIAS = "ratelimit"
 
 

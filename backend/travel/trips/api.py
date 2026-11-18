@@ -24,9 +24,8 @@ from travel.accounts.models import Person, UserDirectory
 from travel.core import policy
 from travel.core.choices import DatePrecision, TravelMode, Visibility
 from travel.media.models import Media
-from travel.vehicles.models import Vehicle
-
 from travel.routing import services as routing
+from travel.vehicles.models import Vehicle
 
 from . import route_versions, services
 from .models import (

@@ -2510,6 +2510,38 @@
         "title": "PreferenceIn",
         "type": "object"
       },
+      "ProposedRoute": {
+        "properties": {
+          "distance": {
+            "description": "metres",
+            "title": "Distance",
+            "type": "number"
+          },
+          "duration": {
+            "description": "seconds",
+            "title": "Duration",
+            "type": "number"
+          },
+          "geometry": {
+            "$ref": "#/components/schemas/RouteGeometry"
+          },
+          "legs": {
+            "items": {
+              "$ref": "#/components/schemas/RouteLegOut"
+            },
+            "title": "Legs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "geometry",
+          "distance",
+          "duration",
+          "legs"
+        ],
+        "title": "ProposedRoute",
+        "type": "object"
+      },
       "PublicMode": {
         "enum": [
           "unlisted",
@@ -2571,6 +2603,11 @@
       },
       "RouteDetailOut": {
         "properties": {
+          "attribution": {
+            "description": "the routing provider's credit; show it with the route",
+            "title": "Attribution",
+            "type": "string"
+          },
           "created_by": {
             "$ref": "#/components/schemas/UserRef"
           },
@@ -2648,6 +2685,7 @@
           "engine",
           "engine_version",
           "engine_data_date",
+          "attribution",
           "produced_at",
           "created_by",
           "length_m",
@@ -2659,9 +2697,64 @@
         "title": "RouteDetailOut",
         "type": "object"
       },
+      "RouteGeometry": {
+        "properties": {
+          "coordinates": {
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "title": "Coordinates",
+            "type": "array"
+          },
+          "type": {
+            "const": "LineString",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "coordinates"
+        ],
+        "title": "RouteGeometry",
+        "type": "object"
+      },
+      "RouteLegOut": {
+        "properties": {
+          "distance": {
+            "description": "metres",
+            "title": "Distance",
+            "type": "number"
+          },
+          "duration": {
+            "description": "seconds",
+            "title": "Duration",
+            "type": "number"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "distance",
+          "duration",
+          "summary"
+        ],
+        "title": "RouteLegOut",
+        "type": "object"
+      },
       "RouteOut": {
         "description": "One frozen version of a leg's route (never recomputed or changed, rule 5).",
         "properties": {
+          "attribution": {
+            "description": "the routing provider's credit; show it with the route",
+            "title": "Attribution",
+            "type": "string"
+          },
           "created_by": {
             "$ref": "#/components/schemas/UserRef"
           },
@@ -2727,6 +2820,7 @@
           "engine",
           "engine_version",
           "engine_data_date",
+          "attribution",
           "produced_at",
           "created_by",
           "length_m",
@@ -2734,6 +2828,158 @@
           "is_current"
         ],
         "title": "RouteOut",
+        "type": "object"
+      },
+      "RouteProposalOut": {
+        "properties": {
+          "cached": {
+            "description": "served from the 10-minute cache of identical requests",
+            "title": "Cached",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "Ok",
+            "title": "Code",
+            "type": "string"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/RouteProvenance"
+          },
+          "routes": {
+            "items": {
+              "$ref": "#/components/schemas/ProposedRoute"
+            },
+            "title": "Routes",
+            "type": "array"
+          },
+          "waypoints": {
+            "items": {
+              "$ref": "#/components/schemas/SnappedWaypoint"
+            },
+            "title": "Waypoints",
+            "type": "array"
+          }
+        },
+        "required": [
+          "code",
+          "routes",
+          "waypoints",
+          "provenance",
+          "cached"
+        ],
+        "title": "RouteProposalOut",
+        "type": "object"
+      },
+      "RouteProvenance": {
+        "properties": {
+          "attribution": {
+            "description": "must be shown wherever this route is drawn",
+            "title": "Attribution",
+            "type": "string"
+          },
+          "data_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "YYYY-MM-DD of the road data, when known",
+            "title": "Data Date"
+          },
+          "engine": {
+            "description": "valhalla, ors or osrm-fossgis",
+            "title": "Engine",
+            "type": "string"
+          },
+          "engine_version": {
+            "title": "Engine Version",
+            "type": "string"
+          },
+          "produced_at": {
+            "title": "Produced At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "engine",
+          "engine_version",
+          "data_date",
+          "attribution",
+          "produced_at"
+        ],
+        "title": "RouteProvenance",
+        "type": "object"
+      },
+      "RouteRequestIn": {
+        "properties": {
+          "profile": {
+            "const": "auto",
+            "default": "auto",
+            "title": "Profile",
+            "type": "string"
+          },
+          "waypoints": {
+            "description": "[lon, lat] pairs in order, 2-25; only these points leave the server",
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "maxItems": 25,
+            "minItems": 2,
+            "title": "Waypoints",
+            "type": "array"
+          }
+        },
+        "required": [
+          "waypoints"
+        ],
+        "title": "RouteRequestIn",
+        "type": "object"
+      },
+      "RouteVersionIn": {
+        "properties": {
+          "note": {
+            "default": "",
+            "maxLength": 255,
+            "title": "Note",
+            "type": "string"
+          },
+          "waypoints": {
+            "description": "the [lon, lat] waypoints of a proposal from POST /routing/route, unchanged",
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "maxItems": 25,
+            "minItems": 2,
+            "title": "Waypoints",
+            "type": "array"
+          }
+        },
+        "required": [
+          "waypoints"
+        ],
+        "title": "RouteVersionIn",
+        "type": "object"
+      },
+      "RoutingErrorOut": {
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          }
+        },
+        "required": [
+          "detail"
+        ],
+        "title": "RoutingErrorOut",
         "type": "object"
       },
       "Setup": {
@@ -2812,6 +3058,28 @@
           "token_qr"
         ],
         "title": "Setup",
+        "type": "object"
+      },
+      "SnappedWaypoint": {
+        "properties": {
+          "location": {
+            "description": "[lon, lat] on the road network",
+            "items": {
+              "type": "number"
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "location",
+          "name"
+        ],
+        "title": "SnappedWaypoint",
         "type": "object"
       },
       "Status": {
@@ -5340,6 +5608,55 @@
         "tags": [
           "trips"
         ]
+      },
+      "post": {
+        "description": "Save the caller's recent proposal for these waypoints as the leg's next frozen version\n(kind `routed`) and make it current. Geometry and provenance come from the server's own\nproposal cache, never from the client; 409 once the proposal is older than 10 minutes.",
+        "operationId": "saveProposedRoute",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "leg_id",
+            "required": true,
+            "schema": {
+              "title": "Leg Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RouteVersionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RouteDetailOut"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Save Proposed Route",
+        "tags": [
+          "trips"
+        ]
       }
     },
     "/api/v1/me": {
@@ -5945,6 +6262,57 @@
         "summary": "Get Route",
         "tags": [
           "trips"
+        ]
+      }
+    },
+    "/api/v1/routing/route": {
+      "post": {
+        "description": "Propose a road route through the waypoints (not saved). 429 with Retry-After when the\ncaller routes too fast; 422 when no road connects the points; 503 when no provider can\nanswer (Retry-After when the fallback is only busy).",
+        "operationId": "proposeRoute",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RouteRequestIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RouteProposalOut"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoutingErrorOut"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Propose Route",
+        "tags": [
+          "routing"
         ]
       }
     },
@@ -6732,7 +7100,7 @@
     },
     "/api/v1/trips/map": {
       "get": {
-        "description": "The filtered trips' stops and legs for the map home (work-order item 20). Legs are\nstraight lines between their end points (stop places, else airports) until routes exist;\ntrip vector tiles from `route_simplified` replace this for routed legs (items 25-26,\ndocs/design/frontend-patterns.md \"Map layers\").",
+        "description": "The filtered trips' stops and legs for the map home (work-order item 20). A leg with a\ncurrent route is drawn from its simplified copy (zoom bucket 9, item 25); others are\nstraight lines between their end points (stop places, else airports). Trip vector tiles\nfrom `route_simplified` replace this later (docs/design/frontend-patterns.md \"Map layers\").",
         "operationId": "getTripMap",
         "parameters": [
           {
