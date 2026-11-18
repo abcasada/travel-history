@@ -84,6 +84,8 @@ await page.getByRole("link", { name: "Edit" }).click();
 await page.getByRole("heading", { name: "Edit trip" }).waitFor();
 await page.getByLabel("Title", { exact: true }).fill(`${title} (edited)`);
 await page.getByRole("button", { name: "Save", exact: true }).click();
+await page.getByText(/^Saved at /).waitFor();
+await page.getByRole("link", { name: "Done" }).click();
 await page.getByRole("heading", { name: `${title} (edited)` }).waitFor();
 page.once("dialog", (dialog) => dialog.accept());
 await page.getByRole("button", { name: "Delete" }).click();

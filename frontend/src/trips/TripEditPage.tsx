@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { type TripDetailOut, useGetTrip } from "../api/generated";
 import { useMe } from "../auth/AuthGate";
@@ -42,7 +43,8 @@ export function TripEditPage() {
 }
 
 function TripEditor({ trip }: { trip: TripDetailOut }) {
-  const navigate = useNavigate();
+  // Saving the fields keeps the editor open: people, stops and legs are usually next.
+  const [savedAt, setSavedAt] = useState<Date | null>(null);
   if (!trip.access.edit) {
     return (
       <div className="p-4 text-sm">
@@ -65,7 +67,12 @@ function TripEditor({ trip }: { trip: TripDetailOut }) {
         </Link>
       </div>
       {/* Remount on a trip change so the form starts from the saved values. */}
-      <TripFieldsForm key={trip.id} trip={trip} onSaved={() => navigate(paths.trip(trip.id))} />
+      <TripFieldsForm key={trip.id} trip={trip} onSaved={() => setSavedAt(new Date())} />
+      {savedAt && (
+        <p className="mt-1 text-sm text-green-700" role="status">
+          Saved at {savedAt.toLocaleTimeString()}.
+        </p>
+      )}
       <hr className="my-4" />
       <ParticipantsEditor trip={trip} />
       <StopsEditor trip={trip} />

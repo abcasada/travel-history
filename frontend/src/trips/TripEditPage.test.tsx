@@ -275,3 +275,27 @@ test("a refused change shows the server's reason", async () => {
   await user.click(await screen.findByRole("button", { name: /Delete Drive/ }));
   expect(await screen.findByRole("alert")).toHaveTextContent("not allowed");
 });
+
+test("saving the trip's fields sends only what the form holds and stays in the editor", async () => {
+  const user = userEvent.setup();
+  const trip = makeDetail({ visibility: "family", notes: "old" });
+  const { fetchMock } = renderAt("/trips/10/edit", [
+    ...COMMON,
+    { path: "/api/v1/trips/10", body: trip },
+    { method: "PATCH", path: "/api/v1/trips/10", body: { ...trip, title: "Renamed" } },
+  ]);
+  const title = await screen.findByLabelText("Title");
+  await user.clear(title);
+  await user.type(title, "Renamed");
+  await user.click(screen.getByRole("button", { name: "Save" }));
+  expect(await screen.findByText(/^Saved at /)).toBeInTheDocument();
+  expect(screen.getByTestId("location")).toHaveTextContent("/trips/10/edit");
+  expect(lastBody(fetchMock, "PATCH", "/api/v1/trips/10")).toEqual({
+    title: "Renamed",
+    start_date: "2024-05-01",
+    end_date: "2024-05-03",
+    purpose_id: 2,
+    visibility: "family",
+    notes: "old",
+  });
+});
