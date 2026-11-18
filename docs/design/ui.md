@@ -36,6 +36,12 @@ stats pages are lazy-loaded chunks imported only by the desktop shell.
 - Review queue: list of candidates on the left, candidate's points/segments and proposed legs on
   the map, action bar with keys.
 
+**Built so far (item 20, 2026-11-19):** the map home and `/trips` show the list with filters
+and every trip on the map; `/trips/:id` replaces the list with the trip's detail (`e` edits);
+`/trips/:id/edit` edits fields, people, stops and legs; `/trips/:id/legs/:legId/route` is a leg's
+route view, where the route editor will open. Selection, bulk edit and list shortcuts come in
+item 21. How pages are built: [frontend-patterns.md](frontend-patterns.md).
+
 ### 18.3 Mobile
 
 ```

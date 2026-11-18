@@ -9,7 +9,7 @@
 milestones 2.1–2.4 done (2.4 tracker ingestion built and tested locally). Work-order item 8
 (tracker exposure) is prepared: the `ingest` service runs on `127.0.0.1:8783` with the exposure
 guard and production settings; the tunnel route waits for Adam's "go"
-([docs/tracking/exposure.md](docs/tracking/exposure.md)). Phase 4: the trips API (T18) is done (item 13, 2026-11-19). Work now follows the
+([docs/tracking/exposure.md](docs/tracking/exposure.md)). Phase 4: the trips API (T18) is done (item 13, 2026-11-19); the catalog UI's first slice (T19 session 1, item 20, 2026-11-19) lets you add, view and edit trips with legs, stops and people, on the map; patterns in [docs/design/frontend-patterns.md](docs/design/frontend-patterns.md). Work now follows the
 orchestrated work order in [docs/ROADMAP.md](docs/ROADMAP.md) (process:
 [docs/ORCHESTRATION.md](docs/ORCHESTRATION.md)).
 
@@ -19,7 +19,7 @@ orchestrated work order in [docs/ROADMAP.md](docs/ROADMAP.md) (process:
 | 1 Skeleton | ✅ 2026-10-20 | [phases](docs/design/phases.md) |
 | 2 Timeline and tracking | 🔄 2.1–2.4 done | [phases](docs/design/phases.md) |
 | 3 Flights | 🔄 3.1–3.2 done (synthetic) | [phases](docs/design/phases.md) |
-| 4 Catalog · 5 Routes · 6 Statistics | ⏳ (4: trips API done, T18) | [phases](docs/design/phases.md) |
+| 4 Catalog · 5 Routes · 6 Statistics | ⏳ (4: trips API done, T18; catalog UI first slice, T19) | [phases](docs/design/phases.md) |
 | 7 Mobile and photos · 8 Family and public · 9 Android · 10 Later | ⏳ | [phases](docs/design/phases.md) |
 
 ## Section map
@@ -57,7 +57,7 @@ means §6.3 in the file below.
 | 26 | External facts register | [docs/research/facts-register.md](docs/research/facts-register.md) |
 | 27 | Licenses and attributions | [docs/design/licenses.md](docs/design/licenses.md) |
 
-Other guides: [backups to the NAS](docs/backup-nas.md), [restore](docs/restore.md),
+Frontend conventions: [docs/design/frontend-patterns.md](docs/design/frontend-patterns.md) (pages, data, forms, errors, map layers, tests). Other guides: [backups to the NAS](docs/backup-nas.md), [restore](docs/restore.md),
 [Timeline export](docs/timeline-export.md); research notes in `docs/research/` (read only when needed).
 
 ## Decisions (one line each; full text and reasoning in [docs/decisions.md](docs/decisions.md))
@@ -153,6 +153,7 @@ Other guides: [backups to the NAS](docs/backup-nas.md), [restore](docs/restore.m
 - D-88 Flight imports: pinned reference downloads, bundled code overrides, user-owned `flight_record` staging table, CLI import under RLS (pending Adam)
 - D-87 Cross-user periodic jobs: `app.job_user_ids` enumerator (ids of active users, `jobs` context only), one RLS transaction per user, failures isolated, advisory run lock; first job `stale_uploads`
 - D-89 Rest of the trips API: contributions editable by their author only while on the trip; the trip owner may delete a removed participant's contributions (Q-16); stop places own or already on the trip; all-or-nothing bulk edit; hidden vehicles filter like missing ones; merge left to T35 (pending Adam)
+- D-90 Catalog UI architecture: URL as state, generated hooks only, no form library, trip map from `GET /trips/map` until routes exist, stops by map/airport/coordinates, "Add me" creates the own person (pending Adam)
 
 ## 25. Open questions (for Adam, answer whenever — nothing is blocked on these)
 

@@ -3,6 +3,7 @@ const ROWS: [string, string][] = [
   ["g then m / t / r / s / v / h", "Go to Map, Trips, Review, Stats, Vehicles, History"],
   ["[ and ]", "Narrow or widen the list"],
   ["\\", "Hide or show the list"],
+  ["e", "Edit the open trip"],
   ["Esc", "Close dialogs, cancel"],
 ];
 

@@ -60,6 +60,8 @@ object under §6.2. "Participant" means a Member whose person participates in th
 | Home periods | own; family-shared ones read-only | own; shared read-only | — | shared read-only | shared read-only | ❌ |
 | Tags (definitions; `GET /tags` lists own; purposes likewise own) | own | own | own | own | ❌ | ❌ |
 | Person: create | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Own account: link to a new person it creates ("Add me", once) | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Account: link to an existing person | ✅ | only a person they manage (no API) | same | same | ❌ | ❌ |
 | Person: edit | ✅ | managing user | managing user | managing user | ❌ | ❌ |
 | Vehicle: read | vis (not hidden, or managing) | managing or not hidden | same | same | not hidden | ❌ |
 | Vehicle: use on own legs | any visible | any visible | any visible | any visible | ❌ | ❌ |
@@ -160,6 +162,23 @@ Notes:
     reorder function, Q-16 and the new helpers as `travel_app`), and the matrix (now 95 actions
     × 7 actors; adds note/track/tag/photo/leg rows before and after Bob's removal, tagging, stops
     and their places, leg order).
+
+- Catalog UI endpoints (work-order item 20, D-90; endpoints in [api.md](api.md) §17):
+  - `GET /persons` returns the people RLS shows (family-visible, created by me, my own, on a
+    trip I can see, owners of vehicles I can see); the policy (`can_view_person`) agrees row by
+    row. `POST /persons` needs `policy.can_create_person` (Admin/Member). `POST /me/person`
+    creates a person and links the caller's account once (`can_create_own_person`); the SQL
+    guard `app.guard_user_update` already allows linking only to a person the account manages
+    (or by the Admin), so an existing person can't be claimed.
+  - `GET /trips/map` uses the trips list's filters over `policy.visible_trips`; stops and legs
+    come from those trips only, under RLS. `GET /reference/airports` is reference data (no RLS),
+    for signed-in family members.
+  - Legs' `origin_stop_id`/`destination_stop_id` accept only a stop of the same trip that the
+    caller can see; hidden, missing and other-trip stops all answer 422 `unknown stop`.
+  - Tests: `tests/permissions/test_catalog_ui_api.py` (every new endpoint × every actor, what
+    each sees on the map and in the people list, own-person creation, leg stop references) and
+    the matrix rows `create_person`, `link_own_new_person`, `link_own_account_to_kid` (now
+    98 actions × 7 actors).
 
 ### 6.4 Row-level security policies
 
