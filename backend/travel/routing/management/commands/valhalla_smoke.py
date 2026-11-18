@@ -6,6 +6,7 @@ The track is generated here from the route itself (resampled, jittered, timestam
 location data is stored anywhere. Exits non-zero on any failure.
 """
 
+import itertools
 import math
 import random
 import time
@@ -34,12 +35,12 @@ def synthetic_track(
     line: list[list[float]], spacing_m: float = 50.0, jitter_m: float = 8.0, speed_mps: float = 25.0
 ) -> list[dict]:
     """Points every `spacing_m` along `line`, jittered by up to `jitter_m`, at `speed_mps`."""
-    rng = random.Random(17)
+    rng = random.Random(17)  # noqa: S311 - reproducible test jitter, not security
     t0 = 1_700_000_000
     out: list[dict] = []
     walked = 0.0
     next_at = 0.0
-    for a, b in zip(line, line[1:], strict=False):
+    for a, b in itertools.pairwise(line):
         seg = _metres(a, b)
         while seg > 0 and next_at <= walked + seg:
             f = (next_at - walked) / seg
