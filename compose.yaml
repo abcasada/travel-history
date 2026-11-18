@@ -46,6 +46,9 @@ x-backend-env: &backend-env
   # Self-hosted routing (docs/valhalla.md): the separate `valhalla` project and where it has data.
   VALHALLA_URL: ${VALHALLA_URL:-http://valhalla:8002}
   VALHALLA_COVERAGE: ${VALHALLA_COVERAGE:-kansas}
+  VALHALLA_DATA_DATE: ${VALHALLA_DATA_DATE:-}
+  ORS_API_KEY: ${ORS_API_KEY:-}
+  ROUTING_FOSSGIS_ENABLED: ${ROUTING_FOSSGIS_ENABLED:-true}
 
 x-backend: &backend
   image: travel-history-backend:${TRAVEL_IMAGE_TAG:-latest}

@@ -140,6 +140,20 @@ RATELIMIT_CLIENT_IP_HEADER = env.str("RATELIMIT_CLIENT_IP_HEADER", "")
 # where it has data (travel/routing/coverage/<name>.geojson, or a path to a .geojson file).
 VALHALLA_URL = env.str("VALHALLA_URL", "http://valhalla:8002")
 VALHALLA_COVERAGE = env.str("VALHALLA_COVERAGE", "kansas")
+# Build date of the OSM extract behind the tiles (YYYY-MM-DD; BUILD_INFO.json's
+# extract_last_modified). Empty = the tile build time from Valhalla's /status.
+VALHALLA_DATA_DATE = env.str("VALHALLA_DATA_DATE", "")
+# Hosted fallback outside coverage (routing.md §13.1, Q-9): skipped cleanly while the key is empty.
+ORS_API_KEY = env.str("ORS_API_KEY", "")
+ORS_URL = env.str("ORS_URL", "https://api.openrouteservice.org")
+# Emergency fallback: at most 1 request/s globally, identifying User-Agent, no personal data.
+FOSSGIS_OSRM_URL = env.str("FOSSGIS_OSRM_URL", "https://routing.openstreetmap.de/routed-car")
+ROUTING_FOSSGIS_ENABLED = env.bool("ROUTING_FOSSGIS_ENABLED", True)
+ROUTING_USER_AGENT = env.str(
+    "ROUTING_USER_AGENT", "travel-history/1 (+https://travel.adamcasada.com)"
+)
+ROUTING_TIMEOUT = env.float("ROUTING_TIMEOUT", 15.0)  # seconds per provider request
+ROUTING_CACHE_SECONDS = env.int("ROUTING_CACHE_SECONDS", 600)  # identical requests (§13.1)
 
 # --- Tracker ingestion (PLAN.md §9.1) -------------------------------------------------------
 # Public origin trackers post to (e.g. https://travel.example.org, item 8); empty = the address
