@@ -24,7 +24,11 @@ and more sources: `docs/research/*.md`. Re-verify before acting on anything olde
 | Valhalla | `format: osrm` output; trace defaults max_shape 16,000, max_distance 200 km | valhalla docs api/turn-by-turn, api/map-matching | 2026-10-19 | H |
 | Valhalla NA build | peak RAM ≈ 16–28 GB @4 threads, 120–150 GB disk, 2–6 h on NVMe | scaled from issues #5698, #5910, #6201, #6312, #6341, #4140 | 2026-10-19 | L |
 | Valhalla on this CPU | no AVX flags in build | Dockerfile, CMakeLists | 2026-10-19 | M |
+| Valhalla on this CPU (tested) | `valhalla-scripted:3.9.1` (digest sha256:6238809f…dfd956, built 2026-10-06) builds Kansas tiles, routes and map-matches on the Xeon W3565 (no AVX) | `./dev valhalla build` + `./dev valhalla smoke` on this host | 2026-11-18 | H |
+| Valhalla releases | 3.9.2 2026-11-14, 3.9.3 2026-11-17 (too new for D-78's 14 days; 3.9.1 kept) | GitHub releases API; ghcr.io tags | 2026-11-18 | H |
+| Valhalla Kansas build (measured) | 188 s total with 2 threads (download 43, time zones 14, admins 5, tiles 124, tar 1); peak 773 MiB anon (1,977 MiB cgroup incl. page cache); build dir 422 MB (tar + admins + tz), loose tiles 298 MB deleted; service 130–237 MiB | BUILD_INFO.json, docker stats, cgroup memory.peak | 2026-11-18 | H |
 | Geofabrik | north-america 19.51 GB; kansas 117 MB | download.geofabrik.de (Content-Length) | 2026-10-19 | H |
+| Geofabrik | kansas-latest.osm.pbf 117,988,533 B, Last-Modified 2026-11-17; `.md5` published next to each extract | HTTP HEAD; download.geofabrik.de | 2026-11-18 | H |
 | OpenRouteService | free: directions 2,000/day, 40/min; ≤ 50 waypoints; results CC-BY-SA 4.0; attribution required; prohibits transmitting personal data | account.heigit.org (plans bundle, /info/tos), openrouteservice.org/restrictions | 2026-10-19 | H |
 | FOSSGIS OSRM | ≤ 1 req/s, valid User-Agent, no heavy use, attribution | routing.openstreetmap.de/about.html | 2026-10-19 | H |
 | Google Maps Platform | ToS §3.2.3(e) no non-Google maps; SST §4.2/4.3, §17, §19: no non-Google map, lat/lng cache ≤ 30 days; §A.3 place IDs cacheable | cloud.google.com/maps-platform/terms (2026-08-26), …/maps-service-terms (2026-10-15) | 2026-10-19 | H |

@@ -102,3 +102,20 @@ of truncated. ms over HTTP through runserver (~55–65 ms of that is runserver),
   point all-in, so 20 M points ≈ 9.3 GB, still inside the 60 GB SSD budget. If space gets tight,
   the cheapest cut is the surrogate `id` column and its index (a composite primary key), or
   coarser time buckets than days at zoom 18–20. Cleanup through the delete trigger left no rows.
+
+### 21.2 Measured: Valhalla Kansas build and service (2026-11-18, work-order item 17)
+
+`./dev valhalla build` with the Geofabrik Kansas extract (113 MiB, Last-Modified 2026-11-17),
+image `valhalla-scripted:3.9.1` (pinned by digest), 2 build threads, elevation and transit off,
+admins and time zones on, on the Xeon W3565 with the data on the SSD (`valhalla/data/`).
+Numbers from the build's `BUILD_INFO.json`, cgroup `memory.peak` and `docker stats`.
+
+| Measure | Result | routing.md §13.5 estimate |
+|---|---|---|
+| Build time | **188 s**: download 43, time zones 14 (fetches the shapefile), admins 5, tiles 124, tar 1 | tens of minutes |
+| Build peak RAM | **773 MiB** anonymous; 1,977 MiB cgroup peak including page cache (4 GiB limit) | < 2 GB |
+| Disk | build directory 422 MB (tiles.tar + admins + time zones); loose tiles (298 MB) deleted after tarring; extract 113 MB; `valhalla/data/` 534 MB total. During a rebuild the new build sits beside the old one (≈ +0.7 GB peak) | ~1–2 GB |
+| Service RAM | 130 MiB idle after the smoke test; **237 MiB peak** after a 15,880-point map-match (1 GiB limit) | a few hundred MB |
+| Latency | route Wichita → Salina (144.7 km): 410 ms first request; map-match of 2,891 points: 312 ms; 15,880 points: 0.8 s | — |
+
+All well inside the estimates. The NA figures in §13.5 remain unmeasured estimates.

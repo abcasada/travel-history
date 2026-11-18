@@ -9,7 +9,7 @@
 milestones 2.1–2.4 done (2.4 tracker ingestion built and tested locally). Work-order item 8
 (tracker exposure) is prepared: the `ingest` service runs on `127.0.0.1:8783` with the exposure
 guard and production settings; the tunnel route waits for Adam's "go"
-([docs/tracking/exposure.md](docs/tracking/exposure.md)). Phase 4: the trips API (T18) is done (item 13, 2026-11-19); the catalog UI's first slice (T19 session 1, item 20, 2026-11-19) lets you add, view and edit trips with legs, stops and people, on the map; patterns in [docs/design/frontend-patterns.md](docs/design/frontend-patterns.md). Work now follows the
+([docs/tracking/exposure.md](docs/tracking/exposure.md)). Phase 4: the trips API (T18) is done (item 13, 2026-11-19); the catalog UI's first slice (T19 session 1, item 20, 2026-11-19) lets you add, view and edit trips with legs, stops and people, on the map; patterns in [docs/design/frontend-patterns.md](docs/design/frontend-patterns.md). Milestone 4.1 (item 17, 2026-11-18): self-hosted Valhalla 3.9.1 with Kansas tiles runs as its own compose project on the `valhalla` network ([docs/valhalla.md](docs/valhalla.md)); routing proxy next (item 25). Work now follows the
 orchestrated work order in [docs/ROADMAP.md](docs/ROADMAP.md) (process:
 [docs/ORCHESTRATION.md](docs/ORCHESTRATION.md)).
 
@@ -19,7 +19,7 @@ orchestrated work order in [docs/ROADMAP.md](docs/ROADMAP.md) (process:
 | 1 Skeleton | ✅ 2026-10-20 | [phases](docs/design/phases.md) |
 | 2 Timeline and tracking | 🔄 2.1–2.4 done | [phases](docs/design/phases.md) |
 | 3 Flights | 🔄 3.1–3.2 done (synthetic) | [phases](docs/design/phases.md) |
-| 4 Catalog · 5 Routes · 6 Statistics | ⏳ (4: trips API done, T18; catalog UI first slice, T19) | [phases](docs/design/phases.md) |
+| 4 Catalog · 5 Routes · 6 Statistics | ⏳ (4: trips API done, T18; catalog UI first slice, T19; 4.1 Valhalla Kansas done) | [phases](docs/design/phases.md) |
 | 7 Mobile and photos · 8 Family and public · 9 Android · 10 Later | ⏳ | [phases](docs/design/phases.md) |
 
 ## Section map
@@ -154,6 +154,7 @@ Frontend conventions: [docs/design/frontend-patterns.md](docs/design/frontend-pa
 - D-87 Cross-user periodic jobs: `app.job_user_ids` enumerator (ids of active users, `jobs` context only), one RLS transaction per user, failures isolated, advisory run lock; first job `stale_uploads`
 - D-89 Rest of the trips API: contributions editable by their author only while on the trip; the trip owner may delete a removed participant's contributions (Q-16); stop places own or already on the trip; all-or-nothing bulk edit; hidden vehicles filter like missing ones; merge left to T35 (pending Adam)
 - D-90 Catalog UI architecture: URL as state, generated hooks only, no form library, trip map from `GET /trips/map` until routes exist, stops by map/airport/coordinates, "Add me" creates the own person (pending Adam)
+- D-91 Valhalla: own build script on the pinned 3.9.1 image (non-root, generic User-Agent, md5 check, atomic `current` switch), Kansas coverage polygon with the Missouri corner cut, no default speeds; dev web `DB_CONN_MAX_AGE=0` (pending Adam)
 
 ## 25. Open questions (for Adam, answer whenever — nothing is blocked on these)
 

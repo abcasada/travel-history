@@ -81,8 +81,16 @@ the toolbar):
   **elevation off** (only matters for bike/foot costing; ~80–120 GB for North America),
   transit off, tar on.
 - **Development now: Kansas** (Geofabrik `kansas-latest.osm.pbf`, 117 MB). Expected on this
-  host: < 2 GB RAM with `server_threads=2`, ~1–2 GB disk, tens of minutes. Coverage polygon =
-  Kansas bbox.
+  host: < 2 GB RAM with `server_threads=2`, ~1–2 GB disk, tens of minutes. **Measured
+  2026-11-18 (item 17, [resource-budget §21.2](resource-budget.md)):** 188 s, 773 MiB peak,
+  422 MB per build; service 130–237 MiB. Coverage polygon = the Kansas bbox with the north-east
+  corner cut along the Missouri River (`backend/travel/routing/coverage/kansas.geojson`, D-91).
+- **As built (item 17, D-91; operations in [docs/valhalla.md](../valhalla.md)):** image pinned by
+  digest; our `valhalla/build.sh` replaces the image's root entrypoint (non-root, generic
+  User-Agent, md5 check, builds into `valhalla/data/builds/<ts>/`, then switches `current`);
+  the service runs `valhalla_service` read-only with a `/status` health check. Config: trace
+  `max_shape` 16,000, `max_distance` 200 km, accuracy/search radius ≤ 100 m, tile cache 256 MB
+  per thread, Meili grid cache at its default; default speeds not applied.
 - **Full North America (19.5 GB PBF, 2026-10-18) — ask Adam before running.** Estimates (scaled
   from published planet builds; low confidence):
 
