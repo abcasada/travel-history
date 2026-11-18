@@ -1,4 +1,4 @@
-import { formatDate, utcToZoned, zonedToUtc } from "./time";
+import { formatDate, formatInZone, utcToZoned, zonedToUtc } from "./time";
 
 test("local wall-clock time in a zone converts to UTC and back", () => {
   // Chicago: CDT (UTC-5) in summer, CST (UTC-6) in winter.
@@ -24,4 +24,11 @@ test("dates display without shifting by the browser's zone", () => {
 
 test("a repeated fall-back hour means its first occurrence", () => {
   expect(zonedToUtc("2024-11-03T01:30", "America/Chicago")).toBe("2024-11-03T06:30:00Z");
+});
+
+test("an instant displays in its own zone, with the zone", () => {
+  const text = formatInZone("2024-07-04T14:30:00Z", "America/Chicago");
+  expect(text).toMatch(/9:30/);
+  expect(text).toMatch(/CDT|GMT-5/);
+  expect(formatInZone(null, "UTC")).toBe("");
 });

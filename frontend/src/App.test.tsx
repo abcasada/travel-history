@@ -4,9 +4,10 @@ import userEvent from "@testing-library/user-event";
 import { App } from "./App";
 import { ME, stubFetch } from "./test/fetch";
 import { setDesktopMedia } from "./test/media";
+import { EMPTY_MAP, makeDetail } from "./test/trips";
 
-function renderApp() {
-  window.history.pushState({}, "", "/app/");
+function renderApp(path = "/app/") {
+  window.history.pushState({}, "", path);
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(<App queryClient={client} />);
 }
@@ -61,4 +62,19 @@ test("? opens the shortcut help on desktop", async () => {
   await waitFor(() =>
     expect(screen.getByRole("dialog", { name: "Keyboard shortcuts" })).toBeInTheDocument(),
   );
+});
+
+test("the mobile shell shows a trip's detail under the map", async () => {
+  setDesktopMedia(false);
+  stubFetch([
+    { path: "/api/v1/me", body: ME },
+    { path: "/api/v1/trips/10", body: makeDetail() },
+    { path: "/api/v1/trips/map", body: EMPTY_MAP },
+  ]);
+  renderApp("/app/trips/10");
+  expect(
+    await screen.findByRole("heading", { name: "Synthetic lake weekend" }),
+  ).toBeInTheDocument();
+  expect(screen.getByTestId("basemap")).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Edit" })).toBeInTheDocument();
 });

@@ -80,12 +80,16 @@ export function utcToZoned(iso: string, timeZone: string): string {
 export function formatInZone(iso: string | null | undefined, timeZone: string): string {
   if (!iso) return "";
   const zone = isValidZone(timeZone) ? timeZone : "UTC";
+  // dateStyle/timeStyle can't be combined with timeZoneName, so the fields are spelled out.
   return new Date(iso).toLocaleString(undefined, {
     timeZone: zone,
-    dateStyle: "medium",
-    timeStyle: "short",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
     timeZoneName: "short",
-  } as Intl.DateTimeFormatOptions);
+  });
 }
 
 /** "2024-05-01" -> "May 1, 2024" without shifting the day by the browser's zone. */

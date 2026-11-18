@@ -11,7 +11,9 @@ export function stubFetch(routes: Route[]) {
       (r) => r.path === url.pathname && (r.method ?? "GET").toUpperCase() === method,
     );
     if (!route) return new Response("{}", { status: 404 });
-    return new Response(route.body === undefined ? "" : JSON.stringify(route.body), {
+    // A 204 response may not have a body at all, not even an empty one.
+    const empty = route.status === 204 ? null : "";
+    return new Response(route.body === undefined ? empty : JSON.stringify(route.body), {
       status: route.status ?? 200,
       headers: { "Content-Type": "application/json" },
     });
