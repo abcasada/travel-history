@@ -90,7 +90,7 @@ Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhi
 16. **[M] T9:** the review UI and manual entry.
     - Status: todo
 17. **[M] T17:** Valhalla with a Kansas extract. Check free disk first.
-    - Status: in progress (dispatched 2026-11-19)
+    - Status: done (2026-11-19)
 18. **[X] T20 core:** trip detection and data integrity, including the locking of confirmed trips.
     - Status: todo
 19. **[H] T20:** the review queue.
@@ -107,7 +107,7 @@ Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhi
 24. **[M] T22:** map-matched routes.
     - Status: todo
 25. **[M] T23 + T24:** routing proxy and manual trips. Without an ORS key, use Valhalla only and leave the ORS fallback stubbed.
-    - Status: todo
+    - Status: in progress (dispatched 2026-11-19)
 26. **[H] T25 core:** the drag editor, ported from gpx.studio (MIT, with attribution).
     - Status: todo
 27. **[M] T25 polish.**
@@ -256,3 +256,4 @@ Nature: mech = mechanical, mod = moderate, hard. Size is S/M/L/XL with approxima
 - Item 4 note: the synthetic-data wipe must keep the phone's tracker points and tokens (stored under dev-admin until Authentik is live).
 - 2026-11-19: item 13 done and verified (`./dev test-quick` 2044 + 32 passed; matrix 665 cases). D-89 is waiting for Adam. Reordered at Adam's request so manual trips with road routes come sooner: 20 → 21 → 17 → 25 → 26. Tracking is on hold and the ingest service is stopped.
 - 2026-11-19: item 20 done and verified (`./dev test-quick` 2117 + 72 passed; e2e covers creating, editing and deleting a trip). Adam can now enter trips, stops, legs and people. D-90 is waiting for Adam. Moved item 21 after 26, because item 20 already covers manual entry and Adam's priority is road-routed legs. Item 17 dispatched.
+- 2026-11-19: item 17 done and verified (Valhalla 3.9.1 healthy, the orchestrator's smoke test passed, `./dev test-quick` 2125 + 72 passed). D-91 is waiting for Adam. Item 25 dispatched; there's no ORS key yet, so the ORS path is built and tested against mocks and goes live when `ORS_API_KEY` appears.
