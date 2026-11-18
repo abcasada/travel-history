@@ -505,6 +505,129 @@
         "title": "DeviceTokenOut",
         "type": "object"
       },
+      "DrawnPiece": {
+        "description": "Points from the client, saved as unverified. `engine` names the provider whose expired\nproposal these points were, so its credit is kept.",
+        "properties": {
+          "coordinates": {
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "maxItems": 10000,
+            "minItems": 1,
+            "title": "Coordinates",
+            "type": "array"
+          },
+          "engine": {
+            "anyOf": [
+              {
+                "enum": [
+                  "valhalla",
+                  "ors",
+                  "osrm-fossgis"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Engine"
+          },
+          "source": {
+            "const": "drawn",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "coordinates"
+        ],
+        "title": "DrawnPiece",
+        "type": "object"
+      },
+      "EditedRouteIn": {
+        "properties": {
+          "note": {
+            "default": "",
+            "maxLength": 255,
+            "title": "Note",
+            "type": "string"
+          },
+          "pieces": {
+            "description": "the edited line in order; joins with identical points are merged",
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "drawn": "#/components/schemas/DrawnPiece",
+                  "proposal": "#/components/schemas/ProposalPiece",
+                  "version": "#/components/schemas/VersionPiece"
+                },
+                "propertyName": "source"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/ProposalPiece"
+                },
+                {
+                  "$ref": "#/components/schemas/VersionPiece"
+                },
+                {
+                  "$ref": "#/components/schemas/DrawnPiece"
+                }
+              ]
+            },
+            "maxItems": 2000,
+            "minItems": 1,
+            "title": "Pieces",
+            "type": "array"
+          },
+          "waypoints": {
+            "description": "the editor's always-visible anchors, start to end: the version's control points",
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "maxItems": 500,
+            "minItems": 2,
+            "title": "Waypoints",
+            "type": "array"
+          }
+        },
+        "required": [
+          "pieces",
+          "waypoints"
+        ],
+        "title": "EditedRouteIn",
+        "type": "object"
+      },
+      "ExpiredPiecesOut": {
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "expired": {
+            "description": "positions in `pieces` whose proposal expired",
+            "items": {
+              "type": "integer"
+            },
+            "title": "Expired",
+            "type": "array"
+          }
+        },
+        "required": [
+          "detail",
+          "expired"
+        ],
+        "title": "ExpiredPiecesOut",
+        "type": "object"
+      },
       "FlightRecordOut": {
         "properties": {
           "aircraft_text": {
@@ -2510,6 +2633,46 @@
         "title": "PreferenceIn",
         "type": "object"
       },
+      "ProposalPiece": {
+        "description": "Points start..end (inclusive) of the caller's cached proposal for these waypoints.",
+        "properties": {
+          "end": {
+            "minimum": 0,
+            "title": "End",
+            "type": "integer"
+          },
+          "source": {
+            "const": "proposal",
+            "title": "Source",
+            "type": "string"
+          },
+          "start": {
+            "minimum": 0,
+            "title": "Start",
+            "type": "integer"
+          },
+          "waypoints": {
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "maxItems": 25,
+            "minItems": 2,
+            "title": "Waypoints",
+            "type": "array"
+          }
+        },
+        "required": [
+          "source",
+          "waypoints",
+          "start",
+          "end"
+        ],
+        "title": "ProposalPiece",
+        "type": "object"
+      },
       "ProposedRoute": {
         "properties": {
           "distance": {
@@ -2663,6 +2826,15 @@
             "title": "Produced At",
             "type": "string"
           },
+          "sources": {
+            "description": "hand-edited versions: per source {source: proposal|version|drawn, engine, points, verified}",
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
           "version": {
             "title": "Version",
             "type": "integer"
@@ -2691,6 +2863,7 @@
           "length_m",
           "note",
           "is_current",
+          "sources",
           "waypoints",
           "geometry"
         ],
@@ -2807,6 +2980,15 @@
             "title": "Produced At",
             "type": "string"
           },
+          "sources": {
+            "description": "hand-edited versions: per source {source: proposal|version|drawn, engine, points, verified}",
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
           "version": {
             "title": "Version",
             "type": "integer"
@@ -2825,7 +3007,8 @@
           "created_by",
           "length_m",
           "note",
-          "is_current"
+          "is_current",
+          "sources"
         ],
         "title": "RouteOut",
         "type": "object"
@@ -4886,6 +5069,38 @@
         "title": "VehicleRef",
         "type": "object"
       },
+      "VersionPiece": {
+        "description": "Points start..end (inclusive) of a saved version of the same leg.",
+        "properties": {
+          "end": {
+            "minimum": 0,
+            "title": "End",
+            "type": "integer"
+          },
+          "route_id": {
+            "title": "Route Id",
+            "type": "integer"
+          },
+          "source": {
+            "const": "version",
+            "title": "Source",
+            "type": "string"
+          },
+          "start": {
+            "minimum": 0,
+            "title": "Start",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "source",
+          "route_id",
+          "start",
+          "end"
+        ],
+        "title": "VersionPiece",
+        "type": "object"
+      },
       "Visibility": {
         "enum": [
           "private",
@@ -5654,6 +5869,67 @@
           }
         ],
         "summary": "Save Proposed Route",
+        "tags": [
+          "trips"
+        ]
+      }
+    },
+    "/api/v1/legs/{leg_id}/routes/edited": {
+      "post": {
+        "description": "Save the drag editor's line as the leg's next frozen version (kind `hand_edited`, or\n`routed` when it is exactly one whole proposal) and make it current. Routed pieces come\nfrom the caller's own cached proposals and saved versions of this leg; drawn pieces are\nvalidated and recorded as unverified (D-93). 409 lists proposal pieces that expired, so the\neditor can resend them as drawn pieces.",
+        "operationId": "saveEditedRoute",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "leg_id",
+            "required": true,
+            "schema": {
+              "title": "Leg Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EditedRouteIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RouteDetailOut"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpiredPiecesOut"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Save Edited Route",
         "tags": [
           "trips"
         ]

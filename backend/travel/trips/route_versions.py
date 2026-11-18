@@ -69,6 +69,7 @@ def save_route_version(
     provenance: dict[str, Any],
     produced_at: dt.datetime,
     note: str = "",
+    sources: list[dict[str, Any]] | None = None,
 ) -> Route:
     """Insert version n+1 of the leg's route and make it current. The caller has checked
     `policy.can_save_route_version`; RLS (`route_insert`, `leg_update`) checks it again."""
@@ -90,6 +91,7 @@ def save_route_version(
             engine_version=str(provenance.get("engine_version", ""))[:32],
             engine_data_date=dt.date.fromisoformat(data_date) if data_date else None,
             attribution=str(provenance.get("attribution", ""))[:200],
+            sources=sources or [],
             produced_at=produced_at,
             created_by=user,
             length_m=_length_m(geom),

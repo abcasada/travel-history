@@ -12,9 +12,10 @@ never email or OIDC identity (D-72, D-76).
 import datetime as dt
 import json
 from enum import StrEnum
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from django.http import HttpRequest
+from django.utils import timezone
 from geojson_pydantic import MultiLineString
 from ninja import Field, Query, Router, Schema, Status
 from ninja.errors import HttpError
@@ -27,7 +28,7 @@ from travel.media.models import Media
 from travel.routing import services as routing
 from travel.vehicles.models import Vehicle
 
-from . import route_versions, services
+from . import route_edits, route_versions, services
 from .models import (
     CabinClass,
     Leg,
@@ -282,6 +283,10 @@ class RouteOut(Schema):
     length_m: float
     note: str
     is_current: bool
+    sources: list[dict[str, Any]] = Field(
+        description="hand-edited versions: per source {source: proposal|version|drawn, engine, "
+        "points, verified}"
+    )
 
 
 class RouteVersionIn(Schema):
@@ -291,6 +296,59 @@ class RouteVersionIn(Schema):
         description="the [lon, lat] waypoints of a proposal from POST /routing/route, unchanged",
     )
     note: str = Field("", max_length=255)
+
+
+Coordinate = list[float]
+
+
+class ProposalPiece(Schema):
+    """Points start..end (inclusive) of the caller's cached proposal for these waypoints."""
+
+    source: Literal["proposal"]
+    waypoints: list[Coordinate] = Field(min_length=2, max_length=25)
+    start: int = Field(ge=0)
+    end: int = Field(ge=0)
+
+
+class VersionPiece(Schema):
+    """Points start..end (inclusive) of a saved version of the same leg."""
+
+    source: Literal["version"]
+    route_id: int
+    start: int = Field(ge=0)
+    end: int = Field(ge=0)
+
+
+class DrawnPiece(Schema):
+    """Points from the client, saved as unverified. `engine` names the provider whose expired
+    proposal these points were, so its credit is kept."""
+
+    source: Literal["drawn"]
+    coordinates: list[Coordinate] = Field(min_length=1, max_length=route_edits.MAX_DRAWN_POINTS)
+    engine: Literal["valhalla", "ors", "osrm-fossgis"] | None = None
+
+
+RoutePiece = Annotated[ProposalPiece | VersionPiece | DrawnPiece, Field(discriminator="source")]
+
+
+class EditedRouteIn(Schema):
+    pieces: list[RoutePiece] = Field(
+        min_length=1,
+        max_length=route_edits.MAX_PIECES,
+        description="the edited line in order; joins with identical points are merged",
+    )
+    waypoints: list[Coordinate] = Field(
+        min_length=2,
+        max_length=route_edits.MAX_CONTROL_POINTS,
+        description="the editor's always-visible anchors, start to end: the version's control "
+        "points",
+    )
+    note: str = Field("", max_length=255)
+
+
+class ExpiredPiecesOut(Schema):
+    detail: str
+    expired: list[int] = Field(description="positions in `pieces` whose proposal expired")
 
 
 class RouteDetailOut(RouteOut):
@@ -1201,6 +1259,7 @@ def _route_row(route: Route, current_id: int | None, creators: dict[int, dict]) 
                 "produced_at",
                 "length_m",
                 "note",
+                "sources",
             )
         },
         "created_by": creators[route.created_by_id],
@@ -1242,7 +1301,59 @@ def save_proposed_route(request, leg_id: int, payload: RouteVersionIn):
             provenance=provenance,
             produced_at=dt.datetime.fromisoformat(provenance["produced_at"]),
             note=payload.note,
+            sources=[
+                {
+                    "source": "proposal",
+                    "engine": provenance["engine"],
+                    "engine_version": provenance.get("engine_version", ""),
+                    "data_date": provenance.get("data_date"),
+                    "verified": True,
+                    "points": len(proposal["routes"][0]["geometry"]["coordinates"]),
+                }
+            ],
         )
+    except TripError as error:
+        _fail(error)
+    return Status(201, get_route(request, route.pk))
+
+
+@router.post(
+    "/legs/{leg_id}/routes/edited",
+    response={201: RouteDetailOut, 409: ExpiredPiecesOut},
+    operation_id="saveEditedRoute",
+)
+def save_edited_route(request, leg_id: int, payload: EditedRouteIn):
+    """Save the drag editor's line as the leg's next frozen version (kind `hand_edited`, or
+    `routed` when it is exactly one whole proposal) and make it current. Routed pieces come
+    from the caller's own cached proposals and saved versions of this leg; drawn pieces are
+    validated and recorded as unverified (D-93). 409 lists proposal pieces that expired, so the
+    editor can resend them as drawn pieces."""
+    leg = _leg(request, leg_id)
+    if not policy.can_save_route_version(request.user, leg):
+        raise HttpError(403, "you cannot edit this leg's route")
+    try:
+        waypoints = [list(route_edits.check_point(w)) for w in payload.waypoints]
+        line = route_edits.assemble(
+            request.user, leg, [piece.model_dump() for piece in payload.pieces]
+        )
+        route = route_versions.save_route_version(
+            request.user,
+            leg,
+            coordinates=line.coordinates,
+            waypoints=line.proposal_waypoints or waypoints,
+            kind=line.kind,
+            provenance={
+                "engine": line.engine,
+                "engine_version": line.engine_version,
+                "data_date": line.data_date,
+                "attribution": line.attribution,
+            },
+            produced_at=timezone.now(),
+            note=payload.note,
+            sources=line.sources,
+        )
+    except route_edits.ProposalsExpired as error:
+        return Status(409, {"detail": error.message, "expired": error.pieces})
     except TripError as error:
         _fail(error)
     return Status(201, get_route(request, route.pk))

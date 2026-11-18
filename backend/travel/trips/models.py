@@ -225,6 +225,10 @@ class Route(models.Model):
     # The provider's required credit (routing.md §13.1: ORS is CC-BY-SA), shown wherever the
     # version is drawn; stored so it survives provider changes.
     attribution = models.CharField(max_length=200, blank=True, default="")
+    # Where a hand-edited version's points came from (routing.md §13.4, D-93): one entry per
+    # source with its engine and point count, and whether the server checked it (its own
+    # cached proposal or a saved version) or the client drew it.
+    sources = models.JSONField(default=list, blank=True)
     produced_at = models.DateTimeField()
     created_by = models.ForeignKey(User, on_delete=models.DO_NOTHING, related_name="+")
     source_time_range = DateTimeRangeField(null=True, blank=True)

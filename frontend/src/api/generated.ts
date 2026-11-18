@@ -214,6 +214,80 @@ export interface DeviceTokenIn {
   name: string;
 }
 
+export type DrawnPieceEngine = typeof DrawnPieceEngine[keyof typeof DrawnPieceEngine] | null;
+
+
+export const DrawnPieceEngine = {
+  valhalla: 'valhalla',
+  ors: 'ors',
+  'osrm-fossgis': 'osrm-fossgis',
+} as const;
+
+/**
+ * Points from the client, saved as unverified. `engine` names the provider whose expired
+ * proposal these points were, so its credit is kept.
+ */
+export interface DrawnPiece {
+  /**
+     * @minItems 1
+     * @maxItems 10000
+     */
+  coordinates: number[][];
+  engine?: DrawnPieceEngine;
+  source: 'drawn';
+}
+
+/**
+ * Points start..end (inclusive) of the caller's cached proposal for these waypoints.
+ */
+export interface ProposalPiece {
+  /** @minimum 0 */
+  end: number;
+  source: 'proposal';
+  /** @minimum 0 */
+  start: number;
+  /**
+     * @minItems 2
+     * @maxItems 25
+     */
+  waypoints: number[][];
+}
+
+/**
+ * Points start..end (inclusive) of a saved version of the same leg.
+ */
+export interface VersionPiece {
+  /** @minimum 0 */
+  end: number;
+  route_id: number;
+  source: 'version';
+  /** @minimum 0 */
+  start: number;
+}
+
+export interface EditedRouteIn {
+  /** @maxLength 255 */
+  note?: string;
+  /**
+     * the edited line in order; joins with identical points are merged
+     * @minItems 1
+     * @maxItems 2000
+     */
+  pieces: (ProposalPiece | VersionPiece | DrawnPiece)[];
+  /**
+     * the editor's always-visible anchors, start to end: the version's control points
+     * @minItems 2
+     * @maxItems 500
+     */
+  waypoints: number[][];
+}
+
+export interface ExpiredPiecesOut {
+  detail: string;
+  /** positions in `pieces` whose proposal expired */
+  expired: number[];
+}
+
 export interface IssueOut {
   detail?: string;
   field: string;
@@ -679,6 +753,8 @@ export interface PurposeRef {
   name: string;
 }
 
+export type RouteDetailOutSourcesItem = { [key: string]: unknown };
+
 export type RouteDetailOutWaypointsItem = { [key: string]: unknown };
 
 export interface RouteDetailOut {
@@ -696,10 +772,14 @@ export interface RouteDetailOut {
   length_m: number;
   note: string;
   produced_at: string;
+  /** hand-edited versions: per source {source: proposal|version|drawn, engine, points, verified} */
+  sources: RouteDetailOutSourcesItem[];
   version: number;
   /** ordered control points {lon, lat, role} */
   waypoints: RouteDetailOutWaypointsItem[];
 }
+
+export type RouteOutSourcesItem = { [key: string]: unknown };
 
 /**
  * One frozen version of a leg's route (never recomputed or changed, rule 5).
@@ -718,6 +798,8 @@ export interface RouteOut {
   length_m: number;
   note: string;
   produced_at: string;
+  /** hand-edited versions: per source {source: proposal|version|drawn, engine, points, verified} */
+  sources: RouteOutSourcesItem[];
   version: number;
 }
 
@@ -2637,6 +2719,100 @@ export const useSaveProposedRoute = <TError = unknown,
         TContext
       > => {
       return useMutation(getSaveProposedRouteMutationOptions(options), queryClient);
+    }
+
+export const getSaveEditedRouteUrl = (legId: number,) => {
+
+
+
+
+  return `/api/v1/legs/${legId}/routes/edited`
+}
+
+/**
+ * Save the drag editor's line as the leg's next frozen version (kind `hand_edited`, or
+ * `routed` when it is exactly one whole proposal) and make it current. Routed pieces come
+ * from the caller's own cached proposals and saved versions of this leg; drawn pieces are
+ * validated and recorded as unverified (D-93). 409 lists proposal pieces that expired, so the
+ * editor can resend them as drawn pieces.
+ * @summary Save Edited Route
+ */
+export const saveEditedRoute = async (legId: number,
+    editedRouteIn: EditedRouteIn, options?: Parameters<typeof apiFetch>[1]): Promise<RouteDetailOut> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return apiFetch<RouteDetailOut>(getSaveEditedRouteUrl(legId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(editedRouteIn)
+  }
+);}
+
+
+
+
+
+export const getSaveEditedRouteMutationKey = () => ['saveEditedRoute'] as const;
+
+export const getSaveEditedRouteMutationOptions = <TError = ExpiredPiecesOut,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveEditedRoute>>, TError,SaveEditedRouteMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof saveEditedRoute>>, TError,SaveEditedRouteMutationVariables, TContext> => {
+
+const mutationKey = getSaveEditedRouteMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof saveEditedRoute>>, SaveEditedRouteMutationVariables> = (props) => {
+          const {legId,data} = props ?? {};
+
+          return  saveEditedRoute(legId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SaveEditedRouteMutationResult = NonNullable<Awaited<ReturnType<typeof saveEditedRoute>>>
+    export type SaveEditedRouteMutationBody = EditedRouteIn
+    export type SaveEditedRouteMutationError = ExpiredPiecesOut
+    export type SaveEditedRouteMutationVariables = {legId: number;data: EditedRouteIn}
+
+    /**
+ * @summary Save Edited Route
+ */
+export const useSaveEditedRoute = <TError = ExpiredPiecesOut,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveEditedRoute>>, TError,SaveEditedRouteMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof saveEditedRoute>>,
+        TError,
+        SaveEditedRouteMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSaveEditedRouteMutationOptions(options), queryClient);
     }
 
 export const getGetMeUrl = () => {
