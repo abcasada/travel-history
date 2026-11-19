@@ -161,8 +161,8 @@ INSTRUCTIONS = [
     (
         "Re-importing updates trips you have not changed in the app since the last import. A trip "
         "you edited in the app is never overwritten: the sheet's changes go to the review queue. "
-        "A stop or leg missing from the sheet is never deleted by the import. Your file is kept "
-        "read-only on the server as the import's original.",
+        "A stop or leg missing from the sheet is never deleted just because it is missing. Your "
+        "file is kept read-only on the server as the import's original.",
         None,
     ),
 ]
