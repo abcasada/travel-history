@@ -3,6 +3,6 @@
 9000002	Synthville Falls	Synthville Falls		33.9	-98.5	P	PPL	US		TX				104000		0	America/Chicago	2026-11-01
 9000003	Synthville	Synthville		36.0	-95.0	P	PPL	US		OK				900		0	America/Chicago	2026-11-01
 9000004	Fakeburg	Fakeburg		38.0	-96.0	P	PPL	US		KS				2500		0	America/Chicago	2026-11-01
-9000005	Zürichsee Synth	Zurichsee Synth		47.3	8.5	P	PPLA	XS		01				350000		0	Europe/Zurich	2026-11-01
+9000005	Zürichsee Synth	Zuerichsee Synth		47.3	8.5	P	PPLA	XS		01				350000		0	Europe/Zurich	2026-11-01
 9000006	Paristown	Paristown		48.8	2.3	P	PPLC	XS		02				2100000		0	Europe/Paris	2026-11-01
 9000007	Paristown	Paristown		33.6	-95.5	P	PPL	US		TX				24000		0	America/Chicago	2026-11-01

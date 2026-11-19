@@ -1,7 +1,12 @@
-/** Inputs the trip editors share: a place (map pick, airport, or typed coordinates), an
- * airport search, and a local date-time in an IANA zone. */
+/** Inputs the trip editors share: a place (map pick, city, airport, or typed coordinates),
+ * airport and city searches, and a local date-time in an IANA zone. */
 import { useId, useState } from "react";
-import { type AirportOut, useSearchAirports } from "../api/generated";
+import {
+  type AirportOut,
+  type GazetteerPlaceOut,
+  useSearchAirports,
+  useSearchPlaces,
+} from "../api/generated";
 import { browserZone, isValidZone } from "../lib/time";
 import { type LngLat, useMapStore } from "../map/store";
 import { Button, inputClass } from "../ui/form";
@@ -62,6 +67,70 @@ export function AirportSearch({
   );
 }
 
+/** The name a chosen city gives a stop: "Wichita, KS" in the US, "Paris, France" elsewhere. */
+export function cityLabel(p: GazetteerPlaceOut): string {
+  const region = p.country_code === "US" ? p.admin1_code : p.country || p.country_code;
+  return region ? `${p.name}, ${region}` : p.name;
+}
+
+function cityDetail(p: GazetteerPlaceOut): string {
+  const where = [p.admin1, p.country].filter(Boolean).join(", ");
+  const people = p.population > 0 ? ` · ${p.population.toLocaleString()} people` : "";
+  return `${p.name}${where ? `, ${where}` : ""}${people}`;
+}
+
+/** Type a city or town ("Paris, TX" narrows by state or country); pick one of the matches.
+ * Searches the server's own GeoNames copy: nothing typed here leaves the server (D-20). */
+export function CitySearch({
+  label,
+  onSelect,
+}: {
+  label: string;
+  onSelect: (place: GazetteerPlaceOut) => void;
+}) {
+  const id = useId();
+  const [q, setQ] = useState("");
+  const term = q.trim();
+  const results = useSearchPlaces(
+    { q: term, limit: 8 },
+    { query: { enabled: term.length >= 2, staleTime: 5 * 60_000 } },
+  );
+  return (
+    <div className="relative">
+      <input
+        id={id}
+        type="search"
+        aria-label={label}
+        placeholder="Find a city or town"
+        className={inputClass}
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+      />
+      {term.length >= 2 && results.data && (
+        <ul className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded border bg-white shadow">
+          {results.data.length === 0 && (
+            <li className="px-2 py-1 text-sm text-slate-500">No places match.</li>
+          )}
+          {results.data.map((p) => (
+            <li key={p.id}>
+              <button
+                type="button"
+                className="block w-full px-2 py-1 text-left text-sm hover:bg-slate-100"
+                onClick={() => {
+                  onSelect(p);
+                  setQ("");
+                }}
+              >
+                {cityDetail(p)}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 /** "37.69, -97.33" (lat, lon, as maps show them) -> a point, else null. */
 export function parseLatLon(text: string): LngLat | null {
   const m = /^\s*(-?\d+(?:\.\d+)?)\s*[,;\s]\s*(-?\d+(?:\.\d+)?)\s*$/.exec(text);
@@ -76,9 +145,9 @@ export function formatPoint(p: LngLat): string {
 }
 
 /**
- * Where something is: click "Pick on map" and then the map, choose an airport, or paste
- * coordinates. There is no address search: forward geocoding would need a hosted service or a
- * gazetteer (GeoNames isn't loaded yet; D-20 keeps geocoding offline).
+ * Where something is: click "Pick on map" and then the map, find a city, choose an airport, or
+ * paste coordinates. A city also suggests a name and its time zone. There is no street-address
+ * search: that would need a hosted geocoder (D-20 keeps geocoding offline).
  */
 export function PlaceInput({
   value,
@@ -87,7 +156,7 @@ export function PlaceInput({
   error,
 }: {
   value: LngLat | null;
-  onChange: (point: LngLat, name?: string) => void;
+  onChange: (point: LngLat, name?: string, zone?: string) => void;
   pickLabel: string;
   error?: string;
 }) {
@@ -106,6 +175,12 @@ export function PlaceInput({
           {picking ? "Click the map…" : "Pick on map"}
         </Button>
       </div>
+      <CitySearch
+        label={`City for ${pickLabel}`}
+        onSelect={(p) =>
+          onChange({ lon: p.lon, lat: p.lat }, cityLabel(p), p.timezone || undefined)
+        }
+      />
       <AirportSearch
         label={`Airport for ${pickLabel}`}
         onSelect={(a) => onChange({ lon: a.lon, lat: a.lat }, airportLabel(a))}

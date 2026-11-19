@@ -117,6 +117,7 @@ function StopForm({
 }) {
   const [values, setValues] = useState(() => initial(stop));
   const [shown, setShown] = useState<Record<string, string>>({});
+  const [suggested, setSuggested] = useState("");
   const invalidate = useInvalidateTrip();
   const create = useCreateStop();
   const update = useUpdateStop();
@@ -195,7 +196,14 @@ function StopForm({
           value={values.point}
           pickLabel={pickLabel}
           error={errors.place ?? errors.lon ?? errors.lat}
-          onChange={(point, name) => set({ point, ...(name && !values.name ? { name } : {}) })}
+          onChange={(point, name, zone) => {
+            // A suggested name replaces an empty or earlier suggested one, never a typed one;
+            // a city's zone applies while no times are entered (they're read in that zone).
+            const rename = name && (!values.name || values.name === suggested);
+            const rezone = zone && !values.arrive && !values.depart;
+            set({ point, ...(rename ? { name } : {}), ...(rezone ? { tz: zone } : {}) });
+            if (rename) setSuggested(name);
+          }}
         />
       </div>
       <div className="mb-3 grid gap-2">

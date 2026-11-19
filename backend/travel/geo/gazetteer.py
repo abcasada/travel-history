@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import datetime as dt
 import io
+import unicodedata
 import zipfile
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -184,6 +185,13 @@ def _text_lines(fetched: Fetched, member: str) -> Iterator[str]:
                 yield line.rstrip("\n")
 
 
+def fold(text: str) -> str:
+    """Lower case without accents, for matching what people type: "Zürich", "zurich" and
+    "ZURICH" all fold to "zurich"."""
+    decomposed = unicodedata.normalize("NFKD", text.casefold())
+    return "".join(c for c in decomposed if not unicodedata.combining(c))
+
+
 def _int(value: str) -> int | None:
     try:
         return int(value)
@@ -206,6 +214,7 @@ def _places(fetched: Fetched, member: str, *, us_filter: bool) -> Iterator[GeoNa
             geonameid=int(f[0]),
             name=f[1][:200],
             asciiname=f[2][:200],
+            name_folded=fold(f[1])[:200],
             point=point,
             feature_class=f[6][:1],
             feature_code=f[7][:10],
@@ -220,6 +229,7 @@ def _places(fetched: Fetched, member: str, *, us_filter: bool) -> Iterator[GeoNa
 PLACE_FIELDS = [
     "name",
     "asciiname",
+    "name_folded",
     "point",
     "feature_class",
     "feature_code",
@@ -327,15 +337,16 @@ def copy_names() -> int:
 
 
 def search(q: str, limit: int) -> list[GeoNamesPlace]:
-    """Places whose name starts with `q`, most populous first (an exact name first of all).
-    "Paris, TX" narrows by state or country: a code (TX, US) or the start of a name (Tex,
-    United)."""
+    """Places whose name starts with `q` (accents ignored), most populous first; among equals
+    an exact name first. "Paris, TX" narrows by state or country: a code (TX, US) or the start
+    of a name (Tex, United)."""
     term, _, qualifier = q.partition(",")
     term, qualifier = term.strip(), qualifier.strip()
     if len(term) < 2:
         return []
+    folded = fold(term)
     places = GeoNamesPlace.objects.filter(
-        Q(name__istartswith=term) | Q(asciiname__istartswith=term)
+        Q(name_folded__startswith=folded) | Q(asciiname__istartswith=term)
     )
     if qualifier:
         places = places.filter(
@@ -344,11 +355,11 @@ def search(q: str, limit: int) -> list[GeoNamesPlace]:
             | Q(country_code__iexact=qualifier)
             | Q(country_name__istartswith=qualifier)
         )
-    exact = Q(name__iexact=term) | Q(asciiname__iexact=term)
+    exact = Q(name_folded=folded) | Q(asciiname__iexact=term)
     return list(
         places.annotate(
             exact_rank=Case(
                 When(exact, then=Value(0)), default=Value(1), output_field=IntegerField()
             )
-        ).order_by("exact_rank", "-population", "name", "geonameid")[:limit]
+        ).order_by("-population", "exact_rank", "name", "geonameid")[:limit]
     )

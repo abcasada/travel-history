@@ -138,13 +138,18 @@ class GeoNamesPlace(models.Model):
     timezone = models.CharField(max_length=40, blank=True)
     admin1_name = models.CharField(max_length=200, blank=True)
     country_name = models.CharField(max_length=200, blank=True)
+    # `name` lower-cased without accents ("Zürich" -> "zurich"; GeoNames' own asciiname is
+    # "Zuerich"), set by the loader: gazetteer.fold().
+    name_folded = models.CharField(max_length=200, blank=True)
 
     class Meta:
-        # Prefix search ("wich" -> Wichita): `istartswith` compiles to UPPER(col) LIKE 'X%',
-        # which these pattern-ops indexes serve whatever the database collation is.
+        # Prefix search ("wich" -> Wichita): `startswith` on the folded name and `istartswith`
+        # (UPPER(col) LIKE 'X%') on asciiname, served by pattern-ops indexes whatever the
+        # database collation is.
         indexes = [
             models.Index(
-                OpClass(Upper("name"), name="text_pattern_ops"), name="geo_gnplace_name_prefix"
+                OpClass("name_folded", name="varchar_pattern_ops"),
+                name="geo_gnplace_folded_prefix",
             ),
             models.Index(
                 OpClass(Upper("asciiname"), name="text_pattern_ops"),

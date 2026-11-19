@@ -155,12 +155,14 @@ def member_client(client):
     return client
 
 
-def test_search_ranks_exact_name_then_population(member_client):
+def test_search_ranks_by_population_then_exact_name(member_client):
     rows = search(member_client, "synthv").json()
     assert [r["id"] for r in rows] == [9000002, 9000001, 9000003, 9000101]
-    exact = search(member_client, "Synthville").json()
-    assert [r["id"] for r in exact][:2] == [9000001, 9000003]  # exact names before "Falls"
-    first = exact[0]
+    with as_owner():  # an exact name wins only among places of the same population
+        GeoNamesPlace.objects.filter(geonameid=9000003).update(population=40)
+    tied = search(member_client, "Synthville").json()
+    assert [r["id"] for r in tied][2:] == [9000003, 9000101]
+    first = rows[1]
     assert first == {
         "id": 9000001,
         "name": "Synthville",
@@ -177,8 +179,8 @@ def test_search_ranks_exact_name_then_population(member_client):
 
 
 def test_search_matches_ascii_names_and_narrows_by_state_or_country(member_client):
-    assert [r["id"] for r in search(member_client, "zurichsee").json()] == [9000005]
-    assert [r["id"] for r in search(member_client, "Zürich").json()] == [9000005]
+    for q in ("zurichsee", "Zürich", "ZURICH", "zuerich"):  # folded name, or GeoNames' ascii
+        assert [r["id"] for r in search(member_client, q).json()] == [9000005], q
     both = search(member_client, "paristown").json()
     assert [r["id"] for r in both] == [9000006, 9000007]
     for qualifier in ("TX", "tex", "us", "United"):
@@ -200,9 +202,9 @@ def test_search_limits(member_client):
 def test_search_uses_the_prefix_indexes():
     load_gazetteer()
     places = GeoNamesPlace.objects.filter(
-        Q(name__istartswith="wich") | Q(asciiname__istartswith="wich")
+        Q(name_folded__startswith="wich") | Q(asciiname__istartswith="wich")
     )
     with transaction.atomic(), connection.cursor() as cursor:
         cursor.execute("SET LOCAL enable_seqscan = off")  # the fixture is tiny
         plan = places.explain()
-    assert "geo_gnplace_name_prefix" in plan and "geo_gnplace_ascii_prefix" in plan, plan
+    assert "geo_gnplace_folded_prefix" in plan and "geo_gnplace_ascii_prefix" in plan, plan

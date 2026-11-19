@@ -116,6 +116,76 @@ test("a stop placed by typed coordinates or a map click is saved as a new place"
   );
 });
 
+const CITY = {
+  name: "Synthville",
+  admin1: "Kansas",
+  admin1_code: "KS",
+  country_code: "US",
+  country: "United States",
+  feature_code: "PPL",
+  timezone: "America/Chicago",
+};
+const CITIES = [
+  { ...CITY, id: 9000001, population: 48000, lon: -97.5, lat: 37.5 },
+  {
+    ...CITY,
+    id: 9000006,
+    name: "Synthtown",
+    admin1: "Synth Canton",
+    admin1_code: "01",
+    country_code: "XS",
+    country: "Synthetic Republic",
+    population: 0,
+    timezone: "Europe/Zurich",
+    lon: 8.5,
+    lat: 47.3,
+  },
+];
+
+test("a city found by name places the stop and suggests its name and time zone", async () => {
+  const user = userEvent.setup();
+  const { fetchMock } = renderAt("/trips/10/edit", [
+    ...COMMON,
+    { path: "/api/v1/trips/10", body: makeDetail() },
+    { path: "/api/v1/reference/places", body: CITIES },
+    { method: "POST", path: "/api/v1/trips/10/stops", status: 201, body: makeStop() },
+  ]);
+  await user.click(await screen.findByRole("button", { name: "Add stop" }));
+  const form = screen.getByRole("form", { name: "New stop" });
+  await user.type(within(form).getByLabelText(/City for/), "Synth, ks");
+  await user.click(
+    await within(form).findByRole("button", {
+      name: "Synthville, Kansas, United States · 48,000 people",
+    }),
+  );
+  expect(requests(fetchMock)).toContain("GET /api/v1/reference/places?q=Synth%2C+ks&limit=8");
+  expect(within(form).getByLabelText("Place name")).toHaveValue("Synthville, KS");
+  expect(within(form).getByTestId("place-point")).toHaveTextContent("37.50000, -97.50000");
+  expect(within(form).getByLabelText("Arrived time zone")).toHaveValue("America/Chicago");
+
+  // Another city replaces a suggested name, but never one the user typed.
+  await user.type(within(form).getByLabelText(/City for/), "Synth");
+  await user.click(await within(form).findByRole("button", { name: /^Synthtown/ }));
+  expect(within(form).getByLabelText("Place name")).toHaveValue("Synthtown, Synthetic Republic");
+  expect(within(form).getByLabelText("Arrived time zone")).toHaveValue("Europe/Zurich");
+  await user.clear(within(form).getByLabelText("Place name"));
+  await user.type(within(form).getByLabelText("Place name"), "Synthetic cabin");
+  await user.type(within(form).getByLabelText(/City for/), "Synth");
+  await user.click(await within(form).findByRole("button", { name: /^Synthville/ }));
+  expect(within(form).getByLabelText("Place name")).toHaveValue("Synthetic cabin");
+
+  await user.click(within(form).getByRole("button", { name: "Add stop" }));
+  await waitFor(() =>
+    expect(lastBody(fetchMock, "POST", "/api/v1/trips/10/stops")).toEqual({
+      kind: "destination",
+      arrive_utc: null,
+      depart_utc: null,
+      tz: "America/Chicago",
+      place: { name: "Synthetic cabin", lon: -97.5, lat: 37.5 },
+    }),
+  );
+});
+
 test("a new leg starts where the last one ended and connects stops", async () => {
   const user = userEvent.setup();
   const motel = makeStop({

@@ -888,6 +888,69 @@
         "title": "FlightRecordOut",
         "type": "object"
       },
+      "GazetteerPlaceOut": {
+        "properties": {
+          "admin1": {
+            "title": "Admin1",
+            "type": "string"
+          },
+          "admin1_code": {
+            "title": "Admin1 Code",
+            "type": "string"
+          },
+          "country": {
+            "title": "Country",
+            "type": "string"
+          },
+          "country_code": {
+            "title": "Country Code",
+            "type": "string"
+          },
+          "feature_code": {
+            "title": "Feature Code",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "lat": {
+            "title": "Lat",
+            "type": "number"
+          },
+          "lon": {
+            "title": "Lon",
+            "type": "number"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "population": {
+            "title": "Population",
+            "type": "integer"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "admin1",
+          "admin1_code",
+          "country_code",
+          "country",
+          "population",
+          "feature_code",
+          "timezone",
+          "lon",
+          "lat"
+        ],
+        "title": "GazetteerPlaceOut",
+        "type": "object"
+      },
       "ImportBatchOut": {
         "properties": {
           "created_at": {
@@ -2533,6 +2596,29 @@
           "country_code"
         ],
         "title": "PlaceOut",
+        "type": "object"
+      },
+      "PlaceSearchIn": {
+        "properties": {
+          "limit": {
+            "default": 20,
+            "maximum": 50,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "q": {
+            "description": "city name, optionally \", state\"",
+            "maxLength": 64,
+            "minLength": 2,
+            "title": "Q",
+            "type": "string"
+          }
+        },
+        "required": [
+          "q"
+        ],
+        "title": "PlaceSearchIn",
         "type": "object"
       },
       "PointsTileIn": {
@@ -6497,6 +6583,67 @@
         "summary": "List Datasets",
         "tags": [
           "flights"
+        ]
+      }
+    },
+    "/api/v1/reference/places": {
+      "get": {
+        "description": "Cities and towns whose name starts with `q`, most populous first; \"Paris, TX\" narrows\nby state or country.",
+        "operationId": "searchPlaces",
+        "parameters": [
+          {
+            "description": "city name, optionally \", state\"",
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "description": "city name, optionally \", state\"",
+              "maxLength": 64,
+              "minLength": 2,
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 50,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/GazetteerPlaceOut"
+                  },
+                  "title": "Response",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Search Places",
+        "tags": [
+          "reference"
         ]
       }
     },

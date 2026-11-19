@@ -328,6 +328,20 @@ export interface FlightRecordOut {
   warnings: IssueOut[];
 }
 
+export interface GazetteerPlaceOut {
+  admin1: string;
+  admin1_code: string;
+  country: string;
+  country_code: string;
+  feature_code: string;
+  id: number;
+  lat: number;
+  lon: number;
+  name: string;
+  population: number;
+  timezone: string;
+}
+
 export type ImportBatchOutSummary = { [key: string]: unknown };
 
 export interface ImportBatchOut {
@@ -694,6 +708,20 @@ export interface PlaceOut {
   lat: number;
   lon: number;
   name: string;
+}
+
+export interface PlaceSearchIn {
+  /**
+     * @minimum 1
+     * @maximum 50
+     */
+  limit?: number;
+  /**
+     * city name, optionally ", state"
+     * @minLength 2
+     * @maxLength 64
+     */
+  q: string;
 }
 
 export interface PointsTileIn {
@@ -1268,6 +1296,20 @@ export type SetPreference200 = { [key: string]: unknown };
 export type SearchAirportsParams = {
 /**
  * code, name or city
+ * @minLength 2
+ * @maxLength 64
+ */
+q: string;
+/**
+ * @minimum 1
+ * @maximum 50
+ */
+limit?: number;
+};
+
+export type SearchPlacesParams = {
+/**
+ * city name, optionally ", state"
  * @minLength 2
  * @maxLength 64
  */
@@ -4086,6 +4128,116 @@ export function useListDatasets<TData = Awaited<ReturnType<typeof listDatasets>>
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getListDatasetsQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getSearchPlacesUrl = (params: SearchPlacesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/reference/places?${stringifiedParams}` : `/api/v1/reference/places`
+}
+
+/**
+ * Cities and towns whose name starts with `q`, most populous first; "Paris, TX" narrows
+ * by state or country.
+ * @summary Search Places
+ */
+export const searchPlaces = async (params: SearchPlacesParams, options?: Parameters<typeof apiFetch>[1]): Promise<GazetteerPlaceOut[]> => {
+
+  return apiFetch<GazetteerPlaceOut[]>(getSearchPlacesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getSearchPlacesQueryKey = (params?: SearchPlacesParams,) => {
+    return [
+    `/api/v1/reference/places`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getSearchPlacesQueryOptions = <TData = Awaited<ReturnType<typeof searchPlaces>>, TError = unknown>(params: SearchPlacesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchPlaces>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getSearchPlacesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof searchPlaces>>> = ({ signal }) => searchPlaces(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof searchPlaces>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type SearchPlacesQueryResult = NonNullable<Awaited<ReturnType<typeof searchPlaces>>>
+export type SearchPlacesQueryError = unknown
+
+
+export function useSearchPlaces<TData = Awaited<ReturnType<typeof searchPlaces>>, TError = unknown>(
+ params: SearchPlacesParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchPlaces>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof searchPlaces>>,
+          TError,
+          Awaited<ReturnType<typeof searchPlaces>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useSearchPlaces<TData = Awaited<ReturnType<typeof searchPlaces>>, TError = unknown>(
+ params: SearchPlacesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchPlaces>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof searchPlaces>>,
+          TError,
+          Awaited<ReturnType<typeof searchPlaces>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useSearchPlaces<TData = Awaited<ReturnType<typeof searchPlaces>>, TError = unknown>(
+ params: SearchPlacesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchPlaces>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Search Places
+ */
+
+export function useSearchPlaces<TData = Awaited<ReturnType<typeof searchPlaces>>, TError = unknown>(
+ params: SearchPlacesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchPlaces>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getSearchPlacesQueryOptions(params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
