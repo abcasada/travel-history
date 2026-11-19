@@ -2,7 +2,7 @@
 
 Handoff note for the next session or subagent. Keep it short; overwrite, don't append history.
 
-- **Nothing in flight (2026-11-18).** Waiting on Adam's answers before the next dispatch: G-1 to G-6 (top of ROADMAP work order; G-1 gates item 40a), Q-18 to Q-21 (spreadsheet, PLAN.md §25), placement of the spreadsheet importer and of the stop/leg notes item (both recommended right after item 14, notes first), D-89 to D-95. With "defaults": add [M] stop/leg notes, then [H] spreadsheet importer (maybe 2 sessions), then 40a… per the re-plan (56c115b).
+- **Nothing in flight (2026-11-18).** Orchestrator answered G-1 to G-5, Q-18 to Q-21 and approved D-88 to D-95 under Adam's delegation (ROADMAP changelog). Waiting on Adam for: order (stop/leg notes [M] + spreadsheet importer [H] before or after the go-live slice 40a–40e) and G-6 (needed only at item 4). Then dispatch per his answer.
 - **Order after that:** 40a → 40b → 40c → 40d → 41a → (42a) → pause (findings + exposure "go") → 40e → 4 → 21 → 27 → pause B → 11 → 12 → pause A → 15 … 24 → 14a → 28, then 29–46.
 - **Adam's go-live answers (defaults):** public at travel.adamcasada.com behind Authentik 2FA (exposure needs his explicit "go" and his tunnel change); trips.* redirects to travel.*; he creates family accounts in Authentik (group `travel-users`), they become Members; request-access form later; focused security review before go-live; dev-admin's data moves to his real account. Authentik runs on the host; he's setting it up per docs/design/auth.md §7.2.
 - **Dev DB holds real data:** Adam's Timeline import (batch 33: 193,009 points, 53,438 segments) and hand-entered trips. Never wipe it. Don't restart web/worker during an import.
