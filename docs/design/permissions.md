@@ -294,7 +294,9 @@ leakproof bigint keys instead (§14).
   - other participants' names, notes, photos and legs **only** where that participant set
     `public_consent`
 - Nothing else is ever copied: no purpose, tags, vehicles, exact times, notes without consent,
-  home data, stops' addresses, participants without consent, raw points.
+  home data, stops' addresses, participants without consent, raw points. The trip's own
+  `notes` and the `notes` on each stop and leg (item 14b) are private and never copied at all;
+  only contribution notes (`trip_note`) with their author's consent can be public.
 - Public views are a separate Django URLconf using the `public` DB alias, which connects as
   `travel_public`. That role has `SELECT` on the snapshot tables only, so even a bug in a public
   view cannot read a private column.

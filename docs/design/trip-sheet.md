@@ -86,6 +86,7 @@ caller, with `edited_in_app_at` left empty.
 | Kind | `lodging`, `destination`, `visit`, `waypoint` | default `destination` |
 | Arrive, Depart | local time (§28.6) | optional |
 | Time zone | IANA name | default from the place (§28.6) |
+| Notes | text ≤ 20,000 | `stop.notes` (item 14b): private, never in a public snapshot (§6.5) |
 
 **Place**, read in this order:
 
@@ -121,6 +122,7 @@ the same coordinates and name; otherwise a new one (`source = manual`, with `geo
 | Airline, Flight, Aircraft, Registration, Seat, Cabin | the flight fields | the flight template's formats and resolvers; `WN 1234` gives the airline when Airline is blank; an unknown aircraft is a warning. On other modes: warning, ignored. |
 | Vehicle | `vehicle` | nickname of a vehicle the caller may use (`can_use_vehicle`); unknown or several → problem |
 | People | participant overrides | only when the leg's people differ from the trip's: exactly these people, stored as include/exclude overrides relative to the trip's set |
+| Notes | `notes` | text ≤ 20,000 (item 14b): private, never in a public snapshot (§6.5) |
 
 `sequence` is the row order; `author` the caller; `participant_scope = trip`; `origin_label` /
 `destination_label` the stop names or airport codes; `import_batch` the batch.

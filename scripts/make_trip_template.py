@@ -40,12 +40,21 @@ TRIP_FIELDS = [
     ("Notes", "SYNTHETIC example data, not a real trip."),
 ]
 
-STOP_HEADERS = ["Stop", "Place", "Name", "Kind", "Arrive", "Depart", "Time zone"]
+STOP_HEADERS = ["Stop", "Place", "Name", "Kind", "Arrive", "Depart", "Time zone", "Notes"]
 # Rows 12-19 of the example tab (19 is a spare row). Labels are optional; legs may use the row
 # number or the label.
 STOPS = [
-    ["home", "Kansas City, MO, US", "", "waypoint", "", "2015-06-12 06:30", "America/Chicago"],
-    ["", "DEN", "", "waypoint", "2015-06-12 09:10", "2015-06-12 10:45", ""],
+    [
+        "home",
+        "Kansas City, MO, US",
+        "",
+        "waypoint",
+        "",
+        "2015-06-12 06:30",
+        "America/Chicago",
+        "",
+    ],
+    ["", "DEN", "", "waypoint", "2015-06-12 09:10", "2015-06-12 10:45", "", ""],
     [
         "springs",
         "Colorado Springs, CO, US",
@@ -54,9 +63,10 @@ STOPS = [
         "2015-06-12 12:15",
         "2015-06-14 09:00",
         "",
+        "Example note: cabin by the creek",
     ],
-    ["", "Taos, NM, US", "", "visit", "2015-06-14 14:00", "2015-06-15 10:00", ""],
-    ["", "Santa Fe, NM, US", "", "lodging", "2015-06-15 11:30", "2015-06-19 09:00", ""],
+    ["", "Taos, NM, US", "", "visit", "2015-06-14 14:00", "2015-06-15 10:00", "", ""],
+    ["", "Santa Fe, NM, US", "", "lodging", "2015-06-15 11:30", "2015-06-19 09:00", "", ""],
     [
         "",
         "35.0961, -106.6699",
@@ -65,33 +75,34 @@ STOPS = [
         "2015-06-19 10:15",
         "2015-06-19 15:00",
         "",
+        "",
     ],
-    ["", "ABQ", "", "waypoint", "2015-06-19 15:30", "2015-06-20 08:00", ""],
-    ["", "", "", "", "", "", ""],
+    ["", "ABQ", "", "waypoint", "2015-06-19 15:30", "2015-06-20 08:00", "", ""],
+    ["", "", "", "", "", "", "", ""],
 ]
 
 LEG_HEADERS = [
     "Leg", "From", "To", "Mode", "Depart", "Arrive", "Depart zone", "Arrive zone",
     "From airport", "To airport", "Airline", "Flight", "Aircraft", "Registration", "Seat",
-    "Cabin", "Vehicle", "People",
+    "Cabin", "Vehicle", "People", "Notes",
 ]  # fmt: skip
 # Rows 23-29. From/To: a stop's row number (12-19) or its label. A flight may leave From or To
 # empty when its airport column is filled (a connection airport needn't be a stop).
 LEGS = [
     ["out", 12, 13, "flight", "2015-06-12 08:05", "2015-06-12 09:10", "", "",
-     "MCI", "", "WN", "WN 1234", "B737", "", "14C", "economy", "", ""],
+     "MCI", "", "WN", "WN 1234", "B737", "", "14C", "economy", "", "", ""],
     ["", 13, "springs", "drive", "2015-06-12 10:45", "2015-06-12 12:15", "", "",
-     "", "", "", "", "", "", "", "", "", ""],
+     "", "", "", "", "", "", "", "", "", "", ""],
     ["", "springs", 15, "drive", "2015-06-14 09:00", "2015-06-14 14:00", "", "",
-     "", "", "", "", "", "", "", "", "", ""],
+     "", "", "", "", "", "", "", "", "", "", "Example note: the High Road"],
     ["", 15, 16, "drive", "2015-06-15 10:00", "2015-06-15 11:30", "", "",
-     "", "", "", "", "", "", "", "", "", ""],
+     "", "", "", "", "", "", "", "", "", "", ""],
     ["", 16, 17, "drive", "2015-06-19 09:00", "2015-06-19 10:15", "", "",
-     "", "", "", "", "", "", "", "", "", ""],
+     "", "", "", "", "", "", "", "", "", "", ""],
     ["", 17, 18, "drive", "2015-06-19 15:00", "2015-06-19 15:30", "", "",
-     "", "", "", "", "", "", "", "", "", ""],
+     "", "", "", "", "", "", "", "", "", "", ""],
     ["back", 18, 12, "flight", "2015-06-20 08:00", "2015-06-20 11:05", "", "",
-     "", "MCI", "WN", "WN 5678", "", "", "", "economy", "", "me"],
+     "", "MCI", "WN", "WN 5678", "", "", "", "economy", "", "me", ""],
 ]  # fmt: skip
 
 INSTRUCTIONS = [
@@ -138,7 +149,8 @@ INSTRUCTIONS = [
         "geonames:<id>. A name that fits more than one place is reported with the choices; the "
         "importer never guesses. Name: optional display name. Kind: lodging, destination, visit or "
         "waypoint (blank = destination). Arrive / Depart: local time YYYY-MM-DD HH:MM, or a date "
-        "only. Time zone: IANA name (America/Denver); blank = the place's own zone.",
+        "only. Time zone: IANA name (America/Denver); blank = the place's own zone. Notes: free "
+        "text about the stop, private (never on a public page).",
         None,
     ),
     ("", None),
@@ -153,7 +165,8 @@ INSTRUCTIONS = [
         "(needed when the stop is a city, optional when it is an airport; From or To may then be "
         "blank), Airline (code or name), Flight (WN 1234), Aircraft, Registration, Seat, Cabin "
         "(economy, premium_economy, business, first, other). Vehicle: a vehicle's nickname in the "
-        "app. People: only when the leg's people differ from the trip's (names separated by ;).",
+        "app. People: only when the leg's people differ from the trip's (names separated by ;). "
+        "Notes: free text about the leg, private (never on a public page).",
         None,
     ),
     ("", None),
@@ -223,7 +236,7 @@ def example(ws) -> None:
     dv.add("B8")
     ws.add_data_validation(dv)
 
-    widths = [12, 26, 22, 12, 17, 17, 16, 14, 12, 10, 8, 10, 9, 12, 6, 16, 10, 16]
+    widths = [12, 26, 22, 12, 17, 17, 16, 30, 12, 10, 8, 10, 9, 12, 6, 16, 10, 16, 30]
     for col, width in enumerate(widths, start=1):
         ws.column_dimensions[get_column_letter(col)].width = width
     ws.column_dimensions["B"].width = 38  # trip field values share column B with Place
