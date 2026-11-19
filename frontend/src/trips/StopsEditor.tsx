@@ -23,6 +23,7 @@ type StopValues = {
   arrive: string;
   depart: string;
   tz: string;
+  notes: string;
 };
 
 function initial(stop?: StopOut): StopValues {
@@ -34,6 +35,7 @@ function initial(stop?: StopOut): StopValues {
     arrive: stop?.arrive_utc ? utcToZoned(stop.arrive_utc, tz) : "",
     depart: stop?.depart_utc ? utcToZoned(stop.depart_utc, tz) : "",
     tz,
+    notes: stop?.notes ?? "",
   };
 }
 
@@ -70,10 +72,15 @@ export function StopsEditor({ trip }: { trip: TripDetailOut }) {
               <StopForm trip={trip} stop={stop} onDone={() => setEditing(null)} />
             </li>
           ) : (
-            <li key={stop.id} className="flex items-center justify-between gap-2 text-sm">
+            <li key={stop.id} className="flex items-start justify-between gap-2 text-sm">
               <span>
                 <span className="font-medium">{stop.place.name || "Unnamed place"}</span>{" "}
                 <span className="text-slate-500">{label(STOP_KIND_LABELS, stop.kind)}</span>
+                {stop.notes && (
+                  <span className="block whitespace-pre-wrap text-xs text-slate-600">
+                    {stop.notes}
+                  </span>
+                )}
               </span>
               {stop.can_edit && editing === null && (
                 <span className="flex gap-2">
@@ -134,6 +141,7 @@ function StopForm({
       arrive_utc: toUtc(values.arrive, values.tz),
       depart_utc: toUtc(values.depart, values.tz),
       tz: values.tz,
+      notes: values.notes,
     };
     const place = { name: values.name.trim(), lon: values.point.lon, lat: values.point.lat };
     const done = {
@@ -222,6 +230,16 @@ function StopForm({
           onChange={(depart, tz) => set({ depart, tz })}
         />
       </div>
+      <Field label="Stop notes" htmlFor="stop-notes" error={errors.notes}>
+        <textarea
+          id="stop-notes"
+          className={inputClass}
+          rows={2}
+          maxLength={20000}
+          value={values.notes}
+          onChange={(e) => set({ notes: e.target.value })}
+        />
+      </Field>
       <MutationError
         error={Object.keys(fieldErrors(mutation.error)).length ? null : mutation.error}
         what="stop"

@@ -143,6 +143,9 @@ function TripDetail({ trip }: { trip: TripDetailOut }) {
                   {label(STOP_KIND_LABELS, stop.kind)}
                   {stop.arrive_utc && ` · ${formatInZone(stop.arrive_utc, stop.tz)}`}
                 </span>
+                {stop.notes && (
+                  <p className="whitespace-pre-wrap text-xs text-slate-600">{stop.notes}</p>
+                )}
               </li>
             ))}
           </ul>
@@ -178,6 +181,7 @@ function LegRow({ leg, trip }: { leg: LegOut; trip: TripDetailOut }) {
         </p>
       )}
       {people.length > 0 && <p className="text-xs text-slate-500">{people.join(", ")}</p>}
+      {leg.notes && <p className="mt-1 whitespace-pre-wrap text-xs">{leg.notes}</p>}
     </li>
   );
 }

@@ -8,7 +8,7 @@ const MAP = { path: "/api/v1/trips/map", body: EMPTY_MAP };
 const TRIP = makeDetail({
   participants: [makeParticipant(7, "Synthetic Parent"), makeParticipant(8, "Synthetic Kid")],
   stops: [
-    makeStop(),
+    makeStop({ notes: "Synthetic: swim before breakfast" }),
     makeStop({ id: 101, place: { ...makeStop().place, id: 501, name: "Synthetic Motel" } }),
   ],
   legs: [
@@ -18,6 +18,7 @@ const TRIP = makeDetail({
       participant_ids: [7],
       start_utc: "2024-05-01T14:00:00Z",
       start_tz: "America/Chicago",
+      notes: "Synthetic: scenic route",
     }),
     makeLeg({
       id: 201,
@@ -42,6 +43,10 @@ test("shows who went, the itinerary in order and the stops", async () => {
   expect(legs).toHaveTextContent(/Drive\s*Synthetic Motel → Synthetic Lake/);
   expect(legs).toHaveTextContent(/Flight\s*SYA → SYB · SY 12/);
   expect(legs).toHaveTextContent("Synthetic Parent");
+  expect(legs).toHaveTextContent("Synthetic: scenic route");
+  expect(screen.getByRole("region", { name: "Stops" })).toHaveTextContent(
+    "Synthetic: swim before breakfast",
+  );
   expect(screen.getAllByRole("link", { name: "Route" })[0]).toHaveAttribute(
     "href",
     "/trips/10/legs/200/route",

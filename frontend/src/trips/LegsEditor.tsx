@@ -33,6 +33,7 @@ type LegValues = {
   flight_number: string;
   origin_airport_id: number | null;
   destination_airport_id: number | null;
+  notes: string;
 };
 
 function initial(trip: TripDetailOut, leg?: LegOut): LegValues {
@@ -54,6 +55,7 @@ function initial(trip: TripDetailOut, leg?: LegOut): LegValues {
     flight_number: leg?.flight_number ?? "",
     origin_airport_id: leg?.origin_airport_id ?? null,
     destination_airport_id: leg?.destination_airport_id ?? null,
+    notes: leg?.notes ?? "",
   };
 }
 
@@ -83,6 +85,7 @@ function toPayload(v: LegValues): LegIn {
     flight_number: flight ? v.flight_number.trim() : "",
     origin_airport_id: flight ? v.origin_airport_id : null,
     destination_airport_id: flight ? v.destination_airport_id : null,
+    notes: v.notes,
   };
 }
 
@@ -128,11 +131,16 @@ export function LegsEditor({ trip }: { trip: TripDetailOut }) {
           const [from, to] = legEnds(leg, trip.stops);
           const name = `${MODE_LABELS[leg.mode as TravelMode] ?? leg.mode} ${from} to ${to}`;
           return (
-            <li key={leg.id} className="flex items-center justify-between gap-2 text-sm">
+            <li key={leg.id} className="flex items-start justify-between gap-2 text-sm">
               <span>
                 <span className="text-slate-500">{index + 1}.</span>{" "}
                 <span className="font-medium">{MODE_LABELS[leg.mode as TravelMode]}</span> {from} →{" "}
                 {to}
+                {leg.notes && (
+                  <span className="block whitespace-pre-wrap text-xs text-slate-600">
+                    {leg.notes}
+                  </span>
+                )}
               </span>
               {editing === null && (
                 <span className="flex shrink-0 items-center gap-2">
@@ -328,6 +336,16 @@ function LegForm({ trip, leg, onDone }: { trip: TripDetailOut; leg?: LegOut; onD
           onChange={(end, end_tz) => set({ end, end_tz })}
         />
       </div>
+      <Field label="Leg notes" htmlFor="leg-notes" error={errors.notes}>
+        <textarea
+          id="leg-notes"
+          className={inputClass}
+          rows={2}
+          maxLength={20000}
+          value={values.notes}
+          onChange={(e) => set({ notes: e.target.value })}
+        />
+      </Field>
       <MutationError
         error={Object.keys(fieldErrors(mutation.error)).length ? null : mutation.error}
         what="leg"

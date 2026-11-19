@@ -1187,6 +1187,19 @@
           "mode": {
             "$ref": "#/components/schemas/TravelMode"
           },
+          "notes": {
+            "anyOf": [
+              {
+                "maxLength": 20000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null clears",
+            "title": "Notes"
+          },
           "origin_airport_id": {
             "anyOf": [
               {
@@ -1441,6 +1454,11 @@
             "title": "Mode",
             "type": "string"
           },
+          "notes": {
+            "description": "private free text; never in a public snapshot",
+            "title": "Notes",
+            "type": "string"
+          },
           "origin_airport_id": {
             "anyOf": [
               {
@@ -1551,6 +1569,7 @@
           "aircraft_registration",
           "seat",
           "cabin_class",
+          "notes",
           "participant_ids",
           "can_edit",
           "can_delete"
@@ -1699,6 +1718,19 @@
                 "type": "null"
               }
             ]
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "maxLength": 20000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null clears",
+            "title": "Notes"
           },
           "origin_airport_id": {
             "anyOf": [
@@ -3399,6 +3431,19 @@
             ],
             "title": "Leg Id"
           },
+          "notes": {
+            "anyOf": [
+              {
+                "maxLength": 20000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null clears",
+            "title": "Notes"
+          },
           "place": {
             "anyOf": [
               {
@@ -3504,6 +3549,11 @@
             ],
             "title": "Leg Id"
           },
+          "notes": {
+            "description": "private free text; never in a public snapshot",
+            "title": "Notes",
+            "type": "string"
+          },
           "place": {
             "$ref": "#/components/schemas/PlaceOut"
           },
@@ -3524,6 +3574,7 @@
           "arrive_utc",
           "depart_utc",
           "tz",
+          "notes",
           "place",
           "author",
           "can_edit"
@@ -3578,6 +3629,19 @@
               }
             ],
             "title": "Leg Id"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "maxLength": 20000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null clears",
+            "title": "Notes"
           },
           "place": {
             "anyOf": [

@@ -43,6 +43,7 @@ export function makeStop(over: Partial<StopOut> = {}): StopOut {
     arrive_utc: null,
     depart_utc: null,
     tz: "America/Chicago",
+    notes: "",
     place: {
       id: 500,
       name: "Synthetic Lake",
@@ -86,6 +87,7 @@ export function makeLeg(over: Partial<LegOut> = {}): LegOut {
     aircraft_registration: "",
     seat: "",
     cabin_class: "",
+    notes: "",
     participant_ids: [],
     can_edit: true,
     can_delete: true,

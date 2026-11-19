@@ -111,8 +111,51 @@ test("a stop placed by typed coordinates or a map click is saved as a new place"
       arrive_utc: null,
       depart_utc: null,
       tz: expect.any(String),
+      notes: "",
       place: { name: "Synthetic Lake", lon: -96.5, lat: 38.5 },
     }),
+  );
+});
+
+test("stop and leg notes show in the lists and are edited in their forms", async () => {
+  const user = userEvent.setup();
+  const trip = makeDetail({
+    stops: [makeStop({ notes: "Synthetic: pool closed" })],
+    legs: [makeLeg({ notes: "Synthetic: roadworks" })],
+  });
+  const { fetchMock } = renderAt("/trips/10/edit", [
+    ...COMMON,
+    { path: "/api/v1/trips/10", body: trip },
+    { method: "PATCH", path: "/api/v1/stops/100", body: makeStop() },
+    { method: "PATCH", path: "/api/v1/legs/200", body: makeLeg() },
+  ]);
+  const stops = await screen.findByRole("region", { name: "Stops" });
+  expect(stops).toHaveTextContent("Synthetic: pool closed");
+  const legs = screen.getByRole("region", { name: "Legs" });
+  expect(legs).toHaveTextContent("Synthetic: roadworks");
+
+  await user.click(within(stops).getByRole("button", { name: "Edit" }));
+  const stopForm = screen.getByRole("form", { name: "Edit stop" });
+  const stopNotes = within(stopForm).getByLabelText("Stop notes");
+  expect(stopNotes).toHaveValue("Synthetic: pool closed");
+  await user.clear(stopNotes);
+  await user.type(stopNotes, "Synthetic: pool open");
+  await user.click(within(stopForm).getByRole("button", { name: "Save stop" }));
+  await waitFor(() =>
+    expect(lastBody(fetchMock, "PATCH", "/api/v1/stops/100")).toMatchObject({
+      notes: "Synthetic: pool open",
+    }),
+  );
+
+  await waitFor(() => expect(screen.queryByRole("form", { name: "Edit stop" })).toBeNull());
+  await user.click(within(legs).getByRole("button", { name: "Edit" }));
+  const legForm = screen.getByRole("form", { name: "Edit leg" });
+  const legNotes = within(legForm).getByLabelText("Leg notes");
+  expect(legNotes).toHaveValue("Synthetic: roadworks");
+  await user.clear(legNotes);
+  await user.click(within(legForm).getByRole("button", { name: "Save leg" }));
+  await waitFor(() =>
+    expect(lastBody(fetchMock, "PATCH", "/api/v1/legs/200")).toMatchObject({ notes: "" }),
   );
 });
 
@@ -181,6 +224,7 @@ test("a city found by name places the stop and suggests its name and time zone",
       arrive_utc: null,
       depart_utc: null,
       tz: "America/Chicago",
+      notes: "",
       place: { name: "Synthetic cabin", lon: -97.5, lat: 37.5 },
     }),
   );

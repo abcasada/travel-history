@@ -406,6 +406,8 @@ export interface LegIn {
   end_utc?: string | null;
   flight_number?: string | null;
   mode: TravelMode;
+  /** null clears */
+  notes?: string | null;
   origin_airport_id?: number | null;
   origin_label?: string | null;
   /** a stop of the same trip */
@@ -462,6 +464,8 @@ export interface LegOut {
   id: number;
   is_contribution: boolean;
   mode: string;
+  /** private free text; never in a public snapshot */
+  notes: string;
   origin_airport_id: number | null;
   origin_label: string;
   origin_stop_id: number | null;
@@ -499,6 +503,8 @@ export interface LegPatchIn {
   end_utc?: string | null;
   flight_number?: string | null;
   mode?: TravelMode | null;
+  /** null clears */
+  notes?: string | null;
   origin_airport_id?: number | null;
   origin_label?: string | null;
   /** a stop of the same trip */
@@ -905,6 +911,8 @@ export interface StopIn {
   depart_utc?: string | null;
   kind: StopKind;
   leg_id?: number | null;
+  /** null clears */
+  notes?: string | null;
   /** or a new place, owned by the caller */
   place?: NewPlaceIn | null;
   /** a place the caller owns, or already on the trip */
@@ -921,6 +929,8 @@ export interface StopOut {
   id: number;
   kind: string;
   leg_id: number | null;
+  /** private free text; never in a public snapshot */
+  notes: string;
   place: PlaceOut;
   trip_id: number;
   tz: string;
@@ -934,6 +944,8 @@ export interface StopPatchIn {
   depart_utc?: string | null;
   kind?: StopKind | null;
   leg_id?: number | null;
+  /** null clears */
+  notes?: string | null;
   /** or a new place, owned by the caller */
   place?: NewPlaceIn | null;
   /** a place the caller owns, or already on the trip */
