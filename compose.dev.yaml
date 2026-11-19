@@ -1,6 +1,7 @@
 # Development overrides (used by ./dev). Adds the mock OIDC provider, Mailpit, the Vite dev
 # server and a `tools` container, and binds dev ports to TRAVEL_LAN_BIND (the server's LAN
-# address) so the stack is reachable over LAN/WireGuard only — never from the internet.
+# address) so the stack is reachable over LAN/WireGuard only — never from the internet. The
+# production stack is a separate project (compose.prod.yaml, ./dev prod …) with its own database.
 
 x-dev-backend: &dev-backend
   image: travel-history-backend-dev:latest

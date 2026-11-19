@@ -2,13 +2,15 @@
 # Development wrapper: every tool runs in a container (nothing is installed on the host).
 set -euo pipefail
 cd "$(dirname "$0")"
+# shellcheck source=scripts/stack.sh
+source scripts/stack.sh
 
-compose() { docker compose -f compose.yaml -f compose.dev.yaml "$@"; }
+# The development project only; the production stack is `./dev prod …` (scripts/prod.sh).
+compose() { dev_compose "$@"; }
 node_run() {
   docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -e npm_config_update_notifier=false \
     -v "$PWD/frontend:/src" -w /src node:24.22.0-trixie-slim@sha256:7f486cabe892bff8fef04c0f7da8dba84a560be3e4e2740b7a86afc57ebec315 "$@"
 }
-random_secret() { head -c 48 /dev/urandom | base64 | tr -d '/+=\n' | head -c 48; }
 env_value() { grep -E "^$1=" .env | head -1 | cut -d= -f2-; }
 
 cmd="${1:-help}"; shift || true
@@ -72,73 +74,15 @@ case "$cmd" in
     ;;
   restore-test)
     # Backup -> restore -> verify, end to end, with a throwaway key (never the real one).
-    set -e
-    rt="$PWD/var/restore-test"; rm -rf "$rt"; mkdir -p "$rt/outbox"
-    compose build backup >/dev/null
-    img=travel-history-backup:latest
-    docker run --rm "$img" age-keygen 2>/dev/null > "$rt/test.key"
-    pub="$(grep -m1 'public key:' "$rt/test.key" | awk '{print $4}')"
-    compose up -d db >/dev/null 2>&1
-    echo "1/4 backup with a test key"
-    compose run --rm -e AGE_RECIPIENT="$pub" -e BACKUP_OUTBOX=/rt/outbox -v "$rt:/rt" \
-      backup /backup/backup.sh
-    dump="$(ls -1 "$rt"/outbox/db/*.age | head -1)"
-    echo "2/4 restore into a scratch database"
-    net=travel-restore-test; db=travel-restore-db; pw="$(random_secret)"
-    docker network create "$net" >/dev/null
-    trap 'docker rm -f "$db" >/dev/null 2>&1; docker network rm "$net" >/dev/null 2>&1; rm -rf "$rt"' EXIT
-    docker run -d --name "$db" --network "$net" --user 999:999 -e POSTGRES_PASSWORD="$pw" \
-      -e TRAVEL_OWNER_PASSWORD="$pw" -e TRAVEL_APP_PASSWORD="$pw" -e TRAVEL_PUBLIC_PASSWORD="$pw" \
-      -v "$PWD/db/init:/docker-entrypoint-initdb.d:ro" postgis/postgis:18-3.6@sha256:b4466ea2ba7e3af54fcbba996d45325720f4b3ecb4f43f99b2f41367dc196f23 >/dev/null
-    for _ in $(seq 1 60); do
-      docker exec "$db" psql -U postgres -d travel -c 'select 1' >/dev/null 2>&1 \
-        && docker logs "$db" 2>&1 | grep -q 'PostgreSQL init process complete' && break
-      sleep 2
-    done
-    sleep 2
-    scratch=(docker run --rm --network "$net" --user "$(id -u):$(id -g)" -e HOME=/tmp
-      -e PGHOST="$db" -e PGUSER=travel_owner -e PGPASSWORD="$pw" -e PGDATABASE=travel
-      -e AGE_IDENTITY_FILE=/rt/test.key -v "$rt:/rt" "$img")
-    "${scratch[@]}" /backup/restore.sh "/rt/outbox/db/$(basename "$dump")"
-    echo "3/4 compare every table's row count and the security policies"
-    counts_sql="SELECT table_name || '=' || (xpath('/row/c/text()', query_to_xml(format('select count(*) as c from %I', table_name), false, true, '')))[1]::text FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE' UNION ALL SELECT 'policies=' || count(*) FROM pg_policies UNION ALL SELECT 'app_functions=' || count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'app' ORDER BY 1"
-    compose exec -T db psql -U travel_owner -d travel -At -c "$counts_sql" > "$rt/source.txt"
-    "${scratch[@]}" psql -At -c "$counts_sql" > "$rt/restored.txt"
-    if diff -u "$rt/source.txt" "$rt/restored.txt"; then
-      echo "    $(wc -l < "$rt/source.txt") tables/checks identical"
-    else
-      echo "RESTORE TEST FAILED: differences above" >&2; exit 1
-    fi
-    echo "4/4 verify raw import files against their checksums"
-    "${scratch[@]}" python3 /backup/verify_raw.py /rt/outbox /rt/test.key
-    echo "restore test passed"
+    scripts/restore-test.sh dev
+    ;;
+  prod)
+    # The production stack: its own compose project, database and .env.prod (D-96).
+    exec scripts/prod.sh "$@"
     ;;
   tracker)
-    # The internet-facing tracker endpoint: the `ingest` service (compose profile "tracker",
-    # production image, 127.0.0.1:8783; docs/tracking/exposure.md). `./dev up` and `./dev down`
-    # leave it alone, so only a deliberate deploy puts new code behind the tunnel.
-    tc() { compose --profile tracker "$@"; }
-    sub="${1:-help}"; shift || true
-    case "$sub" in
-      deploy)
-        tc build ingest
-        tc up -d ingest
-        printf 'waiting for the ingest service to be healthy'
-        for _ in $(seq 1 45); do
-          state="$(docker inspect -f '{{.State.Health.Status}}' "$(tc ps -q ingest)" 2>/dev/null || true)"
-          [ "$state" = healthy ] && break
-          printf '.'; sleep 2
-        done
-        echo " ${state:-not running}"
-        [ "$state" = healthy ] || { tc logs --tail=30 ingest; exit 1; }
-        TRACKER_SMOKE_TOKEN="${TRACKER_SMOKE_TOKEN:-}" scripts/tracker-smoke.sh </dev/null
-        ;;
-      stop)  tc stop ingest && tc rm -f ingest ;;
-      logs)  tc logs -f --tail=100 ingest ;;
-      ps)    tc ps ingest ;;
-      smoke) scripts/tracker-smoke.sh "$@" ;;
-      *)     echo "./dev tracker deploy | stop | logs | ps | smoke [https://<public host>] [--store]" ;;
-    esac
+    # The internet-facing tracker endpoint moved to the production stack (D-96).
+    exec scripts/prod.sh tracker "$@"
     ;;
   valhalla)
     # Valhalla is its own compose project (valhalla/compose.yaml, docs/valhalla.md); the app
@@ -212,9 +156,10 @@ case "$cmd" in
 ./dev restore-test        backup -> restore into a scratch DB -> verify (throwaway key)
 ./dev import-scale-test [size_mb|cleanup]  realistic-size Timeline import on the dev stack (default 1024 MB; deletes its data after)
 ./dev e2e [base-url]      browser smoke test (sign-in, notice, map, both shells; screenshots in e2e/out/)
-./dev tracker deploy      build + (re)start the internet-facing tracker endpoint (127.0.0.1:8783), then smoke-test it
-./dev tracker stop|logs|ps   stop it / follow its log / show it (./dev up and ./dev down leave it alone)
-./dev tracker smoke [url] [--store]  smoke test (default the local service; https://<public host> through the tunnel)
+./dev prod <command>      the production stack (127.0.0.1:8784; ./dev prod help): init, deploy,
+                          status, ps, logs, migrate, manage, shell, psql, backup-now,
+                          restore-test, smoke, down, tracker start|stop|logs|ps|smoke
+./dev tracker <command>   same as ./dev prod tracker (the tracker endpoint runs in production)
 ./dev valhalla build      download the extract (default Kansas) and build routing tiles (docs/valhalla.md)
 ./dev valhalla up|down|status|logs   run / stop / inspect the Valhalla service (valhalla:8002, no ports)
 ./dev valhalla smoke      route + map-match through http://valhalla:8002 from the app's network

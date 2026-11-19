@@ -1,0 +1,104 @@
+# Production overlay (work-order item 40a, D-96, docs/production.md): compose.yaml plus this
+# file, as its own compose project with its own database volume, networks and `.env.prod`
+# (outside the repository). Only `./dev prod …` uses it, always from the release directory: a
+# `git archive` of pushed main, so work in progress never reaches production. Never combined
+# with compose.dev.yaml: no source mounts, runserver, mock OIDC, Mailpit or Vite here.
+name: travel-history-prod
+
+# Forced here, not read from .env.prod, so the env file can't weaken them; settings.py refuses
+# to start a TRAVEL_PRODUCTION server without them anyway (auth.md §7.7). HSTS only reaches
+# browsers over HTTPS, i.e. through the tunnel.
+x-prod-env: &prod-env
+  TRAVEL_PRODUCTION: "true"
+  DJANGO_DEBUG: "false"
+  DJANGO_SECURE_COOKIES: "true"
+  DJANGO_BEHIND_TLS_PROXY: "true"
+  DJANGO_SSL_REDIRECT: "true"
+  DJANGO_HSTS_SECONDS: "31536000"
+  # Trusted because every request from outside this server arrives through the tunnel: the
+  # ports are bound to 127.0.0.1 only, and only this project's containers share its networks.
+  RATELIMIT_CLIENT_IP_HEADER: CF-Connecting-IP
+  OIDC_BACKCHANNEL_URL: ""  # the dev-only back channel (D-57)
+
+x-prod-image: &prod-image
+  image: travel-history-backend:${TRAVEL_IMAGE_TAG:?set by ./dev prod from the release}
+
+services:
+  db:
+    mem_limit: 1536m
+
+  migrate:
+    <<: *prod-image
+    environment: *prod-env
+
+  web:
+    <<: *prod-image
+    environment: *prod-env
+    ports:
+      # Localhost only, no LAN binding: the tunnel's target from go-live on (D-28, D-96).
+      - "127.0.0.1:8784:8000"
+    read_only: true
+    tmpfs: ["/tmp"]
+    healthcheck:
+      start_period: 30s
+      start_interval: 2s
+    mem_limit: 768m
+
+  worker:
+    <<: *prod-image
+    environment: *prod-env
+    mem_limit: 1536m
+
+  backup:
+    image: travel-history-backup:${TRAVEL_IMAGE_TAG:?set by ./dev prod from the release}
+    mem_limit: 512m
+
+  # The internet-facing tracker endpoint (D-73, D-85; docs/tracking/exposure.md), moved here from
+  # the dev project: the production image and settings, answering only the two ingest paths
+  # whatever the Host header says. Its own profile, so it runs only when started on purpose
+  # (`./dev prod tracker start`); tracking is on hold, so it stays stopped for now.
+  ingest:
+    extends: { file: compose.yaml, service: web }
+    <<: *prod-image
+    profiles: ["tracker"]
+    environment:
+      <<: *prod-env
+      DJANGO_ALLOWED_HOSTS: "127.0.0.1,localhost"  # plus TRAVEL_PUBLIC_HOSTS (settings.py)
+      DJANGO_CSRF_TRUSTED_ORIGINS: ""
+      TRAVEL_PUBLIC_SCOPE: tracker
+      TRAVEL_INGEST_ONLY: "true"  # settings.py refuses to start without the values above
+      # Secrets this service never uses.
+      OIDC_CLIENT_SECRET: ""
+      SMTP_PASSWORD: ""
+    volumes: !reset []  # no bulk storage
+    networks: !override [internal, edge]
+    ports:
+      - "127.0.0.1:8783:8000"
+    read_only: true
+    tmpfs: ["/tmp"]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    healthcheck:
+      start_period: 30s
+      start_interval: 2s
+    mem_limit: 512m
+    pids_limit: 100
+
+  # One-off management commands (`./dev prod manage …`): the production image as the OWNER
+  # role, with egress for dataset downloads. Never a long-running service.
+  tools:
+    extends: { file: compose.yaml, service: migrate }
+    <<: *prod-image
+    profiles: ["tools"]
+    environment:
+      <<: *prod-env
+      DB_USER: travel_owner
+      DB_PASSWORD: ${TRAVEL_OWNER_PASSWORD:?set in .env.prod}
+    command: ["python", "manage.py", "help"]
+    networks: !override [internal, egress, valhalla]
+    restart: "no"
+    mem_limit: 1536m
+
+networks:
+  # The internet-facing `ingest` service's own network (needed to publish its port).
+  edge: {}

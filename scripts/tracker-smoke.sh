@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # Smoke test of the internet-facing tracker endpoint (work-order item 8, docs/tracking/exposure.md).
 #
-#   ./dev tracker smoke                         the local `ingest` service (127.0.0.1:8783), as
+#   ./dev prod tracker smoke                    the local `ingest` service (127.0.0.1:8783), as
 #                                               the tunnel would call it
-#   ./dev tracker smoke https://<public host>   through Cloudflare and the tunnel (after "go")
+#   ./dev prod tracker smoke https://<host>     through Cloudflare and the tunnel (after "go")
+#
+# The `ingest` service belongs to the production stack (D-96); its settings come from .env.prod.
 #
 # Checks: every other path answers 404; the tracker endpoints answer, with HSTS and the other
 # security headers and no cookies; a bogus token is refused; locally, plain HTTP is redirected
@@ -14,28 +16,29 @@
 # service's log for both tokens. Tokens never appear on a command line: curl reads its
 # options, URLs and headers included, from standard input.
 set -euo pipefail
-cd "$(dirname "$0")/.."
+# shellcheck source=scripts/stack.sh
+source "$(dirname "$0")/stack.sh"
+cd "$REPO_ROOT"
 
 store=false
 base=""
 for arg in "$@"; do
   case "$arg" in
     --store) store=true ;;
-    -h|--help) sed -n '2,15p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,17p' "$0"; exit 0 ;;
     *) base="$arg" ;;
   esac
 done
 base="${base:-http://127.0.0.1:8783}"
 base="${base%/}"
 
-env_value() { grep -E "^$1=" .env 2>/dev/null | head -1 | cut -d= -f2- || true; }
-public_host="$(env_value TRAVEL_PUBLIC_HOSTS | cut -d, -f1)"
+public_host="$(prod_env_value TRAVEL_PUBLIC_HOSTS | cut -d, -f1)"
 local_mode=false
 extra_headers=()
 if [[ "$base" == http://127.0.0.1:* || "$base" == http://localhost:* ]]; then
   local_mode=true
   if [ -z "$public_host" ]; then
-    echo "TRAVEL_PUBLIC_HOSTS is not set in .env" >&2
+    echo "TRAVEL_PUBLIC_HOSTS is not set in $PROD_ENV_FILE" >&2
     exit 2
   fi
   # What cloudflared adds: the public Host, the visitor's scheme and address (TEST-NET-1).
@@ -163,8 +166,8 @@ fi
 
 echo "Tokens stay out of the logs:"
 sleep 1
-if docker compose -f compose.yaml -f compose.dev.yaml --profile tracker logs --no-color \
-  --since "$started" ingest > "$work/log" 2>/dev/null && [ -s "$work/log" ]; then
+if prod_compose --profile tracker logs --no-color --since "$started" ingest > "$work/log" \
+  2>/dev/null && [ -s "$work/log" ]; then
   if grep -qF "$bogus" "$work/log"; then
     fail "the bogus token is in the ingest log"
   else
