@@ -73,9 +73,11 @@ export const useEditorStore = create<Store>((set, get) => {
     set({ state: next, past: [...past, state].slice(-MAX_UNDO), future: [], error: null });
   }
 
-  async function route(plan: RoutePlan | null) {
+  /** Route `plan` on `base` (the current line, or a split copy of it) and commit the result. */
+  async function route(plan: RoutePlan | null, base?: EditorState) {
     if (!plan || get().busy) return;
-    const before = get().state;
+    const current = get().state;
+    const before = base ?? current;
     if (!needsRoute(plan)) {
       commit(moveAlone(before, pt(plan.chain, 0), pt(plan.targets, 0)));
       return;
@@ -90,7 +92,7 @@ export const useEditorStore = create<Store>((set, get) => {
       return;
     }
     // The user may have undone or left while the request was out: apply only to the same line.
-    if (get().state !== before) {
+    if (get().state !== current) {
       set({ busy: false });
       return;
     }
@@ -126,7 +128,10 @@ export const useEditorStore = create<Store>((set, get) => {
       set({ state: future[0], past: [...past, state], future: future.slice(1) });
     },
     move: (index, to, zoom) => route(planMove(get().state, index, to, zoom)),
-    dragLine: (grabbed, to, zoom) => route(planDragLine(get().state, grabbed, to, zoom)),
+    dragLine: async (grabbed, to, zoom) => {
+      const drag = planDragLine(get().state, grabbed, to, zoom);
+      if (drag) await route(drag.plan, drag.base);
+    },
     append: async (to) => {
       if (get().busy) return;
       const state = get().state;

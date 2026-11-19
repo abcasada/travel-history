@@ -3,8 +3,10 @@ import userEvent from "@testing-library/user-event";
 import { act } from "react";
 import { useMapStore } from "../map/store";
 import { ME } from "../test/fetch";
+import { setDesktopMedia } from "../test/media";
 import { lastBody, renderAt, requests } from "../test/render";
 import { EMPTY_MAP, makeDetail, makeLeg, makeStop } from "../test/trips";
+import { useEditorStore } from "./editor/editorStore";
 
 const MAP = { path: "/api/v1/trips/map", body: EMPTY_MAP };
 
@@ -208,6 +210,7 @@ test("viewers and people who can't edit the leg see versions only", async () => 
   renderAt("/trips/10/legs/200/route", routeRoutes([]), { ...ME, role: "viewer" } as typeof ME);
   expect(await screen.findByText("No route saved yet.")).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Propose a route" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Reshape on the map" })).not.toBeInTheDocument();
 });
 
 test("a via point picked on the map goes between start and end", async () => {
@@ -229,4 +232,90 @@ test("a via point picked on the map goes between start and end", async () => {
   );
   await user.click(screen.getByRole("button", { name: "Remove via 1" }));
   expect(screen.queryByText(/Via 1:/)).not.toBeInTheDocument();
+});
+
+// --- The drag editor (item 26): desktop only, lazy ---------------------------------------------
+
+test("the editor opens on the proposal, takes over the map and saves through saveEditedRoute", async () => {
+  const user = userEvent.setup();
+  const { fetchMock } = renderAt(
+    "/trips/10/legs/200/route",
+    routeRoutes([
+      { method: "POST", path: "/api/v1/routing/route", body: PROPOSAL },
+      { method: "POST", path: "/api/v1/legs/200/routes/edited", status: 201, body: {} },
+    ]),
+  );
+  await user.click(await screen.findByRole("button", { name: "Propose a route" }));
+  await screen.findByText(/^Proposed:/);
+  await user.click(await screen.findByRole("button", { name: "Reshape on the map" }));
+  expect(await screen.findByTestId("editor-status")).toHaveTextContent("3 points, 2 fixed");
+  expect(screen.getByTestId("editor-attribution")).toHaveTextContent("© OpenStreetMap");
+  // The editor draws its own line; the proposal layer and the propose form step aside.
+  expect(screen.queryByTestId("source-leg-proposal")).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Propose a route" })).not.toBeInTheDocument();
+  // Nothing edited yet: nothing to save; an edit (a click on the line) enables it.
+  const save = screen.getByRole("button", { name: "Save the edited route" });
+  expect(save).toBeDisabled();
+  act(() => useEditorStore.getState().insert([-97.41, 37.95]));
+  expect(screen.getByTestId("editor-status")).toHaveTextContent("4 points, 3 fixed");
+  await user.click(screen.getByRole("button", { name: "Undo" }));
+  expect(screen.getByTestId("editor-status")).toHaveTextContent("3 points");
+  await user.keyboard("U");
+  expect(screen.getByTestId("editor-status")).toHaveTextContent("4 points");
+  await user.type(screen.getByLabelText("Note for this version"), "by hand");
+  await user.click(save);
+  await waitFor(() =>
+    expect(lastBody(fetchMock, "POST", "/api/v1/legs/200/routes/edited")).toMatchObject({
+      note: "by hand",
+      pieces: [
+        { source: "proposal", start: 0, end: 0 },
+        { source: "drawn" },
+        { source: "proposal", start: 1, end: 2 },
+      ],
+    }),
+  );
+  expect(await screen.findByRole("button", { name: "Reshape on the map" })).toBeInTheDocument();
+});
+
+test("the editor starts from the current version when there is no proposal", async () => {
+  const user = userEvent.setup();
+  const { fetchMock } = renderAt("/trips/10/legs/200/route", [
+    MAP,
+    TRIP,
+    { path: "/api/v1/legs/200", body: { ...ROAD_LEG, current_route_id: 9 } },
+    { path: "/api/v1/legs/200/routes", body: [] },
+    {
+      path: "/api/v1/routes/9",
+      body: {
+        id: 9,
+        engine: "valhalla",
+        attribution: "Route: Valhalla",
+        waypoints: [
+          { lon: -97.33, lat: 37.69, role: "start" },
+          { lon: -97.61, lat: 38.84, role: "end" },
+        ],
+        geometry: {
+          type: "MultiLineString",
+          coordinates: [
+            [
+              [-97.33, 37.69],
+              [-97.61, 38.84],
+            ],
+          ],
+        },
+      },
+    },
+  ]);
+  await user.click(await screen.findByRole("button", { name: "Reshape on the map" }));
+  expect(await screen.findByTestId("editor-status")).toHaveTextContent("2 points, 2 fixed");
+  expect(requests(fetchMock)).toContain("GET /api/v1/routes/9");
+  await user.click(screen.getByRole("button", { name: "Discard changes" }));
+  expect(await screen.findByRole("button", { name: "Propose a route" })).toBeInTheDocument();
+});
+
+test("the editor is desktop-only", async () => {
+  setDesktopMedia(false);
+  renderAt("/trips/10/legs/200/route", routeRoutes([]));
+  expect(await screen.findByRole("button", { name: "Propose a route" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Reshape on the map" })).not.toBeInTheDocument();
 });

@@ -49,7 +49,7 @@ object under §6.2. "Participant" means a Member whose person participates in th
 | Participants: add (only people the editor can see) / remove | vis | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Notes, photos, own legs, own tags, own GPS track: add | vis + participant | ✅ | ✅ | ❌ | ❌ | ❌ |
 | Contributions: edit / delete (while the author may still contribute, D-89) | own | own | own | ❌ | ❌ | ❌ |
-| A leg's route: save a new version (never change one, rule 5) | as editing the leg | same | own contributed legs | ❌ | ❌ | ❌ |
+| A leg's route: save a new version (never change one, rule 5; proposals and the drag editor) | as editing the leg | same | own contributed legs | ❌ | ❌ | ❌ |
 | Routing proposals (`POST /routing/route`) and their 10-minute cache | own | own | own | own | ❌ | ❌ |
 | Contributions of someone no longer on the trip: delete (not edit; Q-16) | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Stops: add / edit / delete (place: own, or already on the trip) | vis | ✅ | ❌ | ❌ | ❌ | ❌ |
@@ -190,6 +190,12 @@ Notes:
     `route_insert`, `routesimp_insert` and `leg_update` check it again. The geometry comes from
     the caller's own cached proposal, so one user can't save another's drawing; a leg the caller
     can't see answers 404.
+  - `POST /legs/{id}/routes/edited` (item 26, D-93) is the same action ("A leg's route: save a
+    new version") with the same check; proposal pieces come only from the caller's own cache
+    (another user's are "expired", 409) and version pieces only from saved versions of the same
+    leg (else 422), so the editor can't copy geometry from a leg the caller can't edit. Tests:
+    `tests/permissions/test_route_edits_api.py` (every actor; the SQL side is the existing
+    `add_route_version` row, a `hand_edited` insert).
   - Tests: `tests/permissions/test_routing_api.py` (both endpoints × every actor, the
     own-proposal rule, versions never changed) and the matrix rows `propose_route`,
     `view_alice_route_cache`, `delete_alice_route_cache`, `save_route_version_on_bobs_leg`

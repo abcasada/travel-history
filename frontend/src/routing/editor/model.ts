@@ -163,10 +163,19 @@ export function planMove(state: EditorState, index: number, to: Coord, zoom: num
 }
 
 /** A point dragged off the line where it was grabbed: the closest point of the line moves. */
-export function planDragLine(state: EditorState, grabbed: Coord, to: Coord, zoom: number) {
-  const line = coords(state);
-  const index = closestPointIndexIn(line, 0, line.length, grabbed);
-  return index === undefined ? null : planMove(state, index, to, zoom);
+/**
+ * A point of the line dragged from where it was grabbed. gpx.studio moves the closest track
+ * point; a drawn or sparse line may have none nearby, so the line is first split there.
+ * Returns the split line the plan applies to.
+ */
+export function planDragLine(
+  state: EditorState,
+  grabbed: Coord,
+  to: Coord,
+  zoom: number,
+): { base: EditorState; plan: RoutePlan } | null {
+  const split = splitAt(state, grabbed);
+  return split ? { base: split.state, plan: planMove(split.state, split.index, to, zoom) } : null;
 }
 
 /** Appending a point after the end of the line. */
@@ -272,24 +281,24 @@ export function deleteWithoutRoute(state: EditorState, index: number, zoom: numb
  * point of the line if it is within a meter, else a drawn point on the line.
  */
 export function insertAnchor(state: EditorState, at: Coord): EditorState {
+  return splitAt(state, at)?.state ?? state;
+}
+
+/** The line with a fixed anchor at the point closest to `at`, and that anchor's index. */
+function splitAt(state: EditorState, at: Coord): { state: EditorState; index: number } | null {
   const line = coords(state);
   const hit = closestSegment(line, at);
-  if (!hit) return state;
+  if (!hit) return null;
   const points = [...state.points];
   for (const index of [hit.segment, hit.segment + 1]) {
     if (distance(pt(line, index), hit.at) <= SAME_POINT_METERS) {
       points[index] = { ...pt(points, index), zoom: 0 };
-      return { ...state, points };
+      return { state: { ...state, points }, index };
     }
   }
-  points.splice(hit.segment + 1, 0, {
-    lon: hit.at[0],
-    lat: hit.at[1],
-    zoom: 0,
-    src: DRAWN,
-    i: -1,
-  });
-  return { ...state, points };
+  const index = hit.segment + 1;
+  points.splice(index, 0, { lon: hit.at[0], lat: hit.at[1], zoom: 0, src: DRAWN, i: -1 });
+  return { state: { ...state, points }, index };
 }
 
 function ensureEnds(state: EditorState): EditorState {

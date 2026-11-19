@@ -4,6 +4,7 @@ const ROWS: [string, string][] = [
   ["[ and ]", "Narrow or widen the list"],
   ["\\", "Hide or show the list"],
   ["e", "Edit the open trip"],
+  ["u / Shift+U", "Undo or redo in the route editor"],
   ["Esc", "Close dialogs, cancel"],
 ];
 

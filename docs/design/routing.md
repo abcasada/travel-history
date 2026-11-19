@@ -46,7 +46,7 @@ write) and purged hourly by the `routing_cache` user job. Settings: `VALHALLA_DA
 Saving: `POST /legs/{leg_id}/routes {waypoints, note}` takes geometry and provenance from the
 caller's own cached proposal for exactly those waypoints (409 once it expired), never from the
 client; only drive, bus and other legs take a road route (422). The hand-edited geometry of the
-drag editor (item 26) will extend this endpoint.
+drag editor (item 26) saves through `POST /legs/{leg_id}/routes/edited` (§13.4, D-93).
 
 ### 13.2 Saved routes are frozen
 
@@ -91,6 +91,37 @@ the toolbar):
   `routed` if it came straight from a proposal), waypoints = the zoom-0 anchors.
 - Attribution: gpx.studio's MIT notice is kept in the ported files' headers and in
   `THIRD_PARTY_NOTICES.md`.
+
+**As built (item 26, D-93, pending Adam).** Ported from gpx.studio commit 2e0edc7 (2026-11-15)
+into `frontend/src/routing/editor/`:
+
+- `geometry.ts` (from gpx-rs `anchors.rs`, `simplify.rs`, `utils.rs` and `closest-point.ts`):
+  iterative RDP with selection distances, `anchorZoom`, `computeAnchors`, closest point/segment.
+- `model.ts` (the rules of `routing-controls.ts`): an immutable state of points, each with its
+  anchor zoom (or none) and its source (a cached proposal, a saved version, or drawn); plans for
+  move, drag-the-line, append and delete; `applyRoute` splices an answer between the kept
+  anchors exactly as `routeBetweenAnchors`; `toPieces` turns the line into save pieces.
+  Adaptations: dragging the line first splits it at the grabbed place (a straight drawn line has
+  no track point there); clicking the line marks a point within 1 m or inserts one.
+- `controller.ts` (the map half of `routing-controls.ts`): one GeoJSON source of anchors
+  filtered by `minZoom`, a wide invisible hit line, the temporary anchor that follows the
+  pointer along the line, drag with pan disabled; shift-click or right-click deletes (no popup),
+  a click elsewhere appends. Mouse only: the editor is desktop-only.
+- `editorStore.ts` (zustand): undo/redo of whole states (100 steps; `u` / `Shift+U`), one
+  routing request in flight (edits while routing are ignored; requests go out on release, not
+  while dragging, so no debounce is needed), errors snap the line back.
+- `RouteEditor.tsx` / `RouteEditorLayer.tsx`: lazy chunks rendered only in the desktop shell from
+  the leg route page. "Reshape on the map" starts from the unsaved proposal, else the current
+  version (its control points become fixed anchors), else a straight line between the leg's
+  stops. While editing, trip-line clicks don't navigate and the propose form is hidden.
+
+Saving (`POST /legs/{id}/routes/edited`, `travel/trips/route_edits.py`): proposal slices come
+from the caller's own cache, version slices from this leg's saved versions, drawn points are
+validated (ranges, ≤ 10,000 drawn, ≤ 2,000 pieces, ≤ 200,000 points, ≤ 20,000 km). The version
+is `hand_edited` (or `routed` for exactly one whole proposal) with `Route.sources` (per source:
+engine, points, verified), engine = the one engine or `mixed`, the oldest road-data date and
+every provider's credit. Expired proposals: 409 with their piece positions; the editor resends
+them once as drawn points with an `engine` claim (credit only).
 
 ### 13.5 Valhalla service and tile-build strategy
 

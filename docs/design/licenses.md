@@ -16,7 +16,7 @@ sources*, `/app/about`; the loaded reference datasets come from `dataset_version
 | Valhalla | MIT | notice in THIRD_PARTY_NOTICES |
 | OpenRouteService results | CC-BY-SA 4.0 | "© openrouteservice by HeiGIT, data © OpenStreetMap" where ORS-derived routes are shown |
 | FOSSGIS OSRM | service terms | attribution + "fix the map" link when used |
-| gpx.studio (ported anchor routing) | MIT | copyright + permission notice kept in ported file headers and THIRD_PARTY_NOTICES |
+| gpx.studio (ported anchor routing: `frontend/src/routing/editor/geometry.ts`, `model.ts`, `controller.ts`; item 26) | MIT | copyright + permission notice kept in ported file headers and THIRD_PARTY_NOTICES |
 | MapLibre GL JS | BSD-3-Clause | notice |
 | react-map-gl | MIT | notice |
 | OurAirports | public domain | courtesy credit |

@@ -169,9 +169,14 @@ No form library. Every editor follows the same shape (see `TripFieldsForm`, `Sto
   - The leg's route view `/trips/:tripId/legs/:legId/route` is the editor's slot:
     `routing/LegRoutePage.tsx` (controls, versions; "Propose a route" with via points from
     item 25) and `routing/LegRouteLayer.tsx` (map: the current version, and the unsaved proposal
-    from `routing/store.ts`, a zustand store shared across the panels; item 26 adds anchors and
-    the live route). A proposal always shows its provider and attribution. Item 26 lazy-loads its editor component there, desktop only. Saving always
-    creates a new version (rule 5); nothing re-routes a saved one.
+    from `routing/store.ts`, a zustand store shared across the panels). A proposal always shows
+    its provider and attribution. Item 26's drag editor lives in `routing/editor/` and is
+    lazy-loaded from both halves only in the desktop shell (`useShellMode`); while
+    `useRoutingStore().editingLegId` is set, `RouteEditorLayer` replaces the leg's layers and
+    trip-line clicks don't navigate. A framework-free map controller (not react-map-gl
+    `<Source>`s) draws its line and anchors, so jsdom tests cover the model and store, and e2e
+    covers the dragging. Saving always creates a new version (rule 5); nothing re-routes a saved
+    one.
 
 ## 6. Shells and platform code
 
