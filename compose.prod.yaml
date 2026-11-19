@@ -25,6 +25,11 @@ x-prod-image: &prod-image
 
 services:
   db:
+    # Over TCP: during the first initialisation the image's temporary server listens on the
+    # socket only, so a socket check reports ready before the real server accepts connections
+    # (the first deploy's migrate was refused that way).
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d travel"]
     mem_limit: 1536m
 
   migrate:
