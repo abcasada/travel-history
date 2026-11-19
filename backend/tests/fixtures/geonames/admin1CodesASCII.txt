@@ -1,0 +1,6 @@
+# SYNTHETIC test subset in GeoNames dump format (fake places and coordinates)
+US.KS	Kansas	Kansas	4273857
+US.TX	Texas	Texas	4736286
+US.OK	Oklahoma	Oklahoma	4544379
+XS.01	Synth Canton	Synth Canton	9100002
+XS.02	Île-de-Synth	Ile-de-Synth	9100003

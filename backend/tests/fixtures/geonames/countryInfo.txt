@@ -1,0 +1,4 @@
+# SYNTHETIC test subset in GeoNames dump format (fake places and coordinates)
+#ISO	ISO3	ISO-Numeric	fips	Country	Capital	Area(in sq km)	Population	Continent	tld	CurrencyCode	CurrencyName	Phone	Postal Code Format	Postal Code Regex	Languages	geonameid	neighbours	EquivalentFipsCode
+US	USA	840	US	United States	Synth Capital	1	1	NA	.us	USD	Dollar	1			en-US	6252001		
+XS	XSY	999	XS	Synthetic Republic	Paristown	1	1	EU	.xs	XSD	Synth	99			xs	9100001		

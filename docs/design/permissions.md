@@ -173,8 +173,8 @@ Notes:
     guard `app.guard_user_update` already allows linking only to a person the account manages
     (or by the Admin), so an existing person can't be claimed.
   - `GET /trips/map` uses the trips list's filters over `policy.visible_trips`; stops and legs
-    come from those trips only, under RLS. `GET /reference/airports` is reference data (no RLS),
-    for signed-in family members.
+    come from those trips only, under RLS. `GET /reference/airports` and `GET /reference/places`
+    (city search, item 14) are reference data (no RLS), for signed-in family members.
   - Legs' `origin_stop_id`/`destination_stop_id` accept only a stop of the same trip that the
     caller can see; hidden, missing and other-trip stops all answer 422 `unknown stop`.
   - Tests: `tests/permissions/test_catalog_ui_api.py` (every new endpoint × every actor, what

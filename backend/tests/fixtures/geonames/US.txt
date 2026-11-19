@@ -1,0 +1,7 @@
+# SYNTHETIC test subset in GeoNames dump format (fake places and coordinates)
+9000003	Synthville	Synthville		36.0	-95.0	P	PPL	US		OK				900		0	America/Chicago	2026-11-01
+9000101	Synthville Corner	Synthville Corner		38.5	-99.0	P	PPL	US		KS				40		0	America/Chicago	2026-11-01
+9000102	Synthville Heights	Synthville Heights		37.6	-97.4	P	PPLX	US		KS				0		0	America/Chicago	2026-11-01
+9000103	Old Synthville	Old Synthville		38.1	-98.1	P	PPLQ	US		KS				0		0	America/Chicago	2026-11-01
+9000104	Synthville Creek	Synthville Creek		38.2	-98.2	H	STM	US		KS				0		0	America/Chicago	2026-11-01
+9000105	Tinyton	Tinyton		39.0	-100.0	P	PPL	US		KS				0		0	America/Chicago	2026-11-01

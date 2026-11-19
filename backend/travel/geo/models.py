@@ -2,7 +2,9 @@
 read-only for the app role (table prefix `geo_`, see travel/core/db_privileges.py). No RLS."""
 
 from django.contrib.gis.db import models as gis
+from django.contrib.postgres.indexes import OpClass
 from django.db import models
+from django.db.models.functions import Upper
 
 
 class Airport(models.Model):
@@ -119,7 +121,9 @@ class UsCounty(models.Model):
 
 
 class GeoNamesPlace(models.Model):
-    """GeoNames cities500 (CC BY 4.0, attribution required)."""
+    """GeoNames cities500 plus the US populated places below 500 people (CC BY 4.0, attribution
+    required). `admin1_name` and `country_name` are copied from the two tables below at load
+    time so the city search needs no joins (travel/geo/gazetteer.py)."""
 
     geonameid = models.BigIntegerField(primary_key=True)
     name = models.CharField(max_length=200)
@@ -132,6 +136,46 @@ class GeoNamesPlace(models.Model):
     admin2_code = models.CharField(max_length=80, blank=True)
     population = models.BigIntegerField(default=0)
     timezone = models.CharField(max_length=40, blank=True)
+    admin1_name = models.CharField(max_length=200, blank=True)
+    country_name = models.CharField(max_length=200, blank=True)
+
+    class Meta:
+        # Prefix search ("wich" -> Wichita): `istartswith` compiles to UPPER(col) LIKE 'X%',
+        # which these pattern-ops indexes serve whatever the database collation is.
+        indexes = [
+            models.Index(
+                OpClass(Upper("name"), name="text_pattern_ops"), name="geo_gnplace_name_prefix"
+            ),
+            models.Index(
+                OpClass(Upper("asciiname"), name="text_pattern_ops"),
+                name="geo_gnplace_ascii_prefix",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class GeoNamesCountry(models.Model):
+    """GeoNames `countryInfo.txt`: country names for the city search (CC BY 4.0)."""
+
+    iso_a2 = models.CharField(max_length=2, primary_key=True)
+    iso_a3 = models.CharField(max_length=3, blank=True)
+    name = models.CharField(max_length=200)
+    geonameid = models.BigIntegerField(null=True, blank=True)
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class GeoNamesAdmin1(models.Model):
+    """GeoNames `admin1CodesASCII.txt`: states and provinces, keyed "US.KS" (country code and
+    GeoNames' admin-1 code, which is often a FIPS number outside the US)."""
+
+    code = models.CharField(max_length=32, primary_key=True)
+    name = models.CharField(max_length=200)
+    asciiname = models.CharField(max_length=200, blank=True)
+    geonameid = models.BigIntegerField(null=True, blank=True)
 
     def __str__(self) -> str:
         return self.name

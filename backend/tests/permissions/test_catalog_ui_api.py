@@ -41,6 +41,9 @@ CASES = {
     "search_airports": (
         "GET", f"{API}/reference/airports?q=SYN", None, (200, 200, 200, 200, 200, *R)
     ),
+    "search_places": (
+        "GET", f"{API}/reference/places?q=Syn", None, (200, 200, 200, 200, 200, *R)
+    ),
 }  # fmt: skip
 
 PARAMS = [
