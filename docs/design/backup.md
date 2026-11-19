@@ -24,7 +24,7 @@ like "PLAN.md §N" still resolve; the section map in PLAN.md says which file hol
 
 ### 22.2 Restore (tested)
 
-`./dev restore-test` (part of the phase-1 acceptance): generates a throwaway age key, runs a real
+`./dev restore-test` and `./dev prod restore-test` (part of the phase-1 acceptance; the production one since item 40a): generates a throwaway age key, runs a real
 backup with it, restores into a scratch PostGIS container initialized by `db/init`, compares the row
 count of every table plus the RLS policy and `app` function counts with the source, and verifies
 each raw file's checksum after decryption and decompression. Real restore runbook in

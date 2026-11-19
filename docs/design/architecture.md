@@ -59,6 +59,13 @@ flowchart LR
 
 Key points:
 
+- **Two stacks, one set of service definitions (D-96).** `compose.yaml` holds the services;
+  `compose.dev.yaml` turns them into the development stack (project `travel-history`: source
+  mounts, runserver, mock OIDC, Mailpit, Vite, `127.0.0.1:8780` + LAN) and `compose.prod.yaml`
+  into the production stack (project `travel-history-prod`: its own DB volume, networks and
+  `.env.prod`, images built from a `git archive` of pushed `main` and tagged by commit, gunicorn
+  on `127.0.0.1:8784`, the tracker-only `ingest` on `127.0.0.1:8783`). No development command can
+  reach the production database ([production guide](../production.md)).
 - **One image, three roles.** `web`, `worker` and the one-shot `migrate` job run the same backend
   image. The production SPA is built in a Node stage of the same Dockerfile and served by
   Django (WhiteNoise) from the same origin, so session cookies and CSRF work without CORS.
@@ -74,8 +81,10 @@ Key points:
 - **Networks.** `db` is only on an `internal: true` network with no published ports. `web` and
   `worker` join that network, a default egress network (ORS, SMTP, dataset downloads, Web Push)
   and the external `valhalla` network.
-- **Storage.** PostgreSQL data in a named volume on the SSD. Raw import files, photo derivatives
-  and the backup outbox on the HDD under `/storage/hdd1/travel-history` (bind-mounted as `/bulk`).
+- **Storage.** PostgreSQL data in a named volume per stack on the SSD. Raw import files, photo
+  derivatives and the backup outbox under each stack's bulk directory, bind-mounted as `/bulk`:
+  the HDD's `/storage/hdd1/travel-history` by design; until the replacement disk is mounted,
+  `var/bulk` (dev, D-84) and `~/apps/travel-history-prod/bulk` (production) on the SSD.
 - **Containers run as non-root** (`user: ${APP_UID}:${APP_GID}`, matching the other apps so
   bind-mounted files stay owned by the host user), `cap_drop: [ALL]`, `no-new-privileges`,
   memory limits, and log rotation.

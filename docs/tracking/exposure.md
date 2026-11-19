@@ -27,18 +27,21 @@ phone ── HTTPS ── Cloudflare edge ── main tunnel ── cloudflared 
   setups that use `?token=`. Payloads hold the position, time, accuracy, speed and battery.
   This is the same trust you already place in Cloudflare for the other sites. Nothing is stored
   at Cloudflare on purpose, but it is in the path.
-- **The `ingest` service** (in `compose.yaml`, profile `tracker`) runs the production image with
-  production settings and answers only the two tracker paths, whatever the Host header says.
+- **The `ingest` service** belongs to the production stack (`compose.prod.yaml`, profile
+  `tracker`, D-96; [production guide](../production.md)). It runs the deployed production image
+  with production settings and answers only the two tracker paths, whatever the Host header says.
   It is published on `127.0.0.1:8783` only. It has no bulk storage, a read-only root
   filesystem, no OIDC or SMTP secrets, and dropped capabilities.
-- **The dev stack is untouched.** It keeps `127.0.0.1:8780` and the LAN address. `./dev up` and
-  `./dev down` don't touch `ingest`, so work in progress never reaches the internet. Only
-  `./dev tracker deploy` rebuilds and restarts it.
+- **The dev stack is never behind the tunnel.** It keeps `127.0.0.1:8780` and the LAN address,
+  has no `ingest` service and no public host names, and a DEBUG server answers 404 to any host
+  it doesn't know. Work in progress never reaches the internet: `ingest` runs the image of the
+  last `./dev prod deploy`, which builds only pushed `main`. Points it receives land in the
+  production database.
 
 ## The change for Adam (after you reply "go")
 
-Nothing on the server needs to change: the `ingest` service is already running on
-`127.0.0.1:8783` (`./dev tracker ps`). Everything below is in the Cloudflare dashboard.
+On the server, start the service with `./dev prod tracker start` (it runs on `127.0.0.1:8783`;
+`./dev prod tracker ps` shows it). Everything below is in the Cloudflare dashboard.
 
 ### 1. Tunnel route
 
@@ -89,7 +92,7 @@ Don't create any A or AAAA record for `travel`.
 ### 3. Bookkeeping
 
 In `~/infra/TUNNELS.md`, update the travel-history row to read:
-`8783 (tracker endpoint; the full app moves to 8780 at go-live) | travel-history |
+`8783 (tracker endpoint; the full app moves to 8784 at go-live) | travel-history |
 ~/apps/travel-history | travel.adamcasada.com (tracker paths only) | live <date>`. Adam makes
 this edit, or approves it.
 
@@ -104,7 +107,7 @@ Do this right after the route is live.
    **Location trackers**. Name the token `Outside test` and choose **Colota** (a Colota token
    works on both endpoints). Choose **Create token**, copy the token, then choose **Done, hide the
    token**.
-2. **Through Cloudflare, from the server:** run `./dev tracker smoke https://travel.adamcasada.com`
+2. **Through Cloudflare, from the server:** run `./dev prod tracker smoke https://travel.adamcasada.com`
    and paste the token at the hidden prompt. The request leaves the server, reaches Cloudflare
    and comes back through the tunnel. Expect `PASS`. The script checks:
    - every other path returns 404;
@@ -127,7 +130,7 @@ If something fails:
 |---|---|
 | 411 on the token checks | **Disable Chunked Encoding** is off on the route. Turn it on. |
 | 403 with a Cloudflare HTML page | A zone security feature (Bot Fight Mode or a WAF rule) is challenging the requests. A skip rule for `/api/v1/ingest/` on this host is a zone change, so it's Adam's call. The ntfy phone app works through the same zone, so this is unlikely. |
-| 502 or 1033 | The `ingest` service isn't running (`./dev tracker ps`, then `./dev tracker deploy`), or the route's URL is wrong. |
+| 502 or 1033 | The `ingest` service isn't running (`./dev prod tracker ps`, then `./dev prod tracker start`), or the route's URL is wrong. |
 | 404 on the token checks | The route's Path field doesn't match. Compare it with the table above. |
 | "site can't be found" | The home router remembers the failed lookup for up to 30 minutes (`~/infra/TUNNELS.md`). Test on mobile data. |
 
@@ -135,9 +138,9 @@ If something fails:
 
 Any one of these is enough. They're listed fastest first.
 
-1. **Server-side switch, no dashboard needed:** `./dev tracker stop`. The tunnel then answers 502.
+1. **Server-side switch, no dashboard needed:** `./dev prod tracker stop`. The tunnel then answers 502.
    The phones keep their points queued and send them once the endpoint is back
-   (`./dev tracker deploy`).
+   (`./dev prod tracker start`).
 2. **Dashboard:** delete the `travel.adamcasada.com` route on the tunnel, then delete the
    `travel` CNAME under **DNS → Records** if it remains.
 3. **A token leaked:** revoke it on **Location trackers**. This takes effect at once and is
@@ -172,24 +175,23 @@ The [setup guides](README.md) also cover revoking, what is stored, and troublesh
 
 ## Operating notes
 
-- **Deploying changes:** the `ingest` service runs the image built at its last deploy. After
-  any backend change, run `./dev tracker deploy`. It rebuilds, restarts, waits for the health
-  check and runs the local smoke test. The phones lose nothing during the restart: they retry.
-- **Logs:** `./dev tracker logs`. The access log prints paths without query strings, and every
-  application log line is redacted.
-- **Smoke test, any time:** `./dev tracker smoke` checks the local service the way the tunnel
-  calls it, including the plain-HTTP redirect and unknown-host checks. Add a token
+- **Deploying changes:** the `ingest` service runs the image of the last production deploy.
+  `./dev prod deploy` (pushed `main` only) rebuilds, migrates and restarts it if it was running.
+  The phones lose nothing during the restart: they retry.
+- **Logs:** `./dev prod tracker logs`. The access log prints paths without query strings, and
+  every application log line is redacted.
+- **Smoke test, any time:** `./dev prod tracker smoke` checks the local service the way the
+  tunnel calls it, including the plain-HTTP redirect and unknown-host checks. Add a token
   (`TRACKER_SMOKE_TOKEN` or the hidden prompt) to check that tokens are accepted. Add `--store`
-  only with a synthetic account: it stores one synthetic point.
-- **Dev and production stacks:**
-  - Both stacks are the same compose project with the same database volume, and `web` is one
-    service. They never run at the same time and their port `127.0.0.1:8780` never conflicts.
-  - To switch, run `./dev down && docker compose -f compose.yaml up -d --build`. To switch back,
-    run `docker compose -f compose.yaml down && ./dev up`.
-  - `ingest` (`127.0.0.1:8783`) runs alongside either one. Start it with
-    `docker compose -f compose.yaml --profile tracker up -d ingest` under the production stack.
-  - The dev stack uses `8780` (on `127.0.0.1` and the LAN address), `8781`, `8782` and `5173`
-    (LAN only). Nothing else uses `8783`.
+  only with a synthetic account: it stores one synthetic point. `./dev tracker …` is the same
+  command.
+- **Dev and production stacks (D-96):**
+  - They are separate compose projects with separate databases: development is
+    `travel-history` (`./dev up`, `127.0.0.1:8780` and the LAN address, `8781`, `8782`, `5173`),
+    production is `travel-history-prod` (`./dev prod …`, web on `127.0.0.1:8784`, `ingest` on
+    `127.0.0.1:8783`). They run side by side; nothing else uses `8783` or `8784`.
+  - Device tokens live in the database of the stack that created them. Tokens made in the dev
+    app work only once item 40b has copied them into production.
 - **Client addresses:** `ingest` takes the per-address rate limit's address from
   `CF-Connecting-IP`. Cloudflare sets that header, and clients can't set it through Cloudflare.
   Trusting it is safe because only the server itself and this app's containers can reach the
@@ -200,19 +202,19 @@ The [setup guides](README.md) also cover revoking, what is stored, and troublesh
 - **If the route ever points at the dev server by mistake,** every path on the public hostname
   answers 404, the tracker paths included. A server running with DEBUG never answers the public
   hostname.
-- **Go-live (phase 8):**
-  - point the route at `localhost:8780` with no path rule;
-  - set `TRAVEL_PUBLIC_SCOPE=all`, `DJANGO_BEHIND_TLS_PROXY=true` and
-    `RATELIMIT_CLIENT_IP_HEADER=CF-Connecting-IP` for the production `web`;
-  - remove the LAN binding;
+- **Go-live (item 40e):**
+  - point the route at `localhost:8784` (the production `web`) with no path rule;
+  - set `TRAVEL_PUBLIC_SCOPE=all` in `.env.prod` and run `./dev prod up` (production already
+    forces `DJANGO_BEHIND_TLS_PROXY=true`, HSTS and `RATELIMIT_CLIENT_IP_HEADER=CF-Connecting-IP`,
+    and has no LAN binding);
   - retire `ingest`, or keep it behind a tracker-only path rule.
 
 ## How each item 8 condition is met
 
 | Condition | Where |
 |---|---|
-| Only the tracker paths routed; everything else 404 until go-live | App guard `backend/travel/core/exposure.py`, which is on by default (`TRAVEL_PUBLIC_SCOPE=tracker`) for `TRAVEL_PUBLIC_HOSTS`. Ingest-only mode in the `ingest` service. Tunnel path rule as a second layer. Tests: `backend/tests/test_exposure.py`. Live check: `./dev tracker smoke`. |
-| Production settings: DEBUG off, allowed hosts, HTTPS only, HSTS, security headers | The `ingest` service's environment in `compose.yaml`. `settings.py` refuses to start an ingest-only server without them. The response headers are HSTS (1 year), nosniff, X-Frame-Options DENY, Referrer-Policy, CSP and COOP, plus no-store. |
+| Only the tracker paths routed; everything else 404 until go-live | App guard `backend/travel/core/exposure.py`, which is on by default (`TRAVEL_PUBLIC_SCOPE=tracker`) for `TRAVEL_PUBLIC_HOSTS`. Ingest-only mode in the `ingest` service. Tunnel path rule as a second layer. Tests: `backend/tests/test_exposure.py`. Live check: `./dev prod tracker smoke`. |
+| Production settings: DEBUG off, allowed hosts, HTTPS only, HSTS, security headers | The `ingest` service's environment in `compose.prod.yaml`. `settings.py` refuses to start an ingest-only server without them. The response headers are HSTS (1 year), nosniff, X-Frame-Options DENY, Referrer-Policy, CSP and COOP, plus no-store. |
 | T2 rate limiter on these paths | Per address (600/min, keyed on `CF-Connecting-IP`) and per token (120/min), both before the token lookup (D-77, D-82). |
 | Per-device write-only tokens, hashed at rest, revocable | SHA-256 only, CHECK constraint, revocation final (D-82). |
 | Request size cap and strict schema validation | 5 MB and 1,000 points, length required, whole-request rejection (D-82). |

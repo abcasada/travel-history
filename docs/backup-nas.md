@@ -11,13 +11,17 @@ age-keygen -o travel-backup.key        # install age from your OS package manage
 grep 'public key' travel-backup.key    # -> age1...
 ```
 
-- Put the **public** key (`age1…`) into the server's `.env` as `AGE_RECIPIENT=age1...`, then
-  `docker compose -f compose.yaml -f compose.dev.yaml up -d backup` (or `./dev up`).
+- Put the **public** key (`age1…`) into the production stack's
+  `~/apps/travel-history-prod/.env.prod` as `AGE_RECIPIENT=age1...`, then `./dev prod up`
+  ([production guide](production.md)). The development stack's `.env` takes the same line if
+  you want its data backed up too (`./dev up`).
 - Store `travel-backup.key` (the **private** key) in your password manager **and** on paper or
   an offline drive. Without it the backups are unreadable — by design, including for the server.
 - Until `AGE_RECIPIENT` is set, the nightly job logs a warning and writes nothing.
 
-Check it works: `./dev backup-now`, then look in `/storage/hdd1/travel-history/backup-outbox/`.
+Check it works: `./dev prod backup-now`, then look in
+`~/apps/travel-history-prod/bulk/backup-outbox/` (on the HDD's
+`/storage/hdd1/travel-history-prod/backup-outbox/` once the replacement disk is mounted, D-84).
 
 ## 2. Let the NAS read the outbox (read-only, nothing else)
 

@@ -23,11 +23,13 @@ app's 60 GB SSD budget does not fit in the 28 GB free. Development uses small da
 Kansas extract, which fit. The design targets the Ryzen host (§21).
 
 **How the app fits the existing ingress.** It follows the house pattern (the shared tunnel lives
-in `~/infra/cloudflared`; routes are listed in `~/infra/TUNNELS.md`): the `web` container
-publishes `127.0.0.1:8780`, and at go-live the public hostname `travel.adamcasada.com →
-http://localhost:8780` is pointed at it (see the go-live checklist in §23, phase 8). Before
-go-live, the same hostname routes only the tracker paths to the `ingest` service on
-`127.0.0.1:8783` (work-order item 8, D-85, [exposure guide](../tracking/exposure.md)); adding
-the route is a shared-infrastructure change that Adam makes after approving it. Until
-Authentik with 2FA is live the app is **also** bound to the server's LAN address (`TRAVEL_LAN_BIND`, set in `.env`) so it is
-reachable only from the LAN and over WireGuard. No router port forwards are involved.
+in `~/infra/cloudflared`; routes are listed in `~/infra/TUNNELS.md`): the production stack's
+`web` container publishes `127.0.0.1:8784` only, and at go-live (item 40e) the public hostname
+`travel.adamcasada.com → http://localhost:8784` is pointed at it; `trips.adamcasada.com`
+redirects there (D-96, [production guide](../production.md)). Before go-live, the same hostname
+routes only the tracker paths to the production `ingest` service on `127.0.0.1:8783` (work-order
+item 8, D-85, [exposure guide](../tracking/exposure.md)); adding a route is a
+shared-infrastructure change that Adam makes after approving it. The development stack is a
+separate compose project on `127.0.0.1:8780` **and** the server's LAN address
+(`TRAVEL_LAN_BIND`, set in `.env`), reachable only from the LAN and over WireGuard, never behind
+the tunnel (D-28). No router port forwards are involved.

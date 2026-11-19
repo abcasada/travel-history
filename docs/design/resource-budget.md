@@ -11,7 +11,7 @@ after the first real import.
 | Component | CPU | RAM | Disk | Notes |
 |---|---|---|---|---|
 | Travel app: `web` | 1 core steady | 768 MB cap | — | gunicorn 2 workers × 4 threads |
-| Travel app: `ingest` (tracker endpoint before go-live, D-85) | idle except tracker posts | 512 MB cap (~190 MB measured 2026-11-17) | — | same image as `web`, 2 workers × 4 threads; retired or kept tracker-only at go-live |
+| Travel app: `ingest` (tracker endpoint before go-live, D-85; production stack since D-96) | idle except tracker posts | 512 MB cap (~190 MB measured 2026-11-17) | — | same image as `web`, 2 workers × 4 threads; retired or kept tracker-only at go-live |
 | Travel app: `worker` | 1 core steady, bursts to 3–4 during imports | 1.5 GB cap | — | streaming imports keep memory flat |
 | Travel app: `db` (PostGIS) | shared | 1.5 GB cap (`shared_buffers` 512 MB) | ~60 GB SSD at maturity | points table dominates (~100 B/row + indexes; 20 M points ≈ 5 GB) |
 | Travel app total | 2 steady, 4 burst | **≤ 4 GB** | 60 GB SSD | |
@@ -135,3 +135,43 @@ stack running.
 
 Worth it: the US small-town file costs ~70 MB of download and ~80 MB of DB for every small Kansas
 town GeoNames knows. Well inside the SSD budget.
+
+### 21.4 Measured: production and development stacks side by side (2026-11-19, work-order item 40a)
+
+The production stack (`travel-history-prod`, D-96) runs beside the development stack on the
+Xeon W3565 (11 GiB RAM, 4 GiB swap), with Authentik and the Kansas Valhalla running too and the
+other apps as usual. Production was freshly deployed and empty (item 40b copies the data in);
+development held Adam's real data (batch 33, 385,097 gazetteer places). `free -m` and
+`docker stats` (anonymous memory; page cache excluded), sampled idle:
+
+| What | Before production | With production |
+|---|---|---|
+| Host `available` | 5,777 MiB | **5,210 MiB** |
+| Host `used` / swap used | 5,650 MiB / 521 MiB | 6,217 MiB / 521 MiB |
+| All containers | — | 3,995 MiB |
+
+| Container | Measured | Cap (`mem_limit`) |
+|---|---|---|
+| prod `db` (empty) | 75 MiB | 1,536 MiB (`shared_buffers` 512 MB, as dev) |
+| prod `web` (gunicorn 2 × 4, read-only root) | 198 MiB | 768 MiB |
+| prod `worker` | 91 MiB | 1,536 MiB |
+| prod `backup` | 1 MiB | 512 MiB |
+| prod `ingest` (stopped; ~190 MiB when running, §21) | — | 512 MiB |
+| prod `tools` (one-off `./dev prod manage`) | — | 1,536 MiB |
+| dev `db` (real data) | 589 MiB | 1,536 MiB |
+| dev `web` (runserver) / `worker` | 168 / 107 MiB | 768 / 1,536 MiB |
+| dev `frontend` (Vite) / `oidc` / `mail` | 478 / 130 / 11 MiB | 1,280 / 512 / 128 MiB |
+| Authentik server / worker / PostgreSQL | 666 / 282 / 148 MiB | none |
+| Valhalla (Kansas) | 236 MiB | 1,024 MiB |
+
+- **Production costs about 370 MiB idle while empty.** With the real data (item 40b: about
+  0.6 GB of tables, mostly points and the gazetteer) its database should settle near the dev
+  database's 0.6 GiB, so expect about 0.9–1.2 GiB for production in steady use. That leaves
+  roughly 4.5 GiB available with everything running.
+- **The caps follow §21's per-service budget** (production ≤ 4.3 GiB if every service hit its
+  cap at once, which an import and a backup at the same moment could approach). They are
+  ceilings, not reservations; the host can't satisfy both stacks at their caps together, so
+  heavy development work (scale tests, imports in dev) shouldn't overlap production imports.
+- **Easy headroom when it gets tight:** once Adam enters data only in production (item 40c),
+  the dev `frontend`, `oidc` and `mail` (about 620 MiB) can stay stopped between builder
+  sessions. The Ryzen host (32 GB) removes the constraint.
