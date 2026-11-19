@@ -192,10 +192,10 @@ The [setup guides](README.md) also cover revoking, what is stored, and troublesh
     `127.0.0.1:8783`). They run side by side; nothing else uses `8783` or `8784`.
   - Device tokens live in the database of the stack that created them. Tokens made in the dev
     app work only once item 40b has copied them into production.
-- **Client addresses:** `ingest` takes the per-address rate limit's address from
-  `CF-Connecting-IP`. Cloudflare sets that header, and clients can't set it through Cloudflare.
+- **Client addresses:** the production services (`ingest` and `web`) take the per-address rate
+  limits' address from `CF-Connecting-IP`. Cloudflare sets that header, and clients can't set it through Cloudflare.
   Trusting it is safe because only the server itself and this app's containers can reach the
-  port without going through the tunnel. Docker 28 and later also blocks direct routing from the
+  ports without going through the tunnel. Docker 28 and later also blocks direct routing from the
   LAN to ports published on `127.0.0.1` (this host: Docker 29.8, with no `allow-direct-routing`
   override). The dev `web` (reachable on the LAN) keeps using the
   socket address.

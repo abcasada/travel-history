@@ -28,6 +28,10 @@ storage, and only code that is committed and pushed to `main`.
 | Tracker endpoint | `ingest`, `127.0.0.1:8783`, profile `tracker` (stopped while tracking is on hold) | none |
 | Sign-in | Authentik (item 40c) | mock provider (`:8781`) |
 
+Both stacks' `web` and `worker` also join the shared `valhalla` network, where the service name
+`web` is therefore ambiguous; nothing resolves it there (the dev Vite server reaches `web` over
+its own project's network). The databases are never on a shared network.
+
 The production directory sits beside the repository, outside the git working tree, so
 `git clean -fdx` can't delete `.env.prod` or the bulk storage. Set `TRAVEL_PROD_DIR` to use
 another directory. Bulk storage moves to the replacement HDD together with the development
@@ -71,9 +75,10 @@ commands run compose with a cleared environment, so nothing exported in the shel
 2. if production is already running and `AGE_RECIPIENT` is set, takes a backup with the
    currently deployed image (otherwise it warns);
 3. swaps `release.new/` in as `release/` and appends the commit to `deploys.log`;
-4. starts `db`, then `migrate` (owner role; a failed migration stops the deploy), then `web`,
-   `worker` and `backup`; restarts `ingest` only if it was running;
-5. waits for `web`'s health check, removes the images of all but the last two deployed
+4. starts `db` and runs the migrations as the owner role; if one fails, the deploy stops and
+   `web` and `worker` keep running the previous image (each migration is its own transaction);
+5. recreates `web`, `worker` and `backup`, and `ingest` only if it was running;
+6. waits for `web`'s health check, removes the images of all but the last two deployed
    commits, and runs the smoke test.
 
 Every other `./dev prod` command uses the compose files of `release/`, never those of the

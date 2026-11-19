@@ -119,8 +119,14 @@ deploy() {
   rm -rf "$PROD_DIR/release.old"
   echo "$(date -u +%FT%TZ) $head" >> "$PROD_DIR/deploys.log"
 
-  # web waits for migrate (owner role) to finish successfully, so a failed migration stops here.
-  prod_compose up -d --no-build db web worker backup
+  # Migrations (owner role) before web and worker are recreated: if one fails, the previous
+  # release keeps serving (each migration is its own transaction) and the deploy stops.
+  prod_compose up -d --no-build db
+  if ! prod_compose run --rm migrate; then
+    echo "error: migrations failed; web and worker still run the previous image" >&2
+    exit 1
+  fi
+  prod_compose up -d --no-build web worker backup
   $ingest_running && prod_compose --profile tracker up -d --no-build ingest
   wait_healthy prod_compose web 60 || {
     prod_compose logs --tail=40 migrate web

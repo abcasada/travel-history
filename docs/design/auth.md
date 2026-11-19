@@ -138,3 +138,10 @@ No published DB ports · non-root containers · own Docker networks (`internal: 
 `SECURE_HSTS_SECONDS` once public · CSP · `X-Content-Type-Options` · `Referrer-Policy:
 same-origin` · `ALLOWED_HOSTS` explicit · `DEBUG` off by default · secrets only in `.env` (0600)
 · upload size limits · rate limits on public and ingestion routes.
+
+Enforced since item 40a (D-96, [production guide](../production.md)): every production process
+sets `TRAVEL_PRODUCTION`, and `settings.py` refuses to start unless the settings above hold
+(`production_problems` in `travel/core/exposure.py`; HSTS required once `TRAVEL_PUBLIC_SCOPE=all`,
+and `RATELIMIT_CLIENT_IP_HEADER=CF-Connecting-IP`). `/`, `/auth/login` and `/auth/callback` are
+limited per address (60 a minute; 30 per 10 minutes each). `./dev prod smoke` checks the rest
+(ports, networks, non-root, `.env.prod` mode, headers, anonymous refusals).

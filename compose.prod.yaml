@@ -16,7 +16,8 @@ x-prod-env: &prod-env
   DJANGO_SSL_REDIRECT: "true"
   DJANGO_HSTS_SECONDS: "31536000"
   # Trusted because every request from outside this server arrives through the tunnel: the
-  # ports are bound to 127.0.0.1 only, and only this project's containers share its networks.
+  # ports are bound to 127.0.0.1 only; otherwise only this app's own containers (both stacks
+  # join the shared `valhalla` network) can reach these services.
   RATELIMIT_CLIENT_IP_HEADER: CF-Connecting-IP
   OIDC_BACKCHANNEL_URL: ""  # the dev-only back channel (D-57)
 
