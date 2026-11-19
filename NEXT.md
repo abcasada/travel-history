@@ -2,7 +2,7 @@
 
 Handoff note for the next session or subagent. Keep it short; overwrite, don't append history.
 
-- **In flight (2026-11-18):** planner-xhigh re-plans per Adam's requests in the ROADMAP changelog (2026-11-18 entries): item 14 (city search) next, then a minimal family go-live slice. If interrupted, re-dispatch the planner.
+- **In flight (2026-11-18):** item 14 (GeoNames city search), builder-medium. If interrupted, re-dispatch with the interruption rule. Re-plan done (56c115b): order 14 → 40a–40d → 41a → (42a) → pause → 40e → 4 → 21 → 27 → pause B … Ask Adam G-1 to G-6 (top of ROADMAP work order); G-1 must be answered before dispatching 40a.
 - **Adam's go-live answers (defaults):** public at travel.adamcasada.com behind Authentik 2FA (exposure still needs his explicit "go" and his tunnel change); trips.* redirects to travel.*; he creates family accounts in Authentik (group `travel-users`), they become Members; request-access form stays later; a focused security review before go-live; dev-admin's data (import, trips, tracker points) moves to his real account at first sign-in. Authentik already runs on the host (authentik-* containers); he's setting up the app/provider per docs/design/auth.md §7.2.
 - **Dev DB holds real data:** Adam imported his Timeline through the app (batch 33, 193,009 points). Never wipe it; item 4's "wipe synthetic data" must be re-planned. Don't restart web/worker during an import.
 - **Done and verified:** items 1, 2, 3, 5, 5a, 6, 7, 9, 10, 13, 17, 20, 25, 26. ORS is live (ORS_API_KEY set; Denver→Boulder test route via ORS). Valhalla (Kansas) runs as the separate `valhalla` compose project.
