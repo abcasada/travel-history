@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useId, useState } from "react";
+import { lazy, Suspense, useEffect, useId, useState } from "react";
 import { Link, useParams } from "react-router";
 import { errorKind, errorMessage, serverMessage } from "../api/errors";
 import {
@@ -16,6 +16,7 @@ import {
 } from "../api/generated";
 import { useMe } from "../auth/AuthGate";
 import { type LngLat, useMapStore } from "../map/store";
+import { useShellMode } from "../shells/useShellMode";
 import { useInvalidateTrip } from "../trips/cache";
 import { label, MODE_LABELS } from "../trips/labels";
 import { paths } from "../trips/paths";
@@ -27,6 +28,9 @@ import { ENGINE_LABELS, FIX_THE_MAP_URL, formatDuration, useRoutingStore } from 
 const ROAD_MODES = new Set(["drive", "bus", "other"]);
 const MAX_VIAS = 23; // the proxy takes 2-25 waypoints
 
+// The drag editor is desktop-only and heavy: phones never download it (§18.1).
+const RouteEditor = lazy(() => import("./editor/RouteEditor"));
+
 type Via = { key: number; point: LngLat };
 let viaSeq = 0;
 
@@ -34,8 +38,9 @@ let viaSeq = 0;
  * `/trips/:tripId/legs/:legId/route`: a leg's route versions (list pane); the map side is
  * LegRouteLayer. Item 25: "Propose a route" asks `/api/v1/routing/route` for a road route
  * from the leg's start stop through optional via points to its end stop, shows the provider
- * and its attribution, and saves the proposal as the leg's next version. Item 26 (drag editor)
- * adds `<RouteEditor leg={leg} />` here, with its map half in LegRouteLayer.
+ * and its attribution, and saves the proposal as the leg's next version. Item 26: the drag
+ * editor (`editor/RouteEditor`, desktop only) reshapes it on the map, its map half rendered
+ * by LegRouteLayer.
  * Saved versions are frozen (rule 5): every save creates a new version, nothing re-routes one.
  */
 export function LegRoutePage() {
@@ -58,13 +63,16 @@ function LegRoute({ leg }: { leg: LegOut }) {
   const versions = useListLegRoutes(leg.id);
   const me = useMe();
   const canRoute = leg.can_edit && me.role !== "viewer";
+  const { mode } = useShellMode();
+  const editing = useRoutingStore((s) => s.editingLegId === leg.id);
   return (
     <>
       <h2 className="mt-2 mb-1 text-lg font-semibold">
         {label(MODE_LABELS, leg.mode)}: {leg.origin_label || "start"} →{" "}
         {leg.destination_label || "end"}
       </h2>
-      {canRoute && ROAD_MODES.has(leg.mode) && <ProposeRoute leg={leg} />}
+      {canRoute && ROAD_MODES.has(leg.mode) && !editing && <ProposeRoute leg={leg} />}
+      {canRoute && ROAD_MODES.has(leg.mode) && mode === "desktop" && <EditorSlot leg={leg} />}
       {canRoute && !ROAD_MODES.has(leg.mode) && (
         <p className="mb-3 text-sm text-slate-600">
           Road routes are for drive, bus and other legs.
@@ -102,6 +110,21 @@ function VersionRow({ route: r }: { route: RouteOut }) {
         </span>
       )}
     </li>
+  );
+}
+
+function EditorSlot({ leg }: { leg: LegOut }) {
+  const trip = useGetTrip(leg.trip_id);
+  if (!trip.data) return null;
+  const stops = trip.data.stops;
+  return (
+    <Suspense fallback={null}>
+      <RouteEditor
+        leg={leg}
+        start={stopPoint(stops, leg.origin_stop_id)}
+        end={stopPoint(stops, leg.destination_stop_id)}
+      />
+    </Suspense>
   );
 }
 

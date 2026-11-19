@@ -12,6 +12,9 @@ type RoutingState = {
   /** Control points in order: start, vias, end. */
   waypoints: LngLat[];
   proposal: RouteProposalOut | null;
+  /** The leg whose route the drag editor is reshaping (desktop only); other map clicks wait. */
+  editingLegId: number | null;
+  setEditing: (legId: number | null) => void;
   show: (legId: number, waypoints: LngLat[], proposal: RouteProposalOut) => void;
   clear: () => void;
 };
@@ -20,6 +23,8 @@ export const useRoutingStore = create<RoutingState>((set) => ({
   legId: null,
   waypoints: [],
   proposal: null,
+  editingLegId: null,
+  setEditing: (editingLegId) => set({ editingLegId }),
   show: (legId, waypoints, proposal) => set({ legId, waypoints, proposal }),
   clear: () => set({ legId: null, waypoints: [], proposal: null }),
 }));

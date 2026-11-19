@@ -4,6 +4,7 @@ import { useEffect, useMemo } from "react";
 import { Layer, Source, useMap } from "react-map-gl/maplibre";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { useGetTripMap } from "../api/generated";
+import { useRoutingStore } from "../routing/store";
 import { apiParams, readTripFilter } from "../trips/filter";
 import { MODE_COLORS } from "../trips/labels";
 import { paths, selectedTripId, showsTrips } from "../trips/paths";
@@ -116,6 +117,11 @@ function useFitTrip(selected: number | null, data: Parameters<typeof tripBounds>
   }, [key, ref]);
 }
 
+/** A pending map pick (a form asking for a point) or the route editor takes the clicks. */
+function mapIsBusy(): boolean {
+  return useMapStore.getState().pick !== null || useRoutingStore.getState().editingLegId !== null;
+}
+
 /** Click a trip's line or stop to open it; pointer cursor over them. A pending map pick (a
  * form asking for a point) takes the click instead. */
 function useTripClicks() {
@@ -129,12 +135,12 @@ function useTripClicks() {
       return layers.length ? map.queryRenderedFeatures(event.point, { layers })[0] : undefined;
     };
     const onClick = (event: MapMouseEvent) => {
-      if (useMapStore.getState().pick) return;
+      if (mapIsBusy()) return;
       const tripId = Number(hit(event)?.properties?.trip_id);
       if (Number.isInteger(tripId) && tripId > 0) navigate(paths.trip(tripId));
     };
     const onMove = (event: MapMouseEvent) => {
-      if (useMapStore.getState().pick) return;
+      if (mapIsBusy()) return;
       map.getCanvas().style.cursor = hit(event) ? "pointer" : "";
     };
     map.on("click", onClick);

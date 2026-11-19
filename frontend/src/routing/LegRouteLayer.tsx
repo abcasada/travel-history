@@ -1,21 +1,32 @@
 import type { FeatureCollection, LineString, MultiLineString, Point } from "geojson";
-import { useMemo } from "react";
+import { lazy, Suspense, useMemo } from "react";
 import { Layer, Source } from "react-map-gl/maplibre";
 import { useLocation } from "react-router";
 import { useGetLeg, useGetRoute } from "../api/generated";
 import { selectedLegId } from "../trips/paths";
 import { useRoutingStore } from "./store";
 
+const RouteEditorLayer = lazy(() => import("./editor/RouteEditorLayer"));
+
 /**
  * Map side of a leg's route view (`/trips/:tripId/legs/:legId/route`): draws the leg's current
- * route version, if it has one, and a proposal not yet saved (item 25). This is the slot the drag-to-reshape editor (item 26) replaces:
- * it renders its anchors and the live route here, and the list pane's LegRoutePage holds its
- * controls. Saving creates a new frozen version (rule 5); nothing here re-routes.
+ * route version, if it has one, and a proposal not yet saved (item 25). While the drag editor
+ * (item 26, desktop only) is open for this leg, its own layer draws the line being reshaped and
+ * its anchors instead; the list pane's LegRoutePage holds its toolbar. Saving creates a new
+ * frozen version (rule 5); nothing here re-routes a saved one.
  */
 export function LegRouteLayer() {
   const { pathname } = useLocation();
   const legId = selectedLegId(pathname);
+  const editing = useRoutingStore((s) => s.editingLegId);
   if (legId === null) return null;
+  if (editing === legId) {
+    return (
+      <Suspense fallback={null}>
+        <RouteEditorLayer />
+      </Suspense>
+    );
+  }
   return (
     <>
       <CurrentRoute legId={legId} />
