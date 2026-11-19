@@ -238,7 +238,7 @@ Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhi
    - **Backup:** with `AGE_RECIPIENT` set, `./dev prod backup-now` writes an encrypted backup with the real data, and the throwaway-key restore test passes against production. Without the key, finish everything else and leave this gate open.
    - **Tests:** the tool against scratch containers with SYNTHETIC data, including pruning and refusals.
    - **Rehearsal only:** the final copy runs in 40c, right before Adam signs in, so whatever he enters in dev until then carries over.
-   - Status: todo
+   - Status: done (2026-11-18) except the G-2 backup gate: `./dev prod backup-now` with the real AGE_RECIPIENT waits for Adam's key
 40c. **[X] Authentik sign-in and the account handover (PROPOSED: G-3, G-4, G-5).** Two dispatches.
    - **Dispatch 1 [X]: build.**
      - **Authentik:** point production at Authentik per auth.md §7.2 (per-provider issuer, confidential client, `travel-users` group check, `auth_time`, end-session logout). Prove discovery and JWKS work from inside the prod web container through the public hostname; D-57's back channel is dev-only.
@@ -466,3 +466,4 @@ Nature: mech = mechanical, mod = moderate, hard. Size is S/M/L/XL with approxima
 - 2026-11-18: Adam: "stop/leg notes first"; G-6: keep the GPS Timeline import, anything else in dev may be deleted. Added 14b [M] stop and leg notes (runs now) and 14c [H] spreadsheet importer (after 40e; Adam named only notes as going first). Item 4 now keeps the Timeline raw file.
 - 2026-11-18: item 14b done and verified (`./dev test-quick` 2274 + 105 passed; batch 33 intact). Contributors can edit notes on their own legs through the API, but the UI doesn't offer it yet (item 21). Item 40a dispatched.
 - 2026-11-18: item 40a done and verified (`./dev test-quick` 2314 + 105 passed; prod web healthy on 127.0.0.1:8784 only; trips.* → travel.* 301 with forwarded HTTPS; public host stays 404 at scope `tracker`; unknown host 400). The orchestrator added the 8784 port and `./dev prod` to CLAUDE.md (G-1) and approved D-96 under Adam's delegation. Known: dev `./dev restore-test` fails at step 4 on two synthetic raw files lost with the HDD (40b's pruning drops them). Item 40b dispatched with a 10:05 pm CST stop (Adam asked to stop around 10:15 pm).
+- 2026-11-18: item 40b done and verified after a usage-limit stop and resume (`./dev test-quick` 2321 + 105 passed; rehearsal copy in prod: 1 account, batch 33 = 193,009 points, same as dev; dev untouched; no leftovers). Open gate: the encrypted backup needs AGE_RECIPIENT. Next: 40c dispatch 1 (build), which needs Adam's Authentik app/provider and the OIDC values in `.env.prod` to finish.
