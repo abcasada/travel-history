@@ -140,7 +140,9 @@ class ExposureGuardMiddleware:
 CLIENT_IP_HEADER = "CF-Connecting-IP"
 # Secret keys a production server must never run with (build step, tests, examples).
 PLACEHOLDER_SECRET_KEYS = frozenset({"build-only", "test-only-not-secret", "generate"})
-MIN_SECRET_KEY_LENGTH = 40
+# Django's own deploy check (security.W009) asks for 50+ characters, 5+ of them different.
+MIN_SECRET_KEY_LENGTH = 50
+MIN_SECRET_KEY_UNIQUE = 5
 REQUIRED_MIDDLEWARE = (
     "django.middleware.security.SecurityMiddleware",
     "travel.core.exposure.ExposureGuardMiddleware",
@@ -160,6 +162,7 @@ def production_problems(conf: Mapping[str, Any]) -> list[str]:
     key = conf["SECRET_KEY"]
     if (
         len(key) < MIN_SECRET_KEY_LENGTH
+        or len(set(key)) < MIN_SECRET_KEY_UNIQUE
         or key in PLACEHOLDER_SECRET_KEYS
         or key.startswith("django-insecure")
     ):

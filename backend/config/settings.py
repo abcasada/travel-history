@@ -231,6 +231,9 @@ SECURE_SSL_REDIRECT = env.bool("DJANGO_SSL_REDIRECT", BEHIND_TLS_PROXY)
 SECURE_REDIRECT_EXEMPT = [r"^healthz$"]
 SECURE_HSTS_SECONDS = env.int("DJANGO_HSTS_SECONDS", 365 * 24 * 3600 if BEHIND_TLS_PROXY else 0)
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+# Not on the browsers' preload list on purpose (a commitment that is slow to undo), so Django's
+# reminder about SECURE_HSTS_PRELOAD is silenced; `check --deploy` must otherwise pass (D-96).
+SILENCED_SYSTEM_CHECKS = ["security.W021"]
 DATA_UPLOAD_MAX_MEMORY_SIZE = 40 * 1024 * 1024  # one upload chunk (32 MB) plus headroom
 
 SECURE_CSP = {

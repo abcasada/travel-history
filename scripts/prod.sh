@@ -38,7 +38,9 @@ init() {
     (
       umask 077
       while IFS= read -r line; do
-        if [[ "$line" =~ ^([A-Z0-9_]+)=generate$ ]]; then
+        if [[ "$line" == DJANGO_SECRET_KEY=generate ]]; then
+          echo "DJANGO_SECRET_KEY=$(random_secret 64)"  # Django's deploy check wants 50+
+        elif [[ "$line" =~ ^([A-Z0-9_]+)=generate$ ]]; then
           echo "${BASH_REMATCH[1]}=$(random_secret)"
         elif [[ "$line" == APP_UID=* ]]; then
           echo "APP_UID=$(id -u)"

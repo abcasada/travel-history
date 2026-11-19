@@ -116,6 +116,12 @@ strangers="$(docker network inspect -f '{{range .Containers}}{{.Name}} {{end}}' 
   | tr ' ' '\n' | grep -v "^${PROD_PROJECT}-" | grep -v '^$' || true)"
 expect "only production containers share the database network" "" "$strangers"
 expect ".env.prod is mode 0600" 600 "$(stat -c %a "$PROD_ENV_FILE")"
+if prod_compose --profile tools run --rm --no-deps -T tools \
+  python manage.py check --deploy --fail-level WARNING > "$work/check" 2>&1; then
+  pass "Django's deploy checks pass"
+else
+  fail "Django's deploy checks: $(grep -E '^\?: \(' "$work/check" | cut -c1-90 | tr '\n' ' ')"
+fi
 if [ -d "$bulk" ] && ! git -C "$bulk" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   pass "bulk storage outside any git working tree ($bulk)"
 else

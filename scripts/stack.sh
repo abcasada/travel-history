@@ -23,7 +23,10 @@ die() {
   exit 1
 }
 
-random_secret() { head -c 48 /dev/urandom | base64 | tr -d '/+=\n' | head -c 48; }
+random_secret() {  # [length], default 48
+  local n="${1:-48}"
+  head -c $((n * 2)) /dev/urandom | base64 | tr -d '/+=\n' | head -c "$n"
+}
 
 # The project name is explicit, so a stray COMPOSE_PROJECT_NAME can't point dev commands
 # at production.

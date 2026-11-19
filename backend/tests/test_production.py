@@ -115,6 +115,8 @@ def test_production_needs_hsts_once_the_whole_app_is_public():
         ({"RATELIMIT_CLIENT_IP_HEADER": ""}, "RATELIMIT_CLIENT_IP_HEADER must be"),
         ({"RATELIMIT_CLIENT_IP_HEADER": "X-Forwarded-For"}, "RATELIMIT_CLIENT_IP_HEADER must"),
         ({"DJANGO_SECRET_KEY": "short"}, "DJANGO_SECRET_KEY must be a generated secret"),
+        ({"DJANGO_SECRET_KEY": "x" * 49}, "DJANGO_SECRET_KEY must be a generated secret"),
+        ({"DJANGO_SECRET_KEY": "abab" * 20}, "DJANGO_SECRET_KEY must be a generated secret"),
         ({"DJANGO_SECRET_KEY": "django-insecure-" + "x" * 40}, "DJANGO_SECRET_KEY must be"),
         ({"OIDC_BACKCHANNEL_URL": "http://oidc:8080"}, "OIDC_BACKCHANNEL_URL is for development"),
         ({"OIDC_ISSUER": "http://192.0.2.1:8781/default"}, "OIDC_ISSUER must be an https://"),
