@@ -162,6 +162,7 @@ class LegOut(Schema):
     aircraft_registration: str
     seat: str
     cabin_class: str
+    notes: str = Field(description="private free text; never in a public snapshot")
     participant_ids: list[int] = Field(description="people effectively on this leg")
     can_edit: bool
     can_delete: bool = Field(
@@ -195,6 +196,7 @@ class StopOut(Schema):
     arrive_utc: dt.datetime | None
     depart_utc: dt.datetime | None
     tz: str
+    notes: str = Field(description="private free text; never in a public snapshot")
     place: PlaceOut
     author: UserRef
     can_edit: bool
@@ -489,6 +491,7 @@ class LegFieldsIn(Schema):
     aircraft_registration: str | None = Field(None, max_length=16)
     seat: str | None = Field(None, max_length=8)
     cabin_class: CabinClass | None = None
+    notes: str | None = Field(None, max_length=20_000, description="null clears")
 
 
 class LegIn(LegFieldsIn):
@@ -572,6 +575,7 @@ class StopFieldsIn(Schema):
         None, description="a place the caller owns, or already on the trip"
     )
     place: NewPlaceIn | None = Field(None, description="or a new place, owned by the caller")
+    notes: str | None = Field(None, max_length=20_000, description="null clears")
 
 
 class StopIn(StopFieldsIn):
@@ -727,6 +731,7 @@ def _stop(stop: Stop, authors: dict[int, dict], can_edit: bool) -> dict:
         "arrive_utc": stop.arrive_utc,
         "depart_utc": stop.depart_utc,
         "tz": stop.tz,
+        "notes": stop.notes,
         "place": _place(stop.place),
         "author": authors[stop.author_id],
         "can_edit": can_edit,
@@ -782,6 +787,7 @@ class _TripView:
                     "aircraft_registration",
                     "seat",
                     "cabin_class",
+                    "notes",
                 )
             },
             "vehicle": self.vehicles.get(leg.vehicle_id) if leg.vehicle_id else None,

@@ -320,6 +320,7 @@ LEG_PLAIN_FIELDS = {
     "aircraft_registration",
     "seat",
     "cabin_class",
+    "notes",
 }
 LEG_BLANK_IF_NULL = {
     "start_tz",
@@ -330,6 +331,7 @@ LEG_BLANK_IF_NULL = {
     "aircraft_registration",
     "seat",
     "cabin_class",
+    "notes",
 }
 LEG_REFERENCES = {
     "airline_id": (Airline, "airline"),
@@ -701,6 +703,8 @@ def _apply_stop(user, stop: Stop, data: dict[str, Any]) -> None:
         setattr(stop, field, data[field])
     if "tz" in data:
         stop.tz = data["tz"] or ""
+    if "notes" in data:
+        stop.notes = data["notes"] or ""
     check_zone(stop.tz)
     if stop.arrive_utc and stop.depart_utc and stop.depart_utc < stop.arrive_utc:
         raise invalid("depart_utc is before arrive_utc")

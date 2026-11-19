@@ -171,6 +171,8 @@ class Leg(models.Model):
     aircraft_registration = models.CharField(max_length=16, blank=True)
     seat = models.CharField(max_length=8, blank=True)
     cabin_class = models.CharField(max_length=16, choices=CabinClass.choices, blank=True)
+    # Private free text, like Trip.notes: never copied into a public snapshot (§6.5).
+    notes = models.TextField(blank=True)
     # Provenance: references to raw data (never copies of points)
     source_segments = ArrayField(models.BigIntegerField(), default=list, blank=True)
     import_batch = models.ForeignKey(
@@ -334,6 +336,8 @@ class Stop(models.Model):
     arrive_utc = models.DateTimeField(null=True, blank=True)
     depart_utc = models.DateTimeField(null=True, blank=True)
     tz = models.CharField(max_length=64, blank=True)
+    # Private free text, like Trip.notes: never copied into a public snapshot (§6.5).
+    notes = models.TextField(blank=True)
     author = models.ForeignKey(User, on_delete=models.DO_NOTHING, related_name="+")
     source_segment = models.ForeignKey(
         "history.TimelineSegment",
