@@ -109,7 +109,7 @@ Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhi
 25. **[M] T23 + T24:** routing proxy and manual trips. Without an ORS key, use Valhalla only and leave the ORS fallback stubbed.
     - Status: done (2026-11-18)
 26. **[H] T25 core:** the drag editor, ported from gpx.studio (MIT, with attribution).
-    - Status: todo
+    - Status: done (2026-11-18)
 27. **[M] T25 polish.**
     - Status: todo
 28. **[H] T27:** territory stats.
@@ -258,3 +258,8 @@ Nature: mech = mechanical, mod = moderate, hard. Size is S/M/L/XL with approxima
 - 2026-11-19: item 20 done and verified (`./dev test-quick` 2117 + 72 passed; e2e covers creating, editing and deleting a trip). Adam can now enter trips, stops, legs and people. D-90 is waiting for Adam. Moved item 21 after 26, because item 20 already covers manual entry and Adam's priority is road-routed legs. Item 17 dispatched.
 - 2026-11-19: item 17 done and verified (Valhalla 3.9.1 healthy, the orchestrator's smoke test passed, `./dev test-quick` 2125 + 72 passed). D-91 is waiting for Adam. Item 25 dispatched; there's no ORS key yet, so the ORS path is built and tested against mocks and goes live when `ORS_API_KEY` appears.
 - 2026-11-18: item 25 done and verified after resuming from the usage-limit checkpoint (pushed, tree clean, `./dev test-quick` 2199 + 78 passed; e2e routes and saves a Kansas leg through Valhalla). ORS is built and mock-tested and goes live when `ORS_API_KEY` is set and web/worker restart. D-92 was recorded by the builder; it waits for Adam like D-89–91. Item 26 dispatched.
+- 2026-11-18: Adam added ORS_API_KEY to .env. Web/worker recreated after Adam's import finished; a Denver→Boulder test route came back from ORS (46 km). ORS is live.
+- 2026-11-18: Adam asked to move Authentik/go-live up so he and his family can start adding trips. After item 26 reports, dispatch the planner to plan a minimal family go-live slice next (prod web service, real Authentik OIDC, hardening §7.7, focused security review, exposure on Adam's "go"). Adam's answers (defaults): public at travel.adamcasada.com behind Authentik 2FA (exposure still needs his explicit "go" and his tunnel change); he creates family accounts in Authentik and they become Members, request-access form stays later; a focused security review of the exposed app before go-live; item 26 finishes first.
+- 2026-11-18: Adam started a real Google Timeline import through the app on the dev stack. Don't interrupt it: no restarts of web/worker/db until it finishes (this delays the ORS restart). The dev DB now holds real data, so item 4's "wipe synthetic data" step must be re-planned (no blanket wipe), and backups of real data need AGE_RECIPIENT. Builder of item 26 told to leave the stack alone.
+- 2026-11-18: Adam prioritized item 14 (T26 places: GeoNames gazetteer, so stops can be entered by city name) to run right after item 26, then the family go-live slice. Don't interrupt item 26. The go-live plan must include moving dev-admin's data (imported history, trips, tracker points) to Adam's real Authentik account at his first sign-in. Order: 26 → planner (place 14 next, then go-live slice) → 14 → go-live items.
+- 2026-11-18: item 26 done and verified (pushed, `./dev test-quick` 2224 + 103 passed; e2e drags an anchor and saves a hand-edited version). Adam's real import (batch 33, 193,009 points) checked intact afterwards. D-93 (saving edited routes) waits for Adam with D-89–92. Planner dispatched for the item 14 + family go-live re-plan.
