@@ -79,6 +79,7 @@ All commands run in containers through `./dev` (see `./dev help`):
 - `./dev e2e [base-url]` — headless-Chrome smoke test of sign-in, honesty notice, map and both shells (dev stack; screenshots in `e2e/out/`)
 - After changing the API: `./dev manage export_openapi > frontend/src/api/openapi.json && ./dev npm run gen:api` (commit both generated files)
 - `./dev restore-test` — backup → restore into a scratch DB → verify
+- `./dev prod deploy|status|logs|manage|psql|smoke|…` — the separate production stack (`compose.prod.yaml`, files in `~/apps/travel-history-prod/`; deploys only from a clean, pushed main; docs/production.md)
 - Dev URLs (LAN/VPN only): app with hot reload `http://<lan-host>:5173/app/`, Django `:8780`, mock OIDC `:8781`, Mailpit `:8782`
 
 ## Coding conventions
@@ -165,7 +166,8 @@ All commands run in containers through `./dev` (see `./dev help`):
   32 GB host is expected (docs/design/host.md, docs/design/resource-budget.md).
 - Public ingress for the server's sites is a dashboard-managed Cloudflare Tunnel
   (`~/infra/cloudflared`, host networking); apps bind `127.0.0.1:<port>`. This app uses `8780`
-  for the dev web app and `8783` for the ingest-only tracker service.
+  for the dev web app, `8784` for the production web app (the tunnel's target from go-live on)
+  and `8783` for the ingest-only tracker service.
   Adding its hostname is a shared-infrastructure change (ask first).
 - Bulk storage for this app: `/storage/hdd1/travel-history/{raw,media,backup-outbox}` → `/bulk`.
 - Docker image tags are pinned; update deliberately and re-run the CPU smoke test.

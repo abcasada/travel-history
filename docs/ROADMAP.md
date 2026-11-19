@@ -222,8 +222,8 @@ Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhi
    - **Memory:** measure free RAM with both stacks, Authentik and Valhalla running. Set production memory caps and record them in resource-budget.md §21.
    - **Tests:** unsafe production settings refuse to start; the redirect; the auth-route rate limits; `./dev prod smoke` (headers, every private path refused anonymously) against the empty stack.
    - **Docs:** the builder records the decision (stack, port, bulk location) as pending Adam. Must not touch the dev DB or its data.
-   - Status: todo
-40b. **[X] Move the real data into production: tool and rehearsal (PROPOSED: G-2 for the backup gate).**
+   - Status: done (2026-11-18)
+40b. **[X] Move the real data into production: tool and rehearsal (G-2 answered: yes).**
    - **Command:** `./dev prod import-from-dev`, repeatable and run as the owner role.
      - It refuses if the two DBs' applied migrations differ, and forever once any production account has a real (Authentik) identity.
      - It replaces production's DB with a dump of dev's, piped with no dump left on disk.
@@ -465,3 +465,4 @@ Nature: mech = mechanical, mod = moderate, hard. Size is S/M/L/XL with approxima
 - 2026-11-18: Adam delegated: "answer yourself any you're confident in." The orchestrator answered G-1 to G-5 (recommended defaults; port 8784 checked free), Q-18, Q-19, Q-21 (defaults) and Q-20 (preview offers an unticked "create these people" option), and approved D-88 to D-95 (D-92/D-94 were never marked pending). Also decided: family members' own per-stop/leg notes are not added now. Still Adam's: G-6 (deleting real data, needed only at item 4) and whether the stop/leg notes item and the spreadsheet importer run before or after the go-live slice.
 - 2026-11-18: Adam: "stop/leg notes first"; G-6: keep the GPS Timeline import, anything else in dev may be deleted. Added 14b [M] stop and leg notes (runs now) and 14c [H] spreadsheet importer (after 40e; Adam named only notes as going first). Item 4 now keeps the Timeline raw file.
 - 2026-11-18: item 14b done and verified (`./dev test-quick` 2274 + 105 passed; batch 33 intact). Contributors can edit notes on their own legs through the API, but the UI doesn't offer it yet (item 21). Item 40a dispatched.
+- 2026-11-18: item 40a done and verified (`./dev test-quick` 2314 + 105 passed; prod web healthy on 127.0.0.1:8784 only; trips.* → travel.* 301 with forwarded HTTPS; public host stays 404 at scope `tracker`; unknown host 400). The orchestrator added the 8784 port and `./dev prod` to CLAUDE.md (G-1) and approved D-96 under Adam's delegation. Known: dev `./dev restore-test` fails at step 4 on two synthetic raw files lost with the HDD (40b's pruning drops them). Item 40b dispatched with a 10:05 pm CST stop (Adam asked to stop around 10:15 pm).
