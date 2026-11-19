@@ -47,6 +47,16 @@ export function AboutPage() {
           </li>
         ))}
       </ul>
+      <section aria-label="Code from other projects" className="text-sm">
+        <h3 className="mb-1 font-medium">Code from other projects</h3>
+        <p>
+          The route editor's anchor routing is ported from{" "}
+          <a className="underline" href="https://github.com/gpxstudio/gpx.studio" rel="noreferrer">
+            gpx.studio
+          </a>{" "}
+          (© 2026 gpx.studio, MIT License).
+        </p>
+      </section>
     </div>
   );
 }

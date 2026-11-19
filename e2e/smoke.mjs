@@ -102,6 +102,25 @@ await page.getByLabel("Note for this version").fill("E2E proposal");
 await page.getByRole("button", { name: "Save as a new version" }).click();
 await page.getByText(/Version 1 · routed · \d+\.\d km \(current\)/).waitFor();
 await page.getByText(/Valhalla \(self-hosted\) [\d.]+.*OpenStreetMap/).waitFor();
+// The drag editor (work-order item 26): drag the start anchor of the saved route a little, so
+// the span to the next anchor is routed again through the proxy, and save a hand-edited version.
+await page.getByRole("button", { name: "Reshape on the map" }).click();
+await page.getByTestId("editor-status").getByText(/\d+ points, \d+ fixed/).waitFor();
+await page.waitForTimeout(1500);
+const box = await page.locator("canvas.maplibregl-canvas").boundingBox();
+const [ax, ay] = (await page.evaluate(() => window.__routeEditorAnchors()))[0];
+const routesBefore = tripRequests.filter(([m, path]) => m === "POST" && path === "/api/v1/routing/route").length;
+await page.mouse.move(box.x + ax, box.y + ay);
+await page.mouse.down();
+for (let step = 1; step <= 10; step++) await page.mouse.move(box.x + ax + step * 4, box.y + ay + step * 3);
+await page.mouse.up();
+await page.getByRole("button", { name: "Undo" }).and(page.locator(":enabled")).waitFor({ timeout: 30000 });
+const routesAfter = tripRequests.filter(([m, path]) => m === "POST" && path === "/api/v1/routing/route").length;
+if (routesAfter !== routesBefore + 1) throw new Error(`editor routed ${routesAfter - routesBefore} times`);
+await page.screenshot({ path: "out/route-editor.png" });
+await page.getByLabel("Note for this version").fill("E2E drag");
+await page.getByRole("button", { name: "Save the edited route" }).click();
+await page.getByText(/Version 2 · hand_edited · \d+\.\d km \(current\)/).waitFor();
 await page.getByRole("link", { name: /Back to the trip/ }).click();
 await page.getByRole("heading", { name: title }).waitFor();
 await page.getByRole("link", { name: "Edit" }).click();

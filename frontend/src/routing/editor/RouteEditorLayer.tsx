@@ -3,6 +3,7 @@ import { useMap } from "react-map-gl/maplibre";
 import { useMapStore } from "../../map/store";
 import { RouteEditorController } from "./controller";
 import { useEditorStore } from "./editorStore";
+import { anchors } from "./model";
 
 /**
  * Map side of the drag editor (lazy, desktop only): attaches the framework-free controller to
@@ -30,7 +31,17 @@ export default function RouteEditorLayer() {
     });
     controller.current = created;
     created.render(editor().state);
+    // The e2e smoke test (dev server only) needs to know where the visible anchors are drawn.
+    if (import.meta.env.DEV) {
+      Reflect.set(window, "__routeEditorAnchors", () =>
+        anchors(editor().state)
+          .filter((a) => map.getZoom() >= a.zoom)
+          .map((a) => map.project([a.lon, a.lat]))
+          .map((p) => [p.x, p.y]),
+      );
+    }
     return () => {
+      if (import.meta.env.DEV) Reflect.deleteProperty(window, "__routeEditorAnchors");
       created.destroy();
       controller.current = null;
     };

@@ -9,7 +9,7 @@
 milestones 2.1–2.4 done (2.4 tracker ingestion built and tested locally). Work-order item 8
 (tracker exposure) is prepared: the `ingest` service runs on `127.0.0.1:8783` with the exposure
 guard and production settings; the tunnel route waits for Adam's "go"
-([docs/tracking/exposure.md](docs/tracking/exposure.md)). Phase 4: the trips API (T18) is done (item 13, 2026-11-19); the catalog UI's first slice (T19 session 1, item 20, 2026-11-19) lets you add, view and edit trips with legs, stops and people, on the map; patterns in [docs/design/frontend-patterns.md](docs/design/frontend-patterns.md). Milestone 4.1 (item 17, 2026-11-18): self-hosted Valhalla 3.9.1 with Kansas tiles runs as its own compose project on the `valhalla` network ([docs/valhalla.md](docs/valhalla.md)); routing proxy and manual routed legs done (item 25, 2026-11-19: Valhalla in Kansas, ORS once `ORS_API_KEY` is set, FOSSGIS fallback; D-92). Work now follows the
+([docs/tracking/exposure.md](docs/tracking/exposure.md)). Phase 4: the trips API (T18) is done (item 13, 2026-11-19); the catalog UI's first slice (T19 session 1, item 20, 2026-11-19) lets you add, view and edit trips with legs, stops and people, on the map; patterns in [docs/design/frontend-patterns.md](docs/design/frontend-patterns.md). Milestone 4.1 (item 17, 2026-11-18): self-hosted Valhalla 3.9.1 with Kansas tiles runs as its own compose project on the `valhalla` network ([docs/valhalla.md](docs/valhalla.md)); routing proxy and manual routed legs done (item 25, 2026-11-19: Valhalla in Kansas, ORS once `ORS_API_KEY` is set, FOSSGIS fallback; D-92); drag-to-reshape editor core (item 26, gpx.studio port, D-93). Work now follows the
 orchestrated work order in [docs/ROADMAP.md](docs/ROADMAP.md) (process:
 [docs/ORCHESTRATION.md](docs/ORCHESTRATION.md)).
 
@@ -19,7 +19,7 @@ orchestrated work order in [docs/ROADMAP.md](docs/ROADMAP.md) (process:
 | 1 Skeleton | ✅ 2026-10-20 | [phases](docs/design/phases.md) |
 | 2 Timeline and tracking | 🔄 2.1–2.4 done | [phases](docs/design/phases.md) |
 | 3 Flights | 🔄 3.1–3.2 done (synthetic) | [phases](docs/design/phases.md) |
-| 4 Catalog · 5 Routes · 6 Statistics | ⏳ (4: trips API done, T18; catalog UI first slice, T19; 4.1 Valhalla Kansas done; 5.1 routing proxy and 5.2 manual routed legs done) | [phases](docs/design/phases.md) |
+| 4 Catalog · 5 Routes · 6 Statistics | ⏳ (4: trips API done, T18; catalog UI first slice, T19; 4.1 Valhalla Kansas done; 5.1 routing proxy, 5.2 manual routed legs and 5.3 drag editor core done) | [phases](docs/design/phases.md) |
 | 7 Mobile and photos · 8 Family and public · 9 Android · 10 Later | ⏳ | [phases](docs/design/phases.md) |
 
 ## Section map
