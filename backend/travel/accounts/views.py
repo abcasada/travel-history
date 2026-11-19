@@ -14,12 +14,23 @@ from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_GET, require_POST
 
+from travel.core import ratelimit
 from travel.core.rls import set_context
 
 from . import oidc
 from .provisioning import AccessDenied, user_for_claims
 
 BACKEND = "django.contrib.auth.backends.ModelBackend"
+
+
+# Per-address limits on the pages anyone can reach (auth.md §7.7); behind the tunnel the address
+# comes from CF-Connecting-IP (RATELIMIT_CLIENT_IP_HEADER).
+def _auth_rate() -> ratelimit.Rate:
+    return ratelimit.Rate(limit=settings.AUTH_RATE_PER_IP, period=600)
+
+
+def _landing_rate() -> ratelimit.Rate:
+    return ratelimit.Rate(limit=settings.LANDING_RATE_PER_IP, period=60)
 
 
 def _safe_next(request: HttpRequest, candidate: str | None) -> str:
@@ -41,6 +52,7 @@ def _provider_unreachable(request: HttpRequest) -> HttpResponse:
 
 
 @require_GET
+@ratelimit.limit("auth-login", _auth_rate)
 def login_view(request: HttpRequest) -> HttpResponse:
     request.session["login_next"] = _safe_next(request, request.GET.get("next"))
     request.session.pop("reauth_user", None)
@@ -64,6 +76,7 @@ def reauth_view(request: HttpRequest) -> HttpResponse:
 
 
 @require_GET
+@ratelimit.limit("auth-callback", _auth_rate)
 def callback_view(request: HttpRequest) -> HttpResponse:
     try:
         token = oidc.client().authorize_access_token(request)
@@ -117,9 +130,10 @@ def has_recent_auth(request: HttpRequest, max_age: int | None = None) -> bool:
     return bool(request.user.is_authenticated and auth_at and time.time() - auth_at <= max_age)
 
 
+@ratelimit.limit("landing", _landing_rate)
 def landing_view(request: HttpRequest) -> HttpResponse:
-    """Public landing page; signed-in users go straight to the app. The full version (request
-    access, explanation) comes in phase 8."""
+    """Public landing page; signed-in users go straight to the app. It offers only "Sign in"
+    until request access exists (item 36, phase 8)."""
     if request.user.is_authenticated:
         return redirect("/app/")
     return render(request, "landing.html", {"user": request.user})

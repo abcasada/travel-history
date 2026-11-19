@@ -6,18 +6,14 @@ server answers nothing on it; the `ingest` service answers only the tracker endp
 the Host header says; the service refuses to start without production settings."""
 
 import json
-import os
-import subprocess
-import sys
 import time
-from pathlib import Path
 
 import pytest
 from django.test import Client
 from django.urls import resolve
 
 from tests.factories import UserFactory, device_token
-from tests.helpers import as_owner, sample_paths
+from tests.helpers import as_owner, load_settings, loaded, sample_paths
 from travel.core import exposure
 from travel.history.models import LocationPoint
 
@@ -252,74 +248,67 @@ def test_plain_http_is_redirected_to_https_behind_the_proxy(ingest_only, member_
 
 # --- Production settings of the internet-facing service ------------------------------------
 
-BACKEND_DIR = Path(__file__).resolve().parent.parent
-# The `ingest` service's environment in compose.yaml (keep in step).
+# The `ingest` service's environment in compose.prod.yaml (keep in step).
 INGEST_ENV = {
+    "TRAVEL_PRODUCTION": "true",
     "DJANGO_DEBUG": "false",
     "DJANGO_ALLOWED_HOSTS": "127.0.0.1,localhost",
     "DJANGO_CSRF_TRUSTED_ORIGINS": "",
     "DJANGO_SECURE_COOKIES": "true",
     "DJANGO_BEHIND_TLS_PROXY": "true",
+    "DJANGO_SSL_REDIRECT": "true",
+    "DJANGO_HSTS_SECONDS": "31536000",
     "TRAVEL_PUBLIC_HOSTS": PUBLIC,
     "TRAVEL_PUBLIC_SCOPE": "tracker",
     "TRAVEL_INGEST_ONLY": "true",
     "RATELIMIT_CLIENT_IP_HEADER": "CF-Connecting-IP",
 }
-DUMP = """
-import json
-from django.conf import settings
-print(json.dumps({name: getattr(settings, name) for name in (
-    "DEBUG", "ALLOWED_HOSTS", "CSRF_TRUSTED_ORIGINS", "SECURE_PROXY_SSL_HEADER",
-    "SECURE_SSL_REDIRECT", "SECURE_REDIRECT_EXEMPT", "SECURE_HSTS_SECONDS",
-    "SECURE_HSTS_INCLUDE_SUBDOMAINS", "SECURE_CONTENT_TYPE_NOSNIFF", "SECURE_REFERRER_POLICY",
-    "SECURE_CROSS_ORIGIN_OPENER_POLICY", "X_FRAME_OPTIONS", "SESSION_COOKIE_SECURE",
-    "CSRF_COOKIE_SECURE", "TRAVEL_PUBLIC_HOSTS", "TRAVEL_PUBLIC_SCOPE", "TRAVEL_INGEST_ONLY",
-    "RATELIMIT_CLIENT_IP_HEADER")}))
-"""
+SETTING_NAMES = [
+    "DEBUG",
+    "ALLOWED_HOSTS",
+    "CSRF_TRUSTED_ORIGINS",
+    "SECURE_PROXY_SSL_HEADER",
+    "SECURE_SSL_REDIRECT",
+    "SECURE_REDIRECT_EXEMPT",
+    "SECURE_HSTS_SECONDS",
+    "SECURE_HSTS_INCLUDE_SUBDOMAINS",
+    "SECURE_CONTENT_TYPE_NOSNIFF",
+    "SECURE_REFERRER_POLICY",
+    "SECURE_CROSS_ORIGIN_OPENER_POLICY",
+    "X_FRAME_OPTIONS",
+    "SESSION_COOKIE_SECURE",
+    "CSRF_COOKIE_SECURE",
+    "TRAVEL_PUBLIC_HOSTS",
+    "TRAVEL_PUBLIC_SCOPE",
+    "TRAVEL_INGEST_ONLY",
+    "RATELIMIT_CLIENT_IP_HEADER",
+]
 
 
-def load_settings(**overrides: str) -> subprocess.CompletedProcess:
-    """Settings as a fresh process would load them from this environment."""
-    env = {
-        **{k: v for k, v in os.environ.items() if not k.startswith(("DJANGO_", "TRAVEL_"))},
-        "DJANGO_SETTINGS_MODULE": "config.settings",
-        "DJANGO_SECRET_KEY": "test-only-not-secret",
-        **INGEST_ENV,
-        **overrides,
-    }
-    return subprocess.run(  # noqa: S603 - fixed interpreter and script
-        [sys.executable, "-c", DUMP],
-        cwd=BACKEND_DIR,
-        env=env,
-        capture_output=True,
-        text=True,
-        timeout=60,
-        check=False,
-    )
+def load_ingest_settings(**overrides: str):
+    return load_settings({**INGEST_ENV, **overrides}, SETTING_NAMES)
 
 
 def test_the_ingest_service_runs_with_production_settings():
-    result = load_settings()
-    assert result.returncode == 0, result.stderr
-    loaded = json.loads(result.stdout)
-    assert loaded["DEBUG"] is False
-    assert loaded["ALLOWED_HOSTS"] == ["127.0.0.1", "localhost", PUBLIC]
-    assert loaded["CSRF_TRUSTED_ORIGINS"] == [f"https://{PUBLIC}"]
-    assert loaded["SECURE_PROXY_SSL_HEADER"] == ["HTTP_X_FORWARDED_PROTO", "https"]
-    assert loaded["SECURE_SSL_REDIRECT"] is True
-    assert loaded["SECURE_REDIRECT_EXEMPT"] == ["^healthz$"]
-    assert loaded["SECURE_HSTS_SECONDS"] == 31536000
-    assert loaded["SECURE_HSTS_INCLUDE_SUBDOMAINS"] is True
-    assert loaded["SECURE_CONTENT_TYPE_NOSNIFF"] is True
-    assert loaded["SECURE_REFERRER_POLICY"] == "same-origin"
-    assert loaded["SECURE_CROSS_ORIGIN_OPENER_POLICY"] == "same-origin"
-    assert loaded["X_FRAME_OPTIONS"] == "DENY"
-    assert loaded["SESSION_COOKIE_SECURE"] is True
-    assert loaded["CSRF_COOKIE_SECURE"] is True
-    assert loaded["TRAVEL_PUBLIC_HOSTS"] == [PUBLIC]
-    assert loaded["TRAVEL_PUBLIC_SCOPE"] == "tracker"
-    assert loaded["TRAVEL_INGEST_ONLY"] is True
-    assert loaded["RATELIMIT_CLIENT_IP_HEADER"] == "CF-Connecting-IP"
+    result = loaded(load_ingest_settings())
+    assert result["DEBUG"] is False
+    assert result["ALLOWED_HOSTS"] == ["127.0.0.1", "localhost", PUBLIC]
+    assert result["CSRF_TRUSTED_ORIGINS"] == [f"https://{PUBLIC}"]
+    assert result["SECURE_PROXY_SSL_HEADER"] == ["HTTP_X_FORWARDED_PROTO", "https"]
+    assert result["SECURE_SSL_REDIRECT"] is True
+    assert result["SECURE_REDIRECT_EXEMPT"] == ["^healthz$"]
+    assert result["SECURE_HSTS_SECONDS"] == 31536000
+    assert result["SECURE_HSTS_INCLUDE_SUBDOMAINS"] is True
+    assert result["SECURE_CONTENT_TYPE_NOSNIFF"] is True
+    assert result["SECURE_REFERRER_POLICY"] == "same-origin"
+    assert result["SECURE_CROSS_ORIGIN_OPENER_POLICY"] == "same-origin"
+    assert result["X_FRAME_OPTIONS"] == "DENY"
+    assert result["SESSION_COOKIE_SECURE"] is True
+    assert result["CSRF_COOKIE_SECURE"] is True
+    assert result["TRAVEL_PUBLIC_HOSTS"] == [PUBLIC]
+    assert result["TRAVEL_PUBLIC_SCOPE"] == "tracker"
+    assert result["TRAVEL_INGEST_ONLY"] is True
+    assert result["RATELIMIT_CLIENT_IP_HEADER"] == "CF-Connecting-IP"
 
 
 @pytest.mark.slow
@@ -337,22 +326,13 @@ def test_the_ingest_service_runs_with_production_settings():
     ],
 )
 def test_the_ingest_service_refuses_to_start_without_production_settings(override, problem):
-    result = load_settings(**override)
+    result = load_ingest_settings(**override)
     assert result.returncode != 0
     assert "ImproperlyConfigured" in result.stderr
     assert problem in result.stderr
 
 
-def test_production_problems_lists_nothing_for_production_settings():
-    assert (
-        exposure.production_problems(
-            debug=False,
-            proxy_ssl_header=("HTTP_X_FORWARDED_PROTO", "https"),
-            ssl_redirect=True,
-            hsts_seconds=31536000,
-            secure_cookies=True,
-            public_hosts=[PUBLIC],
-            allowed_hosts=["127.0.0.1", PUBLIC],
-        )
-        == []
-    )
+def test_the_ingest_service_needs_hsts_whatever_the_scope():
+    result = load_ingest_settings(DJANGO_HSTS_SECONDS="0", TRAVEL_PUBLIC_SCOPE="tracker")
+    assert result.returncode != 0
+    assert "DJANGO_HSTS_SECONDS must be positive" in result.stderr

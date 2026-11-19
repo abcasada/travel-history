@@ -1,4 +1,9 @@
+import json
+import os
+import subprocess
+import sys
 from contextlib import contextmanager
+from pathlib import Path
 
 from django.db import connections
 from django.urls import URLPattern, URLResolver, get_resolver
@@ -90,3 +95,41 @@ def rollup_mismatches(owner_ids=None, using: str = "default") -> list[tuple]:
             },
         )
         return cursor.fetchall()
+
+
+BACKEND_DIR = Path(__file__).resolve().parent.parent
+# A generated-looking key for settings loaded in a fresh process (production servers refuse
+# short or placeholder keys).
+TEST_SECRET_KEY = "test-only-0123456789abcdefghijklmnopqrstuvwxyz-ABCDEF"
+_DUMP_SETTINGS = """
+import json, sys
+from django.conf import settings
+print(json.dumps({name: getattr(settings, name) for name in sys.argv[1:]}))
+"""
+
+
+def load_settings(env: dict[str, str], names: list[str]) -> subprocess.CompletedProcess:
+    """Settings as a fresh process would load them from this environment (none of this
+    container's DJANGO_/TRAVEL_/OIDC_/RATELIMIT_ variables leak in). stdout holds `names` as
+    JSON when the process succeeds; stderr holds ImproperlyConfigured when it refuses."""
+    prefixes = ("DJANGO_", "TRAVEL_", "OIDC_", "RATELIMIT_")
+    full_env = {
+        **{k: v for k, v in os.environ.items() if not k.startswith(prefixes)},
+        "DJANGO_SETTINGS_MODULE": "config.settings",
+        "DJANGO_SECRET_KEY": TEST_SECRET_KEY,
+        **env,
+    }
+    return subprocess.run(  # noqa: S603 - fixed interpreter and script
+        [sys.executable, "-c", _DUMP_SETTINGS, *names],
+        cwd=BACKEND_DIR,
+        env=full_env,
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+
+
+def loaded(result: subprocess.CompletedProcess) -> dict:
+    assert result.returncode == 0, result.stderr
+    return json.loads(result.stdout)

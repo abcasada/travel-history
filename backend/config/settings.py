@@ -22,8 +22,16 @@ TRAVEL_PUBLIC_HOSTS = [
     host for raw in env.list("TRAVEL_PUBLIC_HOSTS", []) if (host := raw.strip().lower().rstrip("."))
 ]
 TRAVEL_PUBLIC_SCOPE = env.str("TRAVEL_PUBLIC_SCOPE", "tracker")
+# The public name the app lives at; the other public names answer a permanent redirect to the
+# same path on it, except the tracker endpoints (D-96). Default: the first public host.
+TRAVEL_CANONICAL_HOST = env.str("TRAVEL_CANONICAL_HOST", "").strip().lower().rstrip(".") or next(
+    iter(TRAVEL_PUBLIC_HOSTS), ""
+)
 # The internet-facing `ingest` service: the tracker endpoints only, whatever the Host header.
 TRAVEL_INGEST_ONLY = env.bool("TRAVEL_INGEST_ONLY", False)
+# The production stack (compose.prod.yaml, D-96): refuses to start without the production
+# settings of auth.md §7.7 (checked at the end of this file).
+TRAVEL_PRODUCTION = env.bool("TRAVEL_PRODUCTION", False)
 
 ALLOWED_HOSTS = [
     *env.list("DJANGO_ALLOWED_HOSTS", ["localhost", "127.0.0.1"]),
@@ -179,6 +187,10 @@ OIDC_ACCEPTED_ISSUERS = [i for i in [OIDC_ISSUER, *env.list("OIDC_EXTRA_ISSUERS"
 OIDC_ACCEPTED_AUDIENCES = [a for a in [OIDC_CLIENT_ID, *env.list("OIDC_EXTRA_AUDIENCES", [])] if a]
 # Approvals and destructive admin actions need a login at most this many seconds old.
 REAUTH_MAX_AGE = env.int("REAUTH_MAX_AGE", 300)
+# Per-address limits on the public pages (auth.md §7.7): sign-in starts and provider callbacks
+# per 10 minutes each, landing-page views per minute.
+AUTH_RATE_PER_IP = env.int("AUTH_RATE_PER_IP", 30)
+LANDING_RATE_PER_IP = env.int("LANDING_RATE_PER_IP", 60)
 
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"
@@ -274,18 +286,13 @@ LOGGING = {
 # --- Exposure checks -------------------------------------------------------------------------
 if TRAVEL_PUBLIC_SCOPE not in ("tracker", "all"):
     raise ImproperlyConfigured("TRAVEL_PUBLIC_SCOPE must be 'tracker' or 'all'")
-if TRAVEL_INGEST_ONLY:
-    # The internet-facing service refuses to start without production settings.
+if TRAVEL_CANONICAL_HOST and TRAVEL_CANONICAL_HOST not in TRAVEL_PUBLIC_HOSTS:
+    raise ImproperlyConfigured("TRAVEL_CANONICAL_HOST must be one of TRAVEL_PUBLIC_HOSTS")
+if TRAVEL_PRODUCTION or TRAVEL_INGEST_ONLY:
+    # Servers facing the internet refuse to start without production settings (fail closed).
     from travel.core.exposure import production_problems
 
-    _problems = production_problems(
-        debug=DEBUG,
-        proxy_ssl_header=SECURE_PROXY_SSL_HEADER,
-        ssl_redirect=SECURE_SSL_REDIRECT,
-        hsts_seconds=SECURE_HSTS_SECONDS,
-        secure_cookies=SESSION_COOKIE_SECURE,
-        public_hosts=TRAVEL_PUBLIC_HOSTS,
-        allowed_hosts=ALLOWED_HOSTS,
-    )
+    _problems = production_problems(globals())
     if _problems:
-        raise ImproperlyConfigured("TRAVEL_INGEST_ONLY: " + "; ".join(_problems))
+        _which = "TRAVEL_INGEST_ONLY" if TRAVEL_INGEST_ONLY else "TRAVEL_PRODUCTION"
+        raise ImproperlyConfigured(f"{_which}: " + "; ".join(_problems))

@@ -156,16 +156,17 @@ def client_ip(request: HttpRequest) -> str:
 
 
 def limit(
-    scope: str, rate: Rate, key: Callable[[HttpRequest], str] = client_ip
+    scope: str, rate: Rate | Callable[[], Rate], key: Callable[[HttpRequest], str] = client_ip
 ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """View decorator (Django or Ninja; place it below the route decorator). Answers 429 with
-    `Retry-After` once `key(request)` is over the limit."""
+    `Retry-After` once `key(request)` is over the limit. `rate` may be a function returning the
+    rate, read on every request (limits taken from settings)."""
     bucket_key(scope, "")  # an invalid scope fails at import time, not on the first request
 
     def decorator(view: Callable[..., Any]) -> Callable[..., Any]:
         @wraps(view)
         def wrapper(request: HttpRequest, *args: Any, **kwargs: Any) -> Any:
-            decision = hit(scope, key(request), rate)
+            decision = hit(scope, key(request), rate() if callable(rate) else rate)
             if not decision.allowed:
                 return too_many_requests(decision)
             return view(request, *args, **kwargs)

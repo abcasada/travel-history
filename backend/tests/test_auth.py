@@ -16,7 +16,8 @@ from travel.core.loginwall import is_public_path
 from travel.core.rls import rls_context
 from travel.trips.models import Purpose
 
-pytestmark = pytest.mark.django_db
+# The landing page and the sign-in views are rate-limited per address (auth.md §7.7).
+pytestmark = pytest.mark.django_db(databases=["default", "ratelimit"])
 
 ISSUER = "https://idp.example.test/application/o/travel/"
 CLIENT_ID = "travel-web"
