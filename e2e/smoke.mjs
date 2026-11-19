@@ -70,23 +70,25 @@ await page.mouse.click(canvas.x + canvas.width * 0.6, canvas.y + canvas.height *
 await page.getByTestId("place-point").filter({ hasText: /\d+\.\d+, -?\d+\.\d+/ }).waitFor();
 await page.getByRole("form", { name: "New stop" }).getByRole("button", { name: "Add stop" }).click();
 await page.getByText("E2E End", { exact: true }).waitFor();
-// A third stop in Kansas (synthetic: Salina's town centre), so the leg can be routed below.
+// A third stop in Kansas, found by city name in the GeoNames gazetteer (item 14; needs
+// `./dev manage load_gazetteer`), so the leg can be routed below. The city names the stop.
 await page.getByRole("button", { name: "Add stop" }).click();
-await page.getByLabel("Place name").fill("E2E Kansas");
-await page.getByLabel("Coordinates for the new stop").fill("38.8403, -97.6114");
-await page.getByRole("button", { name: "Use", exact: true }).click();
+await page.getByLabel("City for the new stop").fill("Salina, KS");
+await page.getByRole("button", { name: /^Salina, Kansas, United States/ }).click();
+if ((await page.getByLabel("Place name").inputValue()) !== "Salina, KS") throw new Error("city did not name the stop");
+await page.getByTestId("place-point").filter({ hasText: /^38\.8\d+, -97\.6\d+$/ }).waitFor();
 await page.getByRole("form", { name: "New stop" }).getByRole("button", { name: "Add stop" }).click();
-await page.getByText("E2E Kansas", { exact: true }).waitFor();
+await page.getByText("Salina, KS", { exact: true }).waitFor();
 await page.getByRole("button", { name: "Add leg" }).click();
 await page.getByLabel("From stop").selectOption({ label: "E2E Start" });
-await page.getByLabel("To stop").selectOption({ label: "E2E Kansas" });
+await page.getByLabel("To stop").selectOption({ label: "Salina, KS" });
 await page.getByRole("form", { name: "New leg" }).getByRole("button", { name: "Add leg" }).click();
-await page.getByText(/Drive\s+E2E Start\s+→\s+E2E Kansas/).first().waitFor();
+await page.getByText(/Drive\s+E2E Start\s+→\s+Salina, KS/).first().waitFor();
 await page.getByRole("link", { name: "Done" }).click();
 await page.waitForURL(new RegExp(`/app/trips/${tripId}$`));
 await page.getByRole("heading", { name: title }).waitFor();
 await page.getByRole("region", { name: "Who went" }).getByText("Dev Member").waitFor();
-await page.getByRole("region", { name: "Itinerary" }).getByText(/E2E Start → E2E Kansas/).waitFor();
+await page.getByRole("region", { name: "Itinerary" }).getByText(/E2E Start → Salina, KS/).waitFor();
 await page.waitForTimeout(2000);
 await page.screenshot({ path: "out/trip-detail.png" });
 // Routing (work-order item 25): propose a road route for the Kansas leg through the routing

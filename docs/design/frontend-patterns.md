@@ -19,7 +19,7 @@ frontend/src/
                         HistoryLayers; MapPick (pick handler + view tracker); store.ts; geo.ts
   trips/                the catalog feature: paths.ts, filter.ts, labels.ts, cache.ts, pages,
                         editors (TripFieldsForm, ParticipantsEditor, StopsEditor, LegsEditor),
-                        inputs.tsx (PlaceInput, AirportSearch, ZonedTimeInput)
+                        inputs.tsx (PlaceInput, CitySearch, AirportSearch, ZonedTimeInput)
   routing/              a leg's route view: LegRoutePage (list pane), LegRouteLayer (map) - the
                         slot for items 25-26
   ui/                   form.tsx (Field, Button, Section, inputClass), QueryState.tsx
@@ -111,8 +111,10 @@ No form library. Every editor follows the same shape (see `TripFieldsForm`, `Sto
    `datetime-local` + zone with suggestions) and convert with `zonedToUtc` / `utcToZoned`;
    display with `formatInZone`. Dates (trip start/end) are plain `YYYY-MM-DD`; display with
    `formatDate`, never `new Date("2024-05-01")` (that shifts by the browser's zone).
-7. Places: `PlaceInput` (pick on the map, airport search, or typed "lat, lon"). There is no
-   address search: no forward geocoder (D-20); GeoNames isn't loaded yet.
+7. Places: `PlaceInput` (pick on the map, find a city, airport search, or typed "lat, lon").
+   A city (`CitySearch`, `GET /reference/places`, D-94) suggests the stop's name ("Wichita,
+   KS") and, while no times are entered, its time zone; a typed name is never replaced. No
+   street-address search: no forward geocoder (D-20).
 8. Big records are edited in sections that save on their own (the trip edit page: fields,
    people, stops, legs), not one giant form.
 
@@ -267,7 +269,7 @@ Summarised here; full text in [decisions.md](../decisions.md).
 3. No form library: controlled state, `validate`, server field errors in the same slots.
 4. Trip map from a JSON endpoint (`GET /trips/map`) until routes exist; straight legs dashed,
    flights as client-side great-circle arcs.
-5. Stops are placed by map click, airport or coordinates (no address search).
+5. Stops are placed by map click, city (GeoNames, D-94), airport or coordinates (no address search).
 6. "Add me" creates the account's own linked person once (`POST /me/person`); new people
    without accounts via `POST /persons` (family-visible by default).
 7. The trip editor saves section by section; a new trip is created from its fields first.

@@ -136,7 +136,8 @@ and by a trigger.
 | `aircraft_type` | OpenFlights `planes.dat` | name, IATA, ICAO |
 | `country`, `region` | Natural Earth admin-0 / admin-1 (10m) | MultiPolygon, GiST |
 | `us_county` | Census cartographic boundary file (500k) | GEOID, MultiPolygon |
-| `geonames_place` | GeoNames `cities500` (+ admin codes) | names for stops via nearest-place lookup |
+| `geonames_place` | GeoNames `cities500` + US populated places below 500 (+ admin codes, copied admin-1 and country names, folded name) | city search for stops (item 14); names for stops via nearest-place lookup (14a) |
+| `geonames_country`, `geonames_admin1` | GeoNames `countryInfo.txt`, `admin1CodesASCII.txt` | names shown with places |
 | `dataset_version` | — | name, title, source URL, homepage, version, source commit + date, checksum (SHA-256), license + URL, attribution, row count, loaded_at |
 
 ### 5.9 Access, devices, integrations

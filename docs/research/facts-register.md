@@ -73,6 +73,7 @@ and more sources: `docs/research/*.md`. Re-verify before acting on anything olde
 | Natural Earth | public domain; v5.1.x; use `ISO_A2_EH` | naturalearthdata.com | 2026-10-19 | H |
 | Census | 2025 cartographic boundary counties `cb_2025_us_county_500k.zip` | www2.census.gov/geo/tiger/GENZ2025/shp/ | 2026-10-20 | H |
 | GeoNames | CC BY 4.0; cities500 13 MB; admin1 codes often FIPS | download.geonames.org/export/dump/readme.txt | 2026-10-20 | H |
+| GeoNames dump pins (item 14) | Files regenerated daily at unversioned URLs (Last-Modified ≈ 03:00 UTC). Snapshot 2026-11-18: cities500.zip 13,934,578 B sha256 682a5f7e…; US.zip 71,109,884 B 3434a3a5…; countryInfo.txt 79f8f59e…; admin1CodesASCII.txt 2e4867f5…. 237,315 cities500 rows; US.zip has 168,827 kept populated places. asciiname transliterates (Zürich → "Zuerich"); New York's name is "New York City" | HEAD + download of download.geonames.org/export/dump/ | 2026-11-18 | H |
 | ijson | 3.6.0 with C backend wheels | pypi.org/project/ijson | 2026-10-19 | H |
 | Immich | v3.3.3; scoped API keys; `POST /api/search/metadata` with `filter.takenAt` (v3.2+); thumbnails `size=thumbnail|preview`; `PUT /api/assets/{id}` lat/long; no OAuth for third parties | immich OpenAPI spec v3.3.3; docs.immich.app | 2026-10-19 | H |
 | Tauri | 2.12.4; global-shortcut, fs watch, notification plugins | crates.io | 2026-10-19 | H |

@@ -119,3 +119,19 @@ Numbers from the build's `BUILD_INFO.json`, cgroup `memory.peak` and `docker sta
 | Latency | route Wichita → Salina (144.7 km): 410 ms first request; map-match of 2,891 points: 312 ms; 15,880 points: 0.8 s | — |
 
 All well inside the estimates. The NA figures in §13.5 remain unmeasured estimates.
+
+### 21.3 Measured: GeoNames gazetteer (2026-11-18, work-order item 14)
+
+`./dev manage load_gazetteer`, pinned snapshot of 2026-11-18, on the Xeon W3565 with the dev
+stack running.
+
+| What | Measured |
+|---|---|
+| Downloads cached in `/bulk/reference` | 85 MB: `cities500.zip` 13.9 MB, `US.zip` 71.1 MB (307 MB unzipped, read straight from the zip), `countryInfo.txt` 32 kB, `admin1CodesASCII.txt` 152 kB |
+| Rows | 385,097 places: 237,315 from cities500 + 147,782 more from the 168,827 US populated places kept (PPL, PPLA–PPLA5, PPLC, PPLL, PPLS, PPLF, STLMT; neighbourhoods and abandoned or historical places skipped); 252 countries, 3,865 admin-1 names |
+| DB | `geo_geonamesplace` 202 MB (heap 117 MB, indexes 85 MB incl. two prefix indexes ≈ 19 MB each); names tables 1 MB. Dev DB 301 MB → 504 MB |
+| Load time | about 3 min 15 s for all four files (re-runs upsert, same time) |
+| Search | 2–55 ms on the dev DB (a 2-letter prefix like "sa" is the slow end) |
+
+Worth it: the US small-town file costs ~70 MB of download and ~80 MB of DB for every small Kansas
+town GeoNames knows. Well inside the SSD budget.

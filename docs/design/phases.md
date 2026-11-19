@@ -76,7 +76,7 @@ Status markers: ✅ done · 🔄 in progress · ⏳ not started · ⛔ blocked o
 
 | Milestone | Acceptance criteria |
 |---|---|
-| 6.1 Boundaries + geocoding | Natural Earth, Census counties, GeoNames loaded; stops named offline |
+| 6.1 Boundaries + geocoding 🔄 | Natural Earth, Census counties, GeoNames loaded; stops named offline. GeoNames part ✅ 2026-11-18 (item 14, D-94): `load_gazetteer` (cities500 + US populated places, country and admin-1 names; pinned snapshot + SHA-256), `GET /reference/places` (prefix, accents folded, by population, ", state" qualifier), "find a city" in the stop editor of both shells. Natural Earth, Census and reverse geocoding: item 14a |
 | 6.2 Territories | Countries/regions/counties visited, "through" vs "stopped in"; flights count airports only |
 | 6.3 Distances + flight stats | Miles by vehicle, mode, year from saved geometry (great-circle for flights); airports, airlines, aircraft |
 

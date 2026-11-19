@@ -157,6 +157,7 @@ Frontend conventions: [docs/design/frontend-patterns.md](docs/design/frontend-pa
 - D-91 Valhalla: own build script on the pinned 3.9.1 image (non-root, generic User-Agent, md5 check, atomic `current` switch), Kansas coverage polygon with the Missouri corner cut, no default speeds; dev web `DB_CONN_MAX_AGE=0` (pending Adam)
 - D-92 Routing proxy: "no route" ends the chain; ORS/FOSSGIS limits server-wide; per-user proposal cache under RLS; saving uses the server's cached proposal, stores attribution and simplified copies; road modes only
 - D-93 Drag editor saves pieces: cached proposals, own versions, validated drawn points; `hand_edited` with per-source provenance (pending Adam)
+- D-94 GeoNames gazetteer: cities500 + US populated places, pinned snapshot + SHA-256 (cache is the pin, `--latest` re-pins); prefix search on folded names by population; city picker suggests stop name and zone
 
 ## 25. Open questions (for Adam, answer whenever — nothing is blocked on these)
 

@@ -23,5 +23,5 @@ sources*, `/app/about`; the loaded reference datasets come from `dataset_version
 | OpenFlights airlines/aircraft | ODbL 1.0 / DbCL 1.0 | "Airline and aircraft data: OpenFlights.org (ODbL)" with link; derived public datasets under a free license |
 | Natural Earth | public domain | courtesy credit |
 | US Census cartographic boundaries | public domain (US federal work) | courtesy credit |
-| GeoNames | CC BY 4.0 | "Place names: GeoNames (geonames.org), CC BY 4.0" with link |
+| GeoNames | CC BY 4.0 | "Place names: GeoNames (geonames.org), CC BY 4.0" with license link, on the About page from `DatasetVersion` (item 14). Loaded as a subset (cities500, US populated places, country and admin-1 names), names copied onto places, accents folded for search; no other changes |
 | Python/JS dependencies | various permissive (BSD/MIT/Apache) | generated notices file at build time |
