@@ -221,7 +221,9 @@ account, and production refuses `import-from-dev` from then on.
 (925,326 rows, including batch 33's 193,009 points, 53,438 segments and 678,836 roll-ups) and
 `dev-member` (254 rows, including the two synthetic batches whose raw files were lost with the
 HDD); after pruning, one account, 45 identical checks, 1 raw file verified, and
-`./dev prod restore-test` passed (72 tables/checks, raw files 1/1). The backup gate (an encrypted
+`./dev prod restore-test` passed (72 tables/checks, raw files 1/1). A second run, with the steps
+moved into `scripts/import-from-dev.sh`, passed the same way (the raw file already in place was
+compared, not copied again); dev still had its 2 accounts and 193,033 points. The backup gate (an encrypted
 backup with the real key) stays open until `AGE_RECIPIENT` is set.
 
 ## Memory
