@@ -2,7 +2,7 @@
 
 Handoff note for the next session or subagent. Keep it short; overwrite, don't append history.
 
-- **Item 14b done (2026-11-19):** stop and leg notes (migration trips 0007, applied to dev). Next: 40a (G-1 to G-5 answered; G-6: keep the Timeline raw file).
+- **Item 40a in progress (2026-11-19):** production stack separate from dev. Plan: (1) backend: startup hardening for `TRAVEL_PRODUCTION`, trips.* → travel.* redirect, DEBUG unknown-host 404, per-IP limits on `/`, `/auth/login`, `/auth/callback`; (2) `compose.prod.yaml` + `scripts/prod.sh` (`./dev prod …`, release dirs from pushed main, state in `../travel-history-prod/`), ingest moves there; (3) deploy, smoke, RAM measurement; (4) docs (D-28, D-96, CLAUDE.md, production.md). Item 14b done before it.
 - **Order:** 40a → 40b → 40c → 40d → 41a → (42a) → pause (findings + exposure "go") → 40e → 14c (spreadsheet importer) → 4 → 21 → 27 → pause B → 11 → 12 → pause A → 15 … 24 → 14a → 28, then 29–46.
 - **Adam's go-live answers (defaults):** public at travel.adamcasada.com behind Authentik 2FA (exposure needs his explicit "go" and his tunnel change); trips.* redirects to travel.*; he creates family accounts in Authentik (group `travel-users`), they become Members; request-access form later; focused security review before go-live; dev-admin's data moves to his real account. Authentik runs on the host; he's setting it up per docs/design/auth.md §7.2.
 - **Dev DB holds real data:** Adam's Timeline import (batch 33: 193,009 points, 53,438 segments) and hand-entered trips. Never wipe it. Don't restart web/worker during an import.
