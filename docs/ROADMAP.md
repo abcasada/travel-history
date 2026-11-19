@@ -118,7 +118,7 @@ Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhi
       - API schemas, OpenAPI + client regenerated; the stop and leg editors and the trip page show and edit them in both shells.
       - API + RLS tests per actor; matrix note if anything changes. Add Notes columns for stops and legs to the spreadsheet design (trip-sheet.md §28) and the template.
       - Not in scope: family members' own per-stop/leg contribution notes (decided 2026-11-18: not now).
-      - Status: todo
+      - Status: done (2026-11-18)
     - **14c. [H] Trip spreadsheet importer** (D-95, docs/design/trip-sheet.md §28; Q-18 to Q-21 answered). Parser (add defusedxml), resolvers (gazetteer, airports, coordinates), preview/commit API and CLI, new tables with RLS, matrix rows, the preview UI, e2e upload. May need 2 dispatches (UI separately). Runs after the go-live slice (Adam, 2026-11-18: notes first, then go-live).
       - Status: todo
 15. **[H] T9:** home-period detection.
@@ -195,7 +195,7 @@ Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhi
 - **How real data moves:** a dump and restore of the whole dev DB into production's empty DB, then pruning the copy. This beats a per-user export or re-entering trips, which would need new code and lose the hand-entered trips.
 - **Why the handover rebinds the identity instead of moving rows:** raw points and raw files reject UPDATE (D-49), so ownership can't move row by row. Keeping the old account id leaves every row in place.
 
-40a. **[X] Production stack, separate from dev (PROPOSED: G-1).**
+40a. **[X] Production stack, separate from dev (G-1 answered: yes).**
    - **Project:** its own compose project (e.g. `travel-history-prod`) with:
      - its own DB volume;
      - `.env.prod` (0600; freshly generated DB passwords and secret key; Adam adds the OIDC secret and `AGE_RECIPIENT`);
@@ -464,3 +464,4 @@ Nature: mech = mechanical, mod = moderate, hard. Size is S/M/L/XL with approxima
 - 2026-11-18: item 14 done and verified (`./dev test-quick` 2239 + 104 passed; e2e adds a stop by city; 385,097 places loaded in dev). Batch 33 re-checked intact. Spreadsheet design branch merged; its decision renumbered D-95 because item 14 took D-94.
 - 2026-11-18: Adam delegated: "answer yourself any you're confident in." The orchestrator answered G-1 to G-5 (recommended defaults; port 8784 checked free), Q-18, Q-19, Q-21 (defaults) and Q-20 (preview offers an unticked "create these people" option), and approved D-88 to D-95 (D-92/D-94 were never marked pending). Also decided: family members' own per-stop/leg notes are not added now. Still Adam's: G-6 (deleting real data, needed only at item 4) and whether the stop/leg notes item and the spreadsheet importer run before or after the go-live slice.
 - 2026-11-18: Adam: "stop/leg notes first"; G-6: keep the GPS Timeline import, anything else in dev may be deleted. Added 14b [M] stop and leg notes (runs now) and 14c [H] spreadsheet importer (after 40e; Adam named only notes as going first). Item 4 now keeps the Timeline raw file.
+- 2026-11-18: item 14b done and verified (`./dev test-quick` 2274 + 105 passed; batch 33 intact). Contributors can edit notes on their own legs through the API, but the UI doesn't offer it yet (item 21). Item 40a dispatched.
