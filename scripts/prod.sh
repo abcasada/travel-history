@@ -12,6 +12,7 @@ usage() {
                              (fresh secrets, mode 0600); never overwrites an existing file
 ./dev prod deploy            build pushed main into images tagged by its commit, back up (when
                              AGE_RECIPIENT is set), migrate, restart, smoke-test
+./dev prod up                apply .env.prod changes: recreate what changed (deployed image)
 ./dev prod status            deployed commit, containers and health
 ./dev prod ps | logs [svc]   show the stack / follow its logs
 ./dev prod migrate           run migrations with the deployed image (owner role)
@@ -127,6 +128,19 @@ deploy() {
   "$REPO_ROOT/scripts/prod-smoke.sh"
 }
 
+# Recreates the containers whose settings changed (e.g. after Adam pastes a secret into
+# .env.prod), with the deployed image: no build, no new code.
+up() {
+  local ingest_running=false
+  [ -n "$(prod_compose --profile tracker ps -q ingest 2>/dev/null)" ] && ingest_running=true
+  prod_compose up -d --no-build db web worker backup
+  $ingest_running && prod_compose --profile tracker up -d --no-build ingest
+  wait_healthy prod_compose web 60 || {
+    prod_compose logs --tail=40 web
+    exit 1
+  }
+}
+
 status() {
   local commit
   commit="$(prod_commit)"
@@ -163,6 +177,7 @@ shift || true
 case "$cmd" in
   init) init ;;
   deploy) deploy ;;
+  up) up ;;
   status) status ;;
   ps) prod_compose ps "$@" ;;
   logs) prod_compose logs -f --tail=100 "$@" ;;

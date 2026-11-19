@@ -11,7 +11,9 @@ milestones 2.1–2.4 done (2.4 tracker ingestion built and tested locally). Work
 guard and production settings; the tunnel route waits for Adam's "go"
 ([docs/tracking/exposure.md](docs/tracking/exposure.md)). Phase 4: the trips API (T18) is done (item 13, 2026-11-19); the catalog UI's first slice (T19 session 1, item 20, 2026-11-19) lets you add, view and edit trips with legs, stops and people, on the map; patterns in [docs/design/frontend-patterns.md](docs/design/frontend-patterns.md). Milestone 4.1 (item 17, 2026-11-18): self-hosted Valhalla 3.9.1 with Kansas tiles runs as its own compose project on the `valhalla` network ([docs/valhalla.md](docs/valhalla.md)); routing proxy and manual routed legs done (item 25, 2026-11-19: Valhalla in Kansas, ORS once `ORS_API_KEY` is set, FOSSGIS fallback; D-92); drag-to-reshape editor core (item 26, gpx.studio port, D-93). Work now follows the
 orchestrated work order in [docs/ROADMAP.md](docs/ROADMAP.md) (process:
-[docs/ORCHESTRATION.md](docs/ORCHESTRATION.md)).
+[docs/ORCHESTRATION.md](docs/ORCHESTRATION.md)). Family go-live slice: the production stack
+runs separately from dev (item 40a, 2026-11-19: `./dev prod …`, web on `127.0.0.1:8784`, not
+exposed; [docs/production.md](docs/production.md), D-96).
 
 | Phase | Status | Detail |
 |---|---|---|
@@ -58,7 +60,7 @@ means §6.3 in the file below.
 | 27 | Licenses and attributions | [docs/design/licenses.md](docs/design/licenses.md) |
 | 28 | Trip spreadsheet import (design; template in docs/trips/) | [docs/design/trip-sheet.md](docs/design/trip-sheet.md) |
 
-Frontend conventions: [docs/design/frontend-patterns.md](docs/design/frontend-patterns.md) (pages, data, forms, errors, map layers, tests). Other guides: [backups to the NAS](docs/backup-nas.md), [restore](docs/restore.md),
+Frontend conventions: [docs/design/frontend-patterns.md](docs/design/frontend-patterns.md) (pages, data, forms, errors, map layers, tests). Other guides: [the production stack](docs/production.md), [backups to the NAS](docs/backup-nas.md), [restore](docs/restore.md),
 [Timeline export](docs/timeline-export.md); research notes in `docs/research/` (read only when needed).
 
 ## Decisions (one line each; full text and reasoning in [docs/decisions.md](docs/decisions.md))
@@ -92,7 +94,7 @@ Frontend conventions: [docs/design/frontend-patterns.md](docs/design/frontend-pa
 - D-25 Privacy zones clip every route portion inside a home buffer
 - D-26 Desktop wrapper later: Tauri 2 over Electron
 - D-27 Viewer role is read-only
-- D-28 Exposure: `127.0.0.1:8780` plus the LAN address only
+- D-28 Exposure: dev `127.0.0.1:8780` plus the LAN address; production web `127.0.0.1:8784` only (amended by D-96)
 - D-29 Valhalla in `valhalla/` as its own compose project
 - D-30 Backups encrypted with age; private key offline; NAS pulls
 - D-31 Python 3.13
@@ -160,6 +162,7 @@ Frontend conventions: [docs/design/frontend-patterns.md](docs/design/frontend-pa
 - D-93 Drag editor saves pieces: cached proposals, own versions, validated drawn points; `hand_edited` with per-source provenance (pending Adam)
 - D-94 GeoNames gazetteer: cities500 + US populated places, pinned snapshot + SHA-256 (cache is the pin, `--latest` re-pins); prefix search on folded names by population; city picker suggests stop name and zone
 - D-95 Trip spreadsheet: one trip per `.xlsx` tab; trip block, stops header, legs header found by content; legs cite stops by row number, label or `=ROW()`; places never guessed; preview before commit; re-import by trip key, never deletes by absence (pending Adam)
+- D-96 Production stack: own compose project, DB and `.env.prod` beside the repo; deployed only from pushed `main` via a release directory, images tagged by commit; §7.7 enforced at startup; trips.* redirects to travel.*; dev never answers a public name (pending Adam)
 
 ## 25. Open questions (for Adam, answer whenever — nothing is blocked on these)
 
