@@ -54,6 +54,7 @@ All through `./dev prod` (`scripts/prod.sh`); `./dev prod help` lists them.
 | `./dev prod backup-now` | One encrypted backup into `bulk/backup-outbox`. Refuses without `AGE_RECIPIENT`. |
 | `./dev prod restore-test` | Backup with a throwaway key, restore into a scratch database, compare every table's row count, the policies and the `app` functions, verify the raw files' checksums. |
 | `./dev prod import-from-dev` | Replaces production's database with a pruned, verified copy of development's (see [Copying the data from development](#copying-the-data-from-development-item-40b-d-97)). Refused once production has a real sign-in identity. |
+| `./dev prod import-test` | The same steps against scratch containers with SYNTHETIC data, including both refusals. |
 | `./dev prod smoke` | The local smoke test (below). |
 | `./dev prod down` | Stops the stack. The database volume stays. |
 | `./dev prod tracker start\|stop\|logs\|ps\|smoke` | The internet-facing tracker endpoint (`ingest`, docs/tracking/exposure.md). `./dev tracker …` does the same. |
@@ -186,8 +187,10 @@ keep running. Production's database is untouched until step 7.
 4. **Verify** in dev and in the copy: the kept account's rows in every table that refers to an
    account, each of its batches' points (batch 33: 193,009), the policy count and the `app`
    function count must be identical, and only one account may remain. Any difference stops the
-   copy with production unchanged. (If the kept account ever has synthetic or e2e rows in dev,
-   they show up here as a difference, on purpose.)
+   copy with production unchanged. The rows the pruning removes from the kept account on purpose
+   (its SYNTHETIC batches, as the pruning reported them, and rows named `E2E …`) are left out on
+   both sides; anything else they cascade to (legs of an `E2E` trip, say) shows up as a
+   difference and stops the copy.
 5. **Raw files** the remaining rows reference are copied from dev's `raw/` into production's
    (`0444`; an existing file with other content stops the copy, raw files are never
    overwritten), then each is decompressed and checked against its recorded SHA-256 in the
@@ -199,6 +202,13 @@ keep running. Production's database is untouched until step 7.
 7. **Swap:** with `AGE_RECIPIENT` set, a backup of the database being replaced; then `web`,
    `worker`, `backup` (and `ingest`) stop, `travel` is dropped and `travel_import` renamed to
    `travel`, and the services start again and pass their health check.
+
+`./dev prod import-test` (`scripts/import-from-dev-test.sh`) runs the same steps
+(`scripts/import-from-dev.sh`) against two scratch PostGIS containers on an internal network,
+migrated with the working tree's code and holding SYNTHETIC data only: a copy that prunes the
+other account and the kept account's SYNTHETIC batch, a repeat, and both refusals (migrations
+differ; a real identity in production), each leaving the scratch production unchanged. The
+pruning itself has unit tests in `backend/tests/test_devcopy.py`.
 
 The staging database and the temporary directory (`import.*` in the production directory, holding
 only the migration list and the verification counts) are removed on exit, whatever happens.

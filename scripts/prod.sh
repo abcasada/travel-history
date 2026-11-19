@@ -22,6 +22,7 @@ usage() {
 ./dev prod restore-test      backup with a throwaway key -> restore into a scratch DB -> compare
 ./dev prod import-from-dev   replace production's database with a pruned copy of dev's (item 40b;
                              refused once production has a real sign-in identity)
+./dev prod import-test       import-from-dev against scratch containers with SYNTHETIC data
 ./dev prod smoke             local smoke test of 127.0.0.1:8784 (headers, private paths, redirect)
 ./dev prod down              stop the stack (the database volume stays)
 ./dev prod tracker start|stop|logs|ps|smoke [url]   the internet-facing tracker endpoint (8783)
@@ -182,141 +183,46 @@ tracker() {
   esac
 }
 
-# ---- import-from-dev (item 40b, docs/production.md "Copying the data from development") ----
-# Dev's database is only read (pg_dump, SELECTs) and its raw files only copied, never changed.
-STAGING_DB=travel_import
-KEEP_ACCOUNT="${TRAVEL_KEEP_ACCOUNT:-dev-admin@example.test}"
+# ---- import-from-dev (item 40b, D-97): scripts/import-from-dev.sh, with production's hooks ----
+# shellcheck source=scripts/import-from-dev.sh
+source "$REPO_ROOT/scripts/import-from-dev.sh"
 
-# Per-table rows of the kept account (every foreign key to accounts_user), its batches' points,
-# the policies and the `app` functions: equal in dev and in the pruned copy.
-VERIFY_SQL=$(cat <<'SQL'
-WITH k AS (SELECT id FROM accounts_user WHERE lower(email) = lower(:'keep'))
-SELECT 'rows ' || cl.relname || '.' || a.attname || '=' || (xpath('/row/c/text()', query_to_xml(
-  format('select count(*) as c from %I where %I = %s', cl.relname, a.attname, k.id),
-  false, true, '')))[1]::text
-FROM pg_constraint co JOIN pg_class cl ON cl.oid = co.conrelid
-JOIN pg_attribute a ON a.attrelid = co.conrelid AND a.attnum = co.conkey[1], k
-WHERE co.contype = 'f' AND co.confrelid = 'accounts_user'::regclass
-UNION ALL SELECT 'batch ' || b.id || ' points=' || (SELECT count(*) FROM history_locationpoint p
-  WHERE p.import_batch_id = b.id) FROM history_importbatch b, k WHERE b.owner_id = k.id
-UNION ALL SELECT 'policies=' || count(*) FROM pg_policies
-UNION ALL SELECT 'app_functions=' || count(*) FROM pg_proc p JOIN pg_namespace n
-  ON n.oid = p.pronamespace WHERE n.nspname = 'app'
-ORDER BY 1;
-SQL
-)
-
-import_from_dev() {
+import_from_dev_prod() {
   prod_check_env_file
-  local commit work dev_bulk dev_raw prod_raw ingest_running=false
+  local commit ingest_running=false dev_bulk
   commit="$(prod_commit)"
   [ -n "$commit" ] || die "nothing deployed yet: run ./dev prod deploy"
   [ -n "$(dev_compose ps -q db 2>/dev/null)" ] || die "the development database isn't running"
   dev_bulk="$(grep -E '^TRAVEL_BULK_DIR=' .env 2>/dev/null | head -1 | cut -d= -f2- || true)"
   dev_bulk="${dev_bulk:-./var/bulk}"
   [[ "$dev_bulk" = /* ]] || dev_bulk="$REPO_ROOT/${dev_bulk#./}"
-  dev_raw="$dev_bulk/raw"
-  prod_raw="$PROD_DIR/bulk/raw"
-  [ -d "$dev_raw" ] || die "dev's raw archive $dev_raw is missing"
-  work="$(mktemp -d "$PROD_DIR/import.XXXXXX")"
-  # shellcheck disable=SC2064
-  trap "rm -rf '$work'; prod_compose exec -T db psql -q -U postgres -d postgres -c 'DROP DATABASE IF EXISTS $STAGING_DB WITH (FORCE)' >/dev/null 2>&1 || true" EXIT
-  dev_sql() { dev_compose exec -T db psql -v ON_ERROR_STOP=1 -U travel_owner -d travel -At "$@"; }
-  prod_sql() {  # database, psql args
-    local db="$1"
-    shift
-    prod_compose exec -T db psql -v ON_ERROR_STOP=1 -U travel_owner -d "$db" -At "$@"
+  dev_db() { dev_compose exec -T db "$@"; }
+  prod_db() { prod_compose exec -T db "$@"; }
+  prod_dev_copy() {  # staging-db-or-empty, work dir, dev raw dir, dev_copy arguments...
+    local db="$1" work="$2" raw="$3"
+    shift 3
+    prod_compose --profile tools run --rm ${db:+-e DB_NAME="$db"} -v "$work:/work:ro" \
+      -v "$raw:/devraw:ro" tools python manage.py dev_copy "$@"
   }
-  prod_super() { prod_compose exec -T db psql -q -v ON_ERROR_STOP=1 -U postgres -d postgres "$@"; }
-  manage_copy() {  # extra compose-run args..., then the dev_copy arguments after --
-    prod_compose --profile tools run --rm -v "$work:/work:ro" -v "$dev_raw:/devraw:ro" "$@"
+  swap_stop() {
+    [ -n "$(prod_compose --profile tracker ps -q ingest 2>/dev/null)" ] && ingest_running=true
+    if [ -n "$(prod_env_value AGE_RECIPIENT)" ]; then
+      echo "    backup of the database being replaced"
+      prod_compose run --rm backup /backup/backup.sh
+    fi
+    prod_compose --profile tracker stop web worker backup ingest >/dev/null 2>&1 || true
   }
-
+  swap_start() {
+    prod_compose up -d --no-build web worker backup
+    if $ingest_running; then prod_compose --profile tracker up -d --no-build ingest; fi
+    wait_healthy prod_compose web 60 || {
+      prod_compose logs --tail=40 web
+      exit 1
+    }
+  }
   prod_compose up -d --no-build db >/dev/null
   wait_healthy prod_compose db 30 >/dev/null || die "production's database isn't healthy"
-
-  echo "1/7 refusals: the same migrations, no real sign-in identity in production"
-  dev_sql -c "SELECT app || '.' || name FROM django_migrations ORDER BY 1" > "$work/dev-migrations.txt"
-  manage_copy tools python manage.py dev_copy check --dev-migrations /work/dev-migrations.txt
-
-  echo "2/7 copy dev's database into the staging database $STAGING_DB (piped, nothing on disk)"
-  prod_super -c "DROP DATABASE IF EXISTS $STAGING_DB WITH (FORCE)" \
-    -c "CREATE DATABASE $STAGING_DB OWNER travel_owner TEMPLATE template1" \
-    -c "REVOKE ALL ON DATABASE $STAGING_DB FROM PUBLIC" \
-    -c "GRANT CONNECT, TEMPORARY ON DATABASE $STAGING_DB TO travel_app, travel_public"
-  dev_compose exec -T db pg_dump -U travel_owner -d travel -Fc \
-    --exclude-table-data=public.spatial_ref_sys \
-    | prod_compose exec -T db pg_restore -U travel_owner -d "$STAGING_DB" --no-comments --exit-on-error
-
-  echo "3/7 inventory (dry run), then prune the copy down to $KEEP_ACCOUNT"
-  manage_copy -e DB_NAME="$STAGING_DB" tools python manage.py dev_copy prune \
-    --keep "$KEEP_ACCOUNT" --raw-dir /devraw
-  manage_copy -e DB_NAME="$STAGING_DB" tools python manage.py dev_copy prune \
-    --keep "$KEEP_ACCOUNT" --raw-dir /devraw --execute | tail -n 4
-
-  echo "4/7 verify: the kept account's rows, batches, policies and functions equal dev's"
-  dev_sql -v keep="$KEEP_ACCOUNT" <<<"$VERIFY_SQL" > "$work/dev.txt"
-  prod_sql "$STAGING_DB" -v keep="$KEEP_ACCOUNT" <<<"$VERIFY_SQL" > "$work/copy.txt"
-  [ -s "$work/dev.txt" ] || die "no verification output from dev"
-  if ! diff -u "$work/dev.txt" "$work/copy.txt"; then
-    die "the copy differs from dev (above); production is unchanged"
-  fi
-  [ "$(prod_sql "$STAGING_DB" -c 'SELECT count(*) FROM accounts_user')" = 1 ] \
-    || die "the copy still has more than one account; production is unchanged"
-  grep '^batch ' "$work/copy.txt" | sed 's/^/    /'
-  echo "    $(wc -l < "$work/copy.txt") checks identical"
-
-  echo "5/7 raw files the copy references -> $prod_raw (read-only, SHA-256 verified)"
-  prod_sql "$STAGING_DB" -F '|' -c "SELECT storage_path, sha256 FROM history_rawfile ORDER BY 1" \
-    > "$work/raw.txt"
-  local path src dst
-  while IFS='|' read -r path _; do
-    [ -n "$path" ] || continue
-    [[ "$path" != *..* && "$path" != /* ]] || die "unexpected raw path $path"
-    src="$dev_raw/$path"
-    dst="$prod_raw/$path"
-    [ -f "$src" ] || die "raw file $path is missing in dev"
-    if [ -e "$dst" ]; then
-      cmp -s "$src" "$dst" || die "$dst exists with other content; raw files are never overwritten"
-    else
-      mkdir -p "$(dirname "$dst")"
-      cp --preserve=timestamps "$src" "$dst.tmp"
-      chmod 0444 "$dst.tmp"
-      mv "$dst.tmp" "$dst"
-    fi
-  done < "$work/raw.txt"
-  docker run --rm -i --network none --user "$(id -u):$(id -g)" -v "$prod_raw:/raw:ro" \
-    "travel-history-backup:${commit:0:12}" sh -ec '
-      n=0
-      while IFS="|" read -r path sum; do
-        [ -n "$path" ] || continue
-        actual="$(zstd -q -d -c "/raw/$path" | sha256sum | cut -d" " -f1)"
-        [ "$actual" = "$sum" ] || { echo "CHECKSUM MISMATCH $path" >&2; exit 1; }
-        n=$((n + 1))
-      done
-      echo "    raw files verified: $n"' < "$work/raw.txt"
-
-  echo "6/7 reference download cache (GeoNames, airports) -> production bulk storage"
-  if [ -d "$dev_bulk/reference" ]; then
-    mkdir -p "$PROD_DIR/bulk/reference"
-    cp -a --update=none "$dev_bulk/reference/." "$PROD_DIR/bulk/reference/"
-  fi
-
-  echo "7/7 swap the copy in as production's database"
-  [ -n "$(prod_compose --profile tracker ps -q ingest 2>/dev/null)" ] && ingest_running=true
-  if [ -n "$(prod_env_value AGE_RECIPIENT)" ]; then
-    echo "    backup of the database being replaced"
-    prod_compose run --rm backup /backup/backup.sh
-  fi
-  prod_compose --profile tracker stop web worker backup ingest >/dev/null 2>&1 || true
-  prod_super -c "DROP DATABASE travel WITH (FORCE)" -c "ALTER DATABASE $STAGING_DB RENAME TO travel"
-  prod_compose up -d --no-build web worker backup
-  $ingest_running && prod_compose --profile tracker up -d --no-build ingest
-  wait_healthy prod_compose web 60 || {
-    prod_compose logs --tail=40 web
-    exit 1
-  }
-  echo "import-from-dev done: production holds $KEEP_ACCOUNT's data from dev"
+  import_from_dev "$dev_bulk" "$PROD_DIR/bulk" "$PROD_DIR" "travel-history-backup:${commit:0:12}"
 }
 
 cmd="${1:-help}"
@@ -334,7 +240,8 @@ case "$cmd" in
   psql) prod_compose exec db psql -U travel_owner -d travel "$@" ;;
   backup-now) prod_compose run --rm backup /backup/backup.sh ;;
   restore-test) "$REPO_ROOT/scripts/restore-test.sh" prod ;;
-  import-from-dev) import_from_dev ;;
+  import-from-dev) import_from_dev_prod ;;
+  import-test) "$REPO_ROOT/scripts/import-from-dev-test.sh" ;;
   smoke) "$REPO_ROOT/scripts/prod-smoke.sh" "$@" ;;
   down) prod_compose --profile tracker --profile tools down ;;
   tracker) tracker "$@" ;;
