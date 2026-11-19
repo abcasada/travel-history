@@ -5,7 +5,7 @@ Only the orchestrator and the planner edit this file. Status values: todo · in 
 ## Work order
 
 > **Execution order (2026-11-18, planner, from Adam's 2026-11-18 priorities: city search, then family go-live):**
-> **14** → **40a** → **40b** → **40c** (build and final copy, then the handover after Adam's first sign-in) → **40d** → **41a** → **42a** (only if 41a finds blockers) → **pause: 41a's findings + the exposure "go"** → **40e** → **4** → 21 (21a list tools, 21b trip page; frontend-patterns.md §8) → 27 → **Review pause B** → 11 → 12 → **Review pause A** → 15 → 16 → 18 → 19 → 22 → 23 → 24 → 14a → 28, then 29–46 in number order (40 and 41 are now the rest of T38 and the full final review).
+> **14** → **14b** → **40a** → **40b** → **40c** (build and final copy, then the handover after Adam's first sign-in) → **40d** → **41a** → **42a** (only if 41a finds blockers) → **pause: 41a's findings + the exposure "go"** → **40e** → **14c** → **4** → 21 (21a list tools, 21b trip page; frontend-patterns.md §8) → 27 → **Review pause B** → 11 → 12 → **Review pause A** → 15 → 16 → 18 → 19 → 22 → 23 → 24 → 14a → 28, then 29–46 in number order (40 and 41 are now the rest of T38 and the full final review).
 > Location tracking (item 8's last step) stays on hold; when it resumes, it deploys the production stack's `ingest` (40a), never dev's. Earlier orders are in the changelog.
 >
 > **Go-live gates:** 40a waits for G-1; 40c's handover for G-3 and G-4; 40e for G-2's backup, 41a's blockers fixed, and Adam's "go" plus his tunnel change; item 4 for G-6. Adam pastes the Authentik client secret and `AGE_RECIPIENT` into `.env.prod` himself. From 40c's final copy on, Adam enters data only in production. Family members sign in only after 40e. If answers are missing when an item needs them, run 21 and 27 meanwhile.
@@ -16,7 +16,7 @@ Only the orchestrator and the planner edit this file. Status values: todo · in 
 > - **G-3 Handover method (40c):** the first Authentik sign-in creates an empty account. An owner-only command then moves that Authentik login onto the old dev-admin account, so every row stays put, and deletes the empty account. Accounts are never matched by email. **Yes.** **Answered 2026-11-18 by the orchestrator under Adam's delegation: yes.**
 > - **G-4 Sign-in test before exposure (40c):** over an SSH port-forward to localhost (Q-8's method), which needs a temporary second redirect URI `http://localhost:8784/auth/callback` in the Authentik provider, removed at go-live. **Yes.** If no, the first real sign-in and the handover happen right after exposure. **Answered 2026-11-18 by the orchestrator under Adam's delegation: yes; Adam adds the temporary redirect URI in Authentik.**
 > - **G-5 Second-factor check (40c):** refuse sign-ins whose Authentik ID token shows no second factor (`amr`), if Authentik reports one. This is defence in depth if the flow is ever misconfigured. **Yes.** **Answered 2026-11-18 by the orchestrator under Adam's delegation: yes.**
-> - **G-6 Dev cleanup (item 4, deleting real data):** delete the dev copy of the real data (dev DB volume and `var/bulk` raw archive) once production's copy is verified and backed up. Export files in `data/private/` are untouched. **Yes.** **Still Adam's to answer (deleting real data); not needed until item 4.**
+> - **G-6 Dev cleanup (item 4, deleting real data):** delete the dev copy of the real data (dev DB volume and `var/bulk` raw archive) once production's copy is verified and backed up. Export files in `data/private/` are untouched. **Yes.** **Answered 2026-11-18 by Adam: keep the GPS Timeline import (never delete its raw file, batch 33's raw file in dev bulk); anything else in dev may be deleted.**
 > - Still open from earlier: D-89 to D-93 (**yes** to all).
 
 Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhigh. Task IDs (T1…T46) and finding numbers (#1…#16) are from the 2026-10-21 audit; their descriptions and dependencies are in the Task reference below. Each item is one dispatch unless noted.
@@ -56,9 +56,9 @@ Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhi
      - a production backup has run (G-2);
      - production's raw-file checksums match the dev originals;
      - Adam approved G-6 (deleting real data is on CLAUDE.md's stop-and-ask list).
-   - Reset the dev DB volume and delete the dev bulk directory's contents (`var/bulk`, D-84), so dev holds synthetic data only again (D-67's intent). Never touch `data/private/`.
+   - Reset the dev DB volume and delete the dev bulk directory's contents (`var/bulk`, D-84), so dev holds synthetic data only again (D-67's intent), **except the GPS Timeline raw import file(s) (batch 33's raw file), which Adam said must stay (G-6)**: keep them byte-identical (checksum before and after), moving them only within var/bulk if needed. Never touch `data/private/`.
    - Afterwards: `./dev up`, migrations, `./dev e2e`, the quick suite and `./dev restore-test` pass on the empty dev stack. The mock `dev-admin` login now opens an empty account.
-   - Status: todo (re-planned 2026-11-18; PROPOSED: needs G-6)
+   - Status: todo (re-planned 2026-11-18; G-6 answered)
 5. **[H] T6:** raw-history map. ← my history becomes viewable
    - Status: done (2026-11-11)
    - **5a. [H] T6 follow-ups:**
@@ -112,6 +112,14 @@ Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhi
       - Natural Earth admin-0/1 and Census county loaders, same pattern as item 14.
       - Stops named offline ("near <town>, <state>", phases.md 6.1, D-20).
       - Runs before item 28 (territories), which needs the boundaries.
+      - Status: todo
+    - **14b. [M] Stop and leg notes.** Adam's request, 2026-11-18; runs right after item 14.
+      - A free-text `notes` field on each stop and each leg (new migration), edited by whoever can edit that stop or leg (travel.core.policy), readable by whoever can see it, like `Trip.notes`. Private: never in public snapshots (permissions.md §6.5).
+      - API schemas, OpenAPI + client regenerated; the stop and leg editors and the trip page show and edit them in both shells.
+      - API + RLS tests per actor; matrix note if anything changes. Add Notes columns for stops and legs to the spreadsheet design (trip-sheet.md §28) and the template.
+      - Not in scope: family members' own per-stop/leg contribution notes (decided 2026-11-18: not now).
+      - Status: todo
+    - **14c. [H] Trip spreadsheet importer** (D-95, docs/design/trip-sheet.md §28; Q-18 to Q-21 answered). Parser (add defusedxml), resolvers (gazetteer, airports, coordinates), preview/commit API and CLI, new tables with RLS, matrix rows, the preview UI, e2e upload. May need 2 dispatches (UI separately). Runs after the go-live slice (Adam, 2026-11-18: notes first, then go-live).
       - Status: todo
 15. **[H] T9:** home-period detection.
     - Status: todo
@@ -455,3 +463,4 @@ Nature: mech = mechanical, mod = moderate, hard. Size is S/M/L/XL with approxima
 - 2026-11-18: Adam wants notes on individual stops and legs (today: Trip.notes, TripNote contributions on the trip only, and a short note per route version; nothing on stops or legs). Proposed fix item: [M] stop and leg notes (a notes field on each, editable by whoever can edit that stop/leg, private and never in public snapshots; editors in both shells), plus Notes columns in the spreadsheet's stops and legs blocks. Placement waits for Adam's answer (recommended: right after item 14, before the importer).
 - 2026-11-18: item 14 done and verified (`./dev test-quick` 2239 + 104 passed; e2e adds a stop by city; 385,097 places loaded in dev). Batch 33 re-checked intact. Spreadsheet design branch merged; its decision renumbered D-95 because item 14 took D-94.
 - 2026-11-18: Adam delegated: "answer yourself any you're confident in." The orchestrator answered G-1 to G-5 (recommended defaults; port 8784 checked free), Q-18, Q-19, Q-21 (defaults) and Q-20 (preview offers an unticked "create these people" option), and approved D-88 to D-95 (D-92/D-94 were never marked pending). Also decided: family members' own per-stop/leg notes are not added now. Still Adam's: G-6 (deleting real data, needed only at item 4) and whether the stop/leg notes item and the spreadsheet importer run before or after the go-live slice.
+- 2026-11-18: Adam: "stop/leg notes first"; G-6: keep the GPS Timeline import, anything else in dev may be deleted. Added 14b [M] stop and leg notes (runs now) and 14c [H] spreadsheet importer (after 40e; Adam named only notes as going first). Item 4 now keeps the Timeline raw file.
