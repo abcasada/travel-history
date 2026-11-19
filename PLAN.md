@@ -56,6 +56,7 @@ means §6.3 in the file below.
 | 25 | Open questions | below, in this file |
 | 26 | External facts register | [docs/research/facts-register.md](docs/research/facts-register.md) |
 | 27 | Licenses and attributions | [docs/design/licenses.md](docs/design/licenses.md) |
+| 28 | Trip spreadsheet import (design; template in docs/trips/) | [docs/design/trip-sheet.md](docs/design/trip-sheet.md) |
 
 Frontend conventions: [docs/design/frontend-patterns.md](docs/design/frontend-patterns.md) (pages, data, forms, errors, map layers, tests). Other guides: [backups to the NAS](docs/backup-nas.md), [restore](docs/restore.md),
 [Timeline export](docs/timeline-export.md); research notes in `docs/research/` (read only when needed).
@@ -158,6 +159,7 @@ Frontend conventions: [docs/design/frontend-patterns.md](docs/design/frontend-pa
 - D-92 Routing proxy: "no route" ends the chain; ORS/FOSSGIS limits server-wide; per-user proposal cache under RLS; saving uses the server's cached proposal, stores attribution and simplified copies; road modes only
 - D-93 Drag editor saves pieces: cached proposals, own versions, validated drawn points; `hand_edited` with per-source provenance (pending Adam)
 - D-94 GeoNames gazetteer: cities500 + US populated places, pinned snapshot + SHA-256 (cache is the pin, `--latest` re-pins); prefix search on folded names by population; city picker suggests stop name and zone
+- D-95 Trip spreadsheet: one trip per `.xlsx` tab; trip block, stops header, legs header found by content; legs cite stops by row number, label or `=ROW()`; places never guessed; preview before commit; re-import by trip key, never deletes by absence (pending Adam)
 
 ## 25. Open questions (for Adam, answer whenever — nothing is blocked on these)
 
@@ -180,3 +182,7 @@ Frontend conventions: [docs/design/frontend-patterns.md](docs/design/frontend-pa
 | Q-15 | The server's LAN address is DHCP-assigned. A DHCP reservation on the EdgeRouter would keep the dev binding stable (router change → yours). | **Resolved 2026-11-10:** the server already has a fixed address outside the router's DHCP range. |
 | Q-16 | A participant contributed their own leg (e.g. a separate flight home) and is later removed from the trip. Should that leg keep sharing the trip with them, and who may delete it? | **Answered 2026-11-17:** the trip owner may delete a removed participant's leg. Built in item 13 (2026-11-19), for notes, tracks, tags and photos too (D-89). |
 | Q-17 | GPSLogger's setup link (`gpslogger://properties/<https URL>`) downloads a settings file from a web address. Serving one would mean handing the token to anyone with that address (even short-lived, it passes through any proxy's logs). OK to skip it? | **Answered 2026-11-17:** yes, no hosted GPSLogger profile; copyable fields plus a token QR. |
+| Q-18 | Trip spreadsheet layout (§28.2): the template puts the trip's fields (title, dates, purpose, people…) in a small block above the stops header. The block is optional, so row 1 can be the stops header, with the tab name as the title. OK? | Yes: trip block above the stops header, optional. |
+| Q-19 | Trip spreadsheet re-import (§28.9): a stop or leg removed from the sheet is kept (rule 6). Should the preview offer an unticked, per-trip "also remove these N stops and legs" option, or should removal only ever happen in the app? | Offer the unticked option, listing exactly what would go. |
+| Q-20 | Trip spreadsheet people (§28.3): a name in People that matches nobody in the app. Refuse the tab until the person is added in the app, or create the person during the import? | Refuse (a typo would otherwise create a stray person); `me` means you. |
+| Q-21 | Trip spreadsheet: one trip per tab only, or also several small trips stacked in one tab (each with its own trip block)? | One per tab for now; stacking can be added later without changing the format. |
