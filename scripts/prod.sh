@@ -299,7 +299,7 @@ import_from_dev() {
   echo "6/7 reference download cache (GeoNames, airports) -> production bulk storage"
   if [ -d "$dev_bulk/reference" ]; then
     mkdir -p "$PROD_DIR/bulk/reference"
-    cp -a --no-clobber "$dev_bulk/reference/." "$PROD_DIR/bulk/reference/"
+    cp -a --update=none "$dev_bulk/reference/." "$PROD_DIR/bulk/reference/"
   fi
 
   echo "7/7 swap the copy in as production's database"

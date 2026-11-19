@@ -53,6 +53,7 @@ All through `./dev prod` (`scripts/prod.sh`); `./dev prod help` lists them.
 | `./dev prod shell`, `./dev prod psql` | Django shell and psql, both as the owner role. |
 | `./dev prod backup-now` | One encrypted backup into `bulk/backup-outbox`. Refuses without `AGE_RECIPIENT`. |
 | `./dev prod restore-test` | Backup with a throwaway key, restore into a scratch database, compare every table's row count, the policies and the `app` functions, verify the raw files' checksums. |
+| `./dev prod import-from-dev` | Replaces production's database with a pruned, verified copy of development's (see [Copying the data from development](#copying-the-data-from-development-item-40b-d-97)). Refused once production has a real sign-in identity. |
 | `./dev prod smoke` | The local smoke test (below). |
 | `./dev prod down` | Stops the stack. The database volume stays. |
 | `./dev prod tracker start\|stop\|logs\|ps\|smoke` | The internet-facing tracker endpoint (`ingest`, docs/tracking/exposure.md). `./dev tracker …` does the same. |
@@ -153,21 +154,65 @@ Until go-live, the web service is reached only over an SSH port-forward to
   the redirect from trips.* (including a `//host` path) and its tracker exemption.
 - **Development:** if the dev stack runs, `127.0.0.1:8780` answers 404 to both public names.
 
-## Reference data (for item 40b)
+## Copying the data from development (item 40b, D-97)
 
-40b replaces production's database with a copy of development's, which already holds the
-GeoNames gazetteer and the airport and airline tables. The cached download files are needed
-only to load them again (`load_gazetteer`, `load_flight_reference`). The gazetteer's pin is the
-verified cached copy (D-94): GeoNames republishes its files daily at the same address, so a
-fresh download no longer matches the pinned checksum. To keep the pin, copy the cache:
+Adam's real data (the Timeline import, batch 33, and the trips he typed in) was entered through
+the development stack, so it moves into production as a copy of the development database, pruned
+down to his account. `./dev prod import-from-dev` (repeatable; `scripts/prod.sh`, database half in
+`backend/travel/core/devcopy.py`, `manage.py dev_copy`) does it in seven steps. The development
+database is only read (`pg_dump`, `SELECT`s) and its raw files only copied; dev's web and worker
+keep running. Production's database is untouched until step 7.
 
-```sh
-cp -a var/bulk/reference/. ~/apps/travel-history-prod/bulk/reference/
-./dev prod manage load_gazetteer        # only if the copy didn't bring the rows
-```
+1. **Refusals** (`dev_copy check`, in production's current database): the two databases' applied
+   migrations must be identical (deploy the commit dev runs first), and no production account may
+   have a real sign-in identity: an `https://` issuer, since production refuses any other and the
+   mock provider's is `http://`. Once Adam signs in through Authentik (item 40c), the copy is
+   refused for good, because it would erase that account.
+2. **Copy** into a staging database `travel_import` beside production's (created from
+   `template1`, which holds the extensions): `pg_dump -Fc` in dev's database container piped
+   straight into `pg_restore` in production's, so no dump file is ever written.
+3. **Prune** the staging copy: first a dry run that prints the inventory per account and table
+   (before and after), then the same in one committed transaction. Kept: `dev-admin` (set
+   `TRAVEL_KEEP_ACCOUNT` to keep another), all its rows (batches, points, segments, roll-ups, trips,
+   legs, stops, persons, routes, device tokens, tracker points) and the reference tables. Removed:
+   every other account with every row that refers to it; the kept account's batches whose raw
+   file starts with the `SYNTHETIC` fixture marker, with everything they imported; its e2e
+   leftovers (trips, places and device tokens named `E2E …`); and the contents of the sessions,
+   the job queue, the rate-limit counters and the routing cache. Pruning follows PostgreSQL's
+   foreign keys, not Django's `on_delete` (most user references are DO_NOTHING): a NOT NULL
+   reference to a removed row removes its row, a nullable one is set to NULL (and reported),
+   repeated until nothing changes. It refuses to run in a database named `travel` (the live name
+   in both stacks), so it can't prune dev by mistake.
+4. **Verify** in dev and in the copy: the kept account's rows in every table that refers to an
+   account, each of its batches' points (batch 33: 193,009), the policy count and the `app`
+   function count must be identical, and only one account may remain. Any difference stops the
+   copy with production unchanged. (If the kept account ever has synthetic or e2e rows in dev,
+   they show up here as a difference, on purpose.)
+5. **Raw files** the remaining rows reference are copied from dev's `raw/` into production's
+   (`0444`; an existing file with other content stops the copy, raw files are never
+   overwritten), then each is decompressed and checked against its recorded SHA-256 in the
+   backup image. Files of pruned rows are never copied.
+6. **Reference cache:** dev's `reference/` download cache (GeoNames, OurAirports, OpenFlights)
+   goes to production's, without overwriting. The copy already brings the reference rows; the
+   cache is needed only to load them again with the pinned checksums (D-94; or re-pin with
+   `./dev prod manage load_gazetteer --latest`).
+7. **Swap:** with `AGE_RECIPIENT` set, a backup of the database being replaced; then `web`,
+   `worker`, `backup` (and `ingest`) stop, `travel` is dropped and `travel_import` renamed to
+   `travel`, and the services start again and pass their health check.
 
-or re-pin to today's files with `./dev prod manage load_gazetteer --latest` (downloads about
-85 MB; the new checksums are recorded in the dataset versions).
+The staging database and the temporary directory (`import.*` in the production directory, holding
+only the migration list and the verification counts) are removed on exit, whatever happens.
+
+The final copy runs in item 40c, right before Adam's first sign-in, so whatever he enters in dev
+until then carries over. After that sign-in, item 40c moves his Authentik identity onto the copied
+account, and production refuses `import-from-dev` from then on.
+
+**Rehearsal, 2026-11-19 (item 40b):** the copy passed: the dry-run inventory showed `dev-admin`
+(925,326 rows, including batch 33's 193,009 points, 53,438 segments and 678,836 roll-ups) and
+`dev-member` (254 rows, including the two synthetic batches whose raw files were lost with the
+HDD); after pruning, one account, 45 identical checks, 1 raw file verified, and
+`./dev prod restore-test` passed (72 tables/checks, raw files 1/1). The backup gate (an encrypted
+backup with the real key) stays open until `AGE_RECIPIENT` is set.
 
 ## Memory
 

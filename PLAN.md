@@ -13,7 +13,8 @@ guard and production settings; the tunnel route waits for Adam's "go"
 orchestrated work order in [docs/ROADMAP.md](docs/ROADMAP.md) (process:
 [docs/ORCHESTRATION.md](docs/ORCHESTRATION.md)). Family go-live slice: the production stack
 runs separately from dev (item 40a, 2026-11-19: `./dev prod …`, web on `127.0.0.1:8784`, not
-exposed; [docs/production.md](docs/production.md), D-96).
+exposed; [docs/production.md](docs/production.md), D-96); the copy of the real data from dev
+into production is built and rehearsed (item 40b, `./dev prod import-from-dev`, D-97).
 
 | Phase | Status | Detail |
 |---|---|---|
