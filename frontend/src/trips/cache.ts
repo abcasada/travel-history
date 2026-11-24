@@ -13,6 +13,14 @@ export function invalidateTrip(client: QueryClient, tripId?: number) {
   return Promise.all(all.map((queryKey) => client.invalidateQueries({ queryKey })));
 }
 
+/** After a bulk change: every list and the map once, then each changed trip's detail. */
+export function invalidateTrips(client: QueryClient, tripIds: number[]) {
+  return Promise.all([
+    invalidateTrip(client),
+    ...tripIds.map((id) => client.invalidateQueries({ queryKey: getGetTripQueryKey(id) })),
+  ]);
+}
+
 export function useInvalidateTrip() {
   const client = useQueryClient();
   return useCallback((tripId?: number) => invalidateTrip(client, tripId), [client]);

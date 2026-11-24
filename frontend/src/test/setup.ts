@@ -30,7 +30,9 @@ vi.mock("react-map-gl/maplibre", () => ({
       },
       children,
     ),
-  Layer: ({ id }: { id: string }) => createElement("div", { "data-testid": `layer-${id}` }),
+  // Paint is exposed so tests can check highlighting expressions.
+  Layer: ({ id, paint }: { id: string; paint?: unknown }) =>
+    createElement("div", { "data-testid": `layer-${id}`, "data-paint": JSON.stringify(paint) }),
   Popup: () => null,
   useMap: () => ({ current: undefined }),
 }));

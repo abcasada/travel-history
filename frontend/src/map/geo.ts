@@ -83,16 +83,23 @@ export function stopFeatures(stops: MapStopOut[]): FeatureCollection<Point, Stop
 export type Bounds = [[number, number], [number, number]];
 
 /** Bounding box of one trip's stops and legs, or null if it has nothing to draw. */
-export function tripBounds(data: TripMapOut, tripId: number): Bounds | null {
+export function tripBounds(data: TripMapOut, tripIds: number | number[]): Bounds | null {
+  const wanted = new Set(Array.isArray(tripIds) ? tripIds : [tripIds]);
   const points: Position[] = [
-    ...data.stops.filter((s) => s.trip_id === tripId).map((s) => [s.lon, s.lat]),
-    ...data.legs.filter((g) => g.trip_id === tripId).flatMap(legLine),
+    ...data.stops.filter((s) => wanted.has(s.trip_id)).map((s) => [s.lon, s.lat]),
+    ...data.legs.filter((g) => wanted.has(g.trip_id)).flatMap(legLine),
   ];
   if (!points.length) return null;
-  const lons = points.map((p) => p[0] ?? 0);
-  const lats = points.map((p) => p[1] ?? 0);
+  // A loop, not Math.min(...all): many selected routed trips can exceed the argument limit.
+  let [west, south, east, north] = [180, 90, -180, -90];
+  for (const [lon = 0, lat = 0] of points) {
+    west = Math.min(west, lon);
+    east = Math.max(east, lon);
+    south = Math.min(south, lat);
+    north = Math.max(north, lat);
+  }
   return [
-    [Math.min(...lons), Math.min(...lats)],
-    [Math.max(...lons), Math.max(...lats)],
+    [west, south],
+    [east, north],
   ];
 }

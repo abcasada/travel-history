@@ -10,13 +10,19 @@ export type ShortcutHandler = (event: KeyboardEvent) => void;
 export type ShortcutMap = Record<string, ShortcutHandler>;
 
 const SEQUENCE_TIMEOUT_MS = 1000;
+const NOT_TYPED = new Set(["checkbox", "radio", "button", "submit", "reset"]);
 
 export function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   const tag = target.tagName;
-  return (
-    tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target.isContentEditable === true
-  );
+  // A ticked checkbox keeps focus, and j/k/x must keep working after clicking one.
+  if (tag === "INPUT") return !NOT_TYPED.has((target as HTMLInputElement).type);
+  return tag === "TEXTAREA" || tag === "SELECT" || target.isContentEditable === true;
+}
+
+/** Enter on a focused link or button activates it; a bound Enter must not steal that. */
+function activatesOnEnter(target: EventTarget | null): boolean {
+  return target instanceof HTMLElement && target.closest("a[href], button, summary") !== null;
 }
 
 export function bindShortcuts(map: ShortcutMap, target: Window | HTMLElement = window) {
@@ -26,7 +32,10 @@ export function bindShortcuts(map: ShortcutMap, target: Window | HTMLElement = w
   const onKeyDown = (event: Event) => {
     const e = event as KeyboardEvent;
     if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+    // Pressing Shift on its way to "*" or "J" must not cancel a pending sequence.
+    if (e.key === "Shift") return;
     if (isTypingTarget(e.target) && e.key !== "Escape") return;
+    if (e.key === "Enter" && activatesOnEnter(e.target)) return;
     const now = Date.now();
     if (pending && now - pendingAt <= SEQUENCE_TIMEOUT_MS) {
       const handler = map[`${pending} ${e.key}`];

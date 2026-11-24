@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Group,
   type Layout,
@@ -13,6 +13,7 @@ import { MapLayers } from "../map/MapLayers";
 import { ListRoutes } from "../pages/routes";
 import { useShortcuts } from "../platform/shortcuts";
 import { usePreference } from "../prefs/usePreference";
+import { HeaderSearch } from "./HeaderSearch";
 import { ShellMenu } from "./ShellMenu";
 import { ShortcutHelp } from "./ShortcutHelp";
 
@@ -36,6 +37,7 @@ export default function DesktopShell() {
   const listRef = usePanelRef();
   const navigate = useNavigate();
   const [helpOpen, setHelpOpen] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   // Apply a layout that arrived from the server after the first render.
   useEffect(() => {
@@ -53,6 +55,7 @@ export default function DesktopShell() {
 
   useShortcuts({
     "?": () => setHelpOpen((open) => !open),
+    "/": () => searchRef.current?.focus(),
     Escape: () => setHelpOpen(false),
     "[": () => resizeList(-STEP),
     "]": () => resizeList(STEP),
@@ -83,8 +86,8 @@ export default function DesktopShell() {
             </NavLink>
           ))}
         </nav>
-        {/* The search box and its "/" shortcut come back once search is wired up (catalog UI, T19). */}
         <div className="flex-1" />
+        <HeaderSearch ref={searchRef} />
         <ShellMenu />
       </header>
       <Group

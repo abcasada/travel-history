@@ -50,6 +50,12 @@ test("a trip's bounds cover its stops and legs only", () => {
     [-96, 39],
   ]);
   expect(tripBounds(data, 99)).toBeNull();
+  // Several trips (the list's selection, `f`): one box around all of them.
+  expect(tripBounds(data, [10, 11, 99])).toEqual([
+    [-100, 35],
+    [50, 50],
+  ]);
+  expect(tripBounds(data, [])).toBeNull();
 });
 
 test("the view's bbox is rounded and wrapped into the API's range", () => {

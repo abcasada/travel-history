@@ -2,12 +2,14 @@ import { keepPreviousData } from "@tanstack/react-query";
 import type { ExpressionSpecification, MapMouseEvent } from "maplibre-gl";
 import { useEffect, useMemo } from "react";
 import { Layer, Source, useMap } from "react-map-gl/maplibre";
+import { useShallow } from "zustand/react/shallow";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { useGetTripMap } from "../api/generated";
 import { useRoutingStore } from "../routing/store";
 import { apiParams, readTripFilter } from "../trips/filter";
 import { MODE_COLORS } from "../trips/labels";
 import { paths, selectedTripId, showsTrips } from "../trips/paths";
+import { highlighted, useSelectionStore } from "../trips/selection";
 import { legFeatures, stopFeatures, tripBounds } from "./geo";
 import { useMapStore } from "./store";
 
@@ -48,10 +50,16 @@ function TripLayersInner() {
   const legs = useMemo(() => legFeatures(query.data?.legs ?? []), [query.data]);
   const stops = useMemo(() => stopFeatures(query.data?.stops ?? []), [query.data]);
   useFitTrip(selected, query.data);
+  useFitSelection(selected === null ? query.data : undefined);
   useTripClicks();
+  // On the list, the trips under the cursor and in the selection stand out (ui.md §18.4).
+  const listed = useSelectionStore(useShallow(highlighted));
 
-  const isSelected: ExpressionSpecification = ["==", ["get", "trip_id"], selected ?? -1];
-  const dimOthers = selected !== null;
+  const isSelected: ExpressionSpecification =
+    selected !== null
+      ? ["==", ["get", "trip_id"], selected]
+      : ["in", ["get", "trip_id"], ["literal", listed]];
+  const dimOthers = selected !== null || listed.length > 0;
   return (
     <>
       <Source id="trip-legs" type="geojson" data={legs}>
@@ -115,6 +123,19 @@ function useFitTrip(selected: number | null, data: Parameters<typeof tripBounds>
     if (!map || !bounds) return;
     map.fitBounds(bounds, { padding: 60, maxZoom: 12, duration: 600 });
   }, [key, ref]);
+}
+
+/** `f` on the list: fit the map to the selected trips (or the cursor's trip). */
+function useFitSelection(data: Parameters<typeof tripBounds>[0] | undefined) {
+  const { current: ref } = useMap();
+  const fitRequest = useSelectionStore((s) => s.fitRequest);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: fit only when `f` is pressed
+  useEffect(() => {
+    const map = ref?.getMap();
+    if (!fitRequest || !map || !data) return;
+    const bounds = tripBounds(data, highlighted(useSelectionStore.getState()));
+    if (bounds) map.fitBounds(bounds, { padding: 60, maxZoom: 12, duration: 600 });
+  }, [fitRequest, ref]);
 }
 
 /** A pending map pick (a form asking for a point) or the route editor takes the clicks. */

@@ -1,5 +1,12 @@
 import { useSearchParams } from "react-router";
-import { type TravelMode, useListPurposes, useListTags } from "../api/generated";
+import {
+  type TravelMode,
+  useListPersons,
+  useListPurposes,
+  useListTags,
+  type Visibility,
+} from "../api/generated";
+import { useShellMode } from "../shells/useShellMode";
 import { inputClass } from "../ui/form";
 import {
   EMPTY_FILTER,
@@ -8,7 +15,7 @@ import {
   type TripFilter,
   writeTripFilter,
 } from "./filter";
-import { MODE_LABELS, MODES } from "./labels";
+import { MODE_LABELS, MODES, VISIBILITY_LABELS } from "./labels";
 
 function toggle<T>(values: T[], value: T): T[] {
   return values.includes(value) ? values.filter((v) => v !== value) : [...values, value];
@@ -23,19 +30,24 @@ export function TripFilters() {
   const filter = readTripFilter(params);
   const purposes = useListPurposes();
   const tags = useListTags();
+  const persons = useListPersons();
+  // The desktop shell's header search box edits the same `q` (and "/" focuses it).
+  const { mode: shell } = useShellMode();
   const update = (change: Partial<TripFilter>) =>
     setParams(writeTripFilter(params, { ...filter, ...change }), { replace: true });
 
   return (
     <section aria-label="Trip filters" className="mb-3 space-y-2 text-sm">
-      <input
-        type="search"
-        aria-label="Search trip titles"
-        placeholder="Search titles…"
-        className={inputClass}
-        value={filter.q}
-        onChange={(e) => update({ q: e.target.value })}
-      />
+      {shell === "mobile" && (
+        <input
+          type="search"
+          aria-label="Search trip titles"
+          placeholder="Search titles…"
+          className={inputClass}
+          value={filter.q}
+          onChange={(e) => update({ q: e.target.value })}
+        />
+      )}
       <div className="flex flex-wrap items-end gap-2">
         <label className="flex flex-col text-xs">
           From
@@ -54,6 +66,36 @@ export function TripFilters() {
             value={filter.to ?? ""}
             onChange={(e) => update({ to: e.target.value || null })}
           />
+        </label>
+        <label className="flex flex-col text-xs">
+          Person
+          <select
+            className="rounded border px-1 py-0.5 text-sm"
+            value={filter.person ?? ""}
+            onChange={(e) => update({ person: e.target.value ? Number(e.target.value) : null })}
+          >
+            <option value="">Anyone</option>
+            {(persons.data ?? []).map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.display_name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col text-xs">
+          Visibility
+          <select
+            className="rounded border px-1 py-0.5 text-sm"
+            value={filter.visibility ?? ""}
+            onChange={(e) => update({ visibility: (e.target.value || null) as Visibility | null })}
+          >
+            <option value="">Any</option>
+            {(Object.keys(VISIBILITY_LABELS) as Visibility[]).map((v) => (
+              <option key={v} value={v}>
+                {VISIBILITY_LABELS[v]}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="flex items-center gap-1 text-xs">
           <input

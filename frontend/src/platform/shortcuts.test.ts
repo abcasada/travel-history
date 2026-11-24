@@ -41,3 +41,37 @@ test("modifier combinations are left to the browser", () => {
   expect(t).not.toHaveBeenCalled();
   unbind();
 });
+
+test("Enter on a focused link or button activates it instead of the shortcut", () => {
+  const open = vi.fn();
+  const unbind = bindShortcuts({ Enter: open });
+  const button = document.createElement("button");
+  document.body.append(button);
+  press("Enter", {}, button);
+  expect(open).not.toHaveBeenCalled();
+  press("Enter");
+  expect(open).toHaveBeenCalledTimes(1);
+  button.remove();
+  unbind();
+});
+
+test("sequences that start with a symbol work (* then a)", () => {
+  const all = vi.fn();
+  const unbind = bindShortcuts({ "* a": all });
+  press("*", { shiftKey: true });
+  press("a");
+  expect(all).toHaveBeenCalledTimes(1);
+  unbind();
+});
+
+test("a focused checkbox is not a text field: list keys keep working after ticking one", () => {
+  const next = vi.fn();
+  const unbind = bindShortcuts({ j: next });
+  const box = document.createElement("input");
+  box.type = "checkbox";
+  document.body.append(box);
+  press("j", {}, box);
+  expect(next).toHaveBeenCalledTimes(1);
+  box.remove();
+  unbind();
+});
