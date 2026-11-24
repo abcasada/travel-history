@@ -134,7 +134,7 @@ def test_upload_preview_commit(alice):
         record.content_hash,
     )
     stops, legs = trip_rows(alice.user, trip)
-    assert [s.sheet_key for s in stops][0] == "label:home"
+    assert stops[0].sheet_key == "label:home"
     assert {s.import_batch_id for s in stops} == {batch_id}
     assert stops[2].notes == "SYNTHETIC note: cabin by the creek" and stops[2].kind == "lodging"
     assert stops[3].place.name == "Old Town Synth" and stops[3].tz == "America/Denver"

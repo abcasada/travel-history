@@ -34,7 +34,13 @@ from tests.factories import (
 from tests.helpers import as_owner
 from travel.accounts.models import AccessRequest, DeviceToken, Person, Role, User
 from travel.flights.models import FlightRecord
-from travel.history.models import HomePeriod, LocationPoint, RawFile, TimelineSegment
+from travel.history.models import (
+    HomePeriod,
+    ImportBatch,
+    LocationPoint,
+    RawFile,
+    TimelineSegment,
+)
 from travel.media.models import Media
 from travel.routing.models import RouteRequestCache
 from travel.trips.models import (
@@ -49,9 +55,20 @@ from travel.trips.models import (
     Trip,
     TripNote,
     TripParticipant,
+    TripSheetLink,
+    TripSheetRecord,
     TripTag,
 )
 from travel.vehicles.models import Vehicle, VehicleOwnership, VehiclePrivate
+
+# A parsed trip spreadsheet tab (item 14c-1) whose key already stands for alice's family trip,
+# with the hash it was applied with: the preview calls it identical.
+SHEET_CONTENT = {
+    "trip": {"title": "Synthetic sheet trip", "default_title": "Synthetic"},
+    "stops": [],
+    "legs": [],
+    "unknown_people": [],
+}
 
 
 @pytest.fixture
@@ -179,6 +196,39 @@ def build_family() -> SimpleNamespace:
             from_code="QQQ",
             to_code="QQR",
         )
+        # Trip spreadsheet imports (item 14c-1): raw history, own only.
+        f.alice_sheet_batch = ImportBatch.objects.create(
+            owner=f.alice, kind="trip_sheet", status="preview", raw_file=f.alice_raw
+        )
+        f.alice_sheet_record = TripSheetRecord.objects.create(
+            owner=f.alice,
+            import_batch=f.alice_sheet_batch,
+            tab_name="Synthetic",
+            position=2,
+            key="synthetic",
+            content=SHEET_CONTENT,
+            content_hash="c" * 64,
+        )
+        f.alice_sheet_link = TripSheetLink.objects.create(
+            owner=f.alice,
+            key="synthetic",
+            trip=fam,
+            last_record=f.alice_sheet_record,
+            applied_hash="c" * 64,
+            applied_at=timezone.now(),
+        )
+        f.bob_sheet_batch = ImportBatch.objects.create(
+            owner=f.bob, kind="trip_sheet", status="preview"
+        )
+        f.bob_sheet_record = TripSheetRecord.objects.create(
+            owner=f.bob,
+            import_batch=f.bob_sheet_batch,
+            tab_name="Bob's",
+            position=2,
+            key="bobs",
+            content=SHEET_CONTENT,
+            content_hash="d" * 64,
+        )
         f.alice_home = HomePeriod.objects.create(
             person=f.alice.person, managed_by=f.alice, address="1 Synthetic St"
         )
@@ -249,7 +299,8 @@ def _row_counts():
         Trip, TripParticipant, TripNote, Leg, LegParticipantOverride, Route, LocationPoint,
         TimelineSegment, RawFile, HomePeriod, Vehicle, VehiclePrivate, Person, User,
         DeviceToken, AccessRequest, Purpose, Media, TripTag, FlightRecord, Tag,
-        TrackContribution, Stop, Place, RouteRequestCache,
+        TrackContribution, Stop, Place, RouteRequestCache, ImportBatch, TripSheetRecord,
+        TripSheetLink,
     )  # fmt: skip
     # One round trip per case: SELECT (SELECT count(*) FROM a), (SELECT count(*) FROM b), ...
     # Table names come from model metadata, never from input.

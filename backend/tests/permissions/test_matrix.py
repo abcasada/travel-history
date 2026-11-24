@@ -20,7 +20,13 @@ from travel.accounts.models import AccessRequest, DeviceToken, Person, User, Use
 from travel.core import policy
 from travel.core.rls import set_context
 from travel.flights.models import FlightRecord
-from travel.history.models import HomePeriod, LocationPoint, RawFile, TimelineSegment
+from travel.history.models import (
+    HomePeriod,
+    ImportBatch,
+    LocationPoint,
+    RawFile,
+    TimelineSegment,
+)
 from travel.media.models import Media
 from travel.routing.models import RouteRequestCache
 from travel.trips.models import (
@@ -34,6 +40,8 @@ from travel.trips.models import (
     Trip,
     TripNote,
     TripParticipant,
+    TripSheetLink,
+    TripSheetRecord,
     TripTag,
 )
 from travel.vehicles.models import Vehicle, VehiclePrivate
@@ -93,6 +101,83 @@ def person_of(f, actor):
 def _link_new_person(f, actor):
     person = Person.objects.create(display_name="Me", created_by_id=uid(f, actor))
     return User.objects.filter(pk=uid(f, actor)).update(person=person) == 1
+
+
+def _own_sheet_record(f, actor):
+    batch = ImportBatch.objects.create(owner_id=uid(f, actor), kind="trip_sheet")
+    return TripSheetRecord.objects.create(
+        owner_id=uid(f, actor),
+        import_batch=batch,
+        tab_name="Mine",
+        position=2,
+        key="mine",
+        content={},
+        content_hash="e" * 64,
+    )
+
+
+def _others_sheet_record(f, actor):
+    """Someone else's parsed tab: bob's for alice, alice's for everyone else."""
+    return (
+        f.bob_sheet_record if actor is not None and actor.pk == f.alice.pk else f.alice_sheet_record
+    )
+
+
+def _others_trip(f, actor):
+    """A trip the actor doesn't own: the Admin's for alice, alice's family trip otherwise."""
+    if actor is not None and actor.pk == f.alice.pk:
+        return f.admin_private_trip
+    return f.trips["family"]
+
+
+def _trip_sheet_actions():
+    """Trip spreadsheet imports (item 14c-1, trip-sheet.md §28.10): parsed tabs and key links
+    are raw history (own only); a link stands only for the owner's own trip; the parsed content
+    never changes."""
+    return {
+        "view_alice_trip_sheet": (
+            lambda f, a: (
+                sees(TripSheetRecord, f.alice_sheet_record.pk)
+                and sees(TripSheetLink, f.alice_sheet_link.pk)
+            ),
+            lambda f, u: policy.can_commit_trip_sheet(u, f.alice_sheet_batch),
+        ),
+        "import_trip_sheet": (
+            lambda f, a: inserts(lambda: _own_sheet_record(f, a)),
+            lambda f, u: policy.can_import(u),
+        ),
+        "commit_own_trip_sheet": (
+            lambda f, a: inserts(
+                lambda: TripSheetLink.objects.create(
+                    owner_id=uid(f, a),
+                    key="mine",
+                    last_record=_own_sheet_record(f, a),
+                    applied_hash="e" * 64,
+                )
+            ),
+            lambda f, u: policy.can_commit_trip_sheet(u, ImportBatch(owner_id=u.pk)),
+        ),
+        "commit_other_users_batch": (
+            lambda f, a: updates(TripSheetRecord, _others_sheet_record(f, a).pk, outcome="created"),
+            lambda f, u: policy.can_commit_trip_sheet(
+                u, _others_sheet_record(f, u if u.is_authenticated else None).import_batch
+            ),
+        ),
+        "reimport_other_users_trip": (
+            lambda f, a: inserts(
+                lambda: TripSheetLink.objects.create(
+                    owner_id=uid(f, a), key="theirs", trip=_others_trip(f, a)
+                )
+            ),
+            lambda f, u: policy.can_reimport_trip(
+                u, _others_trip(f, u if u.is_authenticated else None)
+            ),
+        ),
+        "edit_alice_sheet_content": (
+            lambda f, a: updates(TripSheetRecord, f.alice_sheet_record.pk, content={"x": 1}),
+            None,
+        ),
+    }
 
 
 def _trip_actions():
@@ -698,6 +783,7 @@ ACTIONS = {
     ),
     **_trips_api_actions(),
     **_contribution_actions(),
+    **_trip_sheet_actions(),
 }
 
 T, F = True, False
@@ -807,6 +893,13 @@ MATRIX = {
     "add_stop_at_the_trips_place:family":       (T, T, F, F, F, F, F),
     "edit_family_stop":                         (T, T, F, F, F, F, F),
     "reorder_legs:family":                      (T, T, F, F, F, F, F),
+    # Trip spreadsheet imports (item 14c-1)
+    "view_alice_trip_sheet":                    (F, T, F, F, F, F, F),
+    "import_trip_sheet":                        (T, T, T, T, F, F, F),
+    "commit_own_trip_sheet":                    (T, T, T, T, F, F, F),
+    "commit_other_users_batch":                 (F, F, F, F, F, F, F),
+    "reimport_other_users_trip":                (F, F, F, F, F, F, F),
+    "edit_alice_sheet_content":                 (F, F, F, F, F, F, F),
 }  # fmt: skip
 
 CASES = [
