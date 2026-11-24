@@ -4,8 +4,15 @@ Only the orchestrator and the planner edit this file. Status values: todo · in 
 
 ## Work order
 
-> **Execution order (2026-11-18, planner, from Adam's 2026-11-18 priorities: city search, then family go-live):**
-> **14** → **14b** → **40a** → **40b** → **P1** (parallel readiness; then two lanes, D-98) → **40c** (build and final copy, then the handover after Adam's first sign-in) → **40d** → **41a** → **42a** (only if 41a finds blockers) → **pause: 41a's findings + the exposure "go"** → **40e** → **14c** → **4** → 21 (21a list tools, 21b trip page; frontend-patterns.md §8) → 27 → **Review pause B** → 11 → 12 → **Review pause A** → 15 → 16 → 18 → 19 → 22 → 23 → 24 → 14a → 28, then 29–46 in number order (40 and 41 are now the rest of T38 and the full final review).
+> **Execution order (2026-11-23, planner, for parallel lanes, D-98). Adam's priorities are unchanged: go-live first, then 14c, 21, 27 …**
+> Done: 14, 14b, 40a, 40b. Next, **P1** alone in the main checkout. After it is verified, two lanes:
+> - **Lane A, the go-live chain:** **40c-1** (build, in a lane) → **40d** → **40c-2** (deploy and final copy; main checkout) → Adam's first sign-in → **40c-3** (handover; main checkout) → **41a** → **42a** (only if 41a finds blockers) → **pause: 41a's findings + the exposure "go"** → **40e** (main checkout) → **4** (main checkout; needs G-2's backup). 40d and 40c-2 may swap if Adam's Authentik values arrive first.
+> - **Lane B, beside it:** **14c-1** → **14c-2** → **21a** → **21b** → **27** → **Review pause B** (after 40e: Adam reviews 21 and 27 in production, where his data is) → 11 → 12 → **Review pause A** → 15 → 16 → 18 → 19 → 22 → 23 → 24 → 14a → 28, then 29–46 in number order (40 and 41 are the rest of T38 and the full final review).
+> - **Expected pairs:** 40c-1 ∥ 14c-1 · 40d ∥ 14c-2 · while Lane A waits on Adam (Authentik values, first sign-in, the "go"), its slot takes Lane B's next pairable item (27, 21a) · 41a beside 21b (reviewers don't count) · after pause B: 11 ∥ 32a and 12 ∥ 30 (both pulled forward as frontend-only partners).
+> - **Rules:** pair only by the footprint rule (key below the questions). When the next item can't pair with the running one, the free lane takes the first later item that can, but never one that waits on a pending review pause or changes what that pause reviews. `main-checkout` items run with no other builder and no merges: drain the lanes first (unless Adam approves L-1). From 41a's start until 40e's smoke passes, merge only Lane B items with no backend footprint, so 40e deploys what 41a reviewed. A pause stops new dispatches in both lanes (unless Adam approves L-2); running lanes finish; pauses that coincide go to Adam in one message.
+> - **After pause A** (provisional; the planner re-pairs at each review pause): most items change the API, so under the current rule pairs come mainly where one side is frontend-only, docs or Android: 16 ∥ 18, 23 ∥ 24 (if 24 needs no migration or API change), 44–45 beside items 33–39 once 32b is done, 46b or 46c beside a backend item. L-4 would allow more.
+> - **Three lanes after the Ryzen move** (about mid-January, Q-2): a third lane fits where two frontend, Android or docs items can sit beside one backend item: 11 ∥ 32a ∥ 30, 16 ∥ 18 ∥ 46b, Android beside phase 8. The rule then holds across all three (at most one with `migrations` or `api`).
+>
 > Location tracking (item 8's last step) stays on hold; when it resumes, it deploys the production stack's `ingest` (40a), never dev's. Earlier orders are in the changelog.
 >
 > **Go-live gates:** 40a waits for G-1; 40c's handover for G-3 and G-4; 40e for G-2's backup, 41a's blockers fixed, and Adam's "go" plus his tunnel change; item 4 for G-6. Adam pastes the Authentik client secret and `AGE_RECIPIENT` into `.env.prod` himself. From 40c's final copy on, Adam enters data only in production. Family members sign in only after 40e. If answers are missing when an item needs them, run 21 and 27 meanwhile.
@@ -18,8 +25,17 @@ Only the orchestrator and the planner edit this file. Status values: todo · in 
 > - **G-5 Second-factor check (40c):** refuse sign-ins whose Authentik ID token shows no second factor (`amr`), if Authentik reports one. This is defence in depth if the flow is ever misconfigured. **Yes.** **Answered 2026-11-18 by the orchestrator under Adam's delegation: yes.**
 > - **G-6 Dev cleanup (item 4, deleting real data):** delete the dev copy of the real data (dev DB volume and `var/bulk` raw archive) once production's copy is verified and backed up. Export files in `data/private/` are untouched. **Yes.** **Answered 2026-11-18 by Adam: keep the GPS Timeline import (never delete its raw file, batch 33's raw file in dev bulk); anything else in dev may be deleted.**
 > - Still open from earlier: D-89 to D-93 (**yes** to all).
+>
+> **Questions for Adam (2026-11-23, parallel lanes). All PROPOSED: not approved until Adam answers. Recommended defaults in bold.**
+> - **L-1 Lanes beside main-checkout items:** may a worktree lane keep building (its merge waits) while 40c-2, 40c-3, 40e or item 4 runs in the main checkout? Worktree stacks never touch real data. **Yes, while free RAM stays above 2 GiB.** Until answered, drain the lanes first.
+> - **L-2 The go-live pause:** while Lane A waits for the exposure "go", may Lane B keep dispatching? **Yes; Review pauses A and B still stop both lanes.** Until answered, the pause stops both.
+> - **L-3 Conflicts in shared files:** may the orchestrator resolve rebase conflicts confined to the uncounted shared files (key below) itself, sending only code conflicts back to the builder (amends ORCHESTRATION.md)? **Yes.**
+> - **L-4 Two API items at once (amends D-98):** from Review pause A on, allow two items that both change the API, or add migrations in different apps, with the later merge regenerating openapi.json and the client after its rebase? Most later items change the API, so the current rule often leaves one lane idle. **Yes, if the go-live-period merges go smoothly.**
+> - **L-5 Production deploys after 40e:** the orchestrator runs `./dev prod deploy` (it backs up first) after each verified merge that changes the app, so Adam and the family see work as it lands? **Yes; batch them instead if Adam prefers fewer restarts.**
 
 Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhigh. Task IDs (T1…T46) and finding numbers (#1…#16) are from the 2026-10-21 audit; their descriptions and dependencies are in the Task reference below. Each item is one dispatch unless noted.
+
+**Footprints (D-98).** Each open item lists the areas it changes. Backend apps go by name (`trips`, `history`, …). `core` is split into `core.policy` (policy.py, the permission-matrix tests, permissions.md §6.3), `core.jobs` (job runner and schedules) and `core.web` (exposure guard, login wall, middleware, rate limits). `config` means settings and URLs. Frontend areas are `fe:<folder>` under `frontend/src/`, plus `fe:pwa` (Vite config, manifest, service worker, `index.html`); other top-level dirs go by name. Flags: `migrations`; `api` (changes openapi.json); `main-checkout` (real dev data, the main dev stack or the production stack: runs in the main checkout with no other builder running and no merges until it reports). Not counted: the shared docs every item updates (PLAN.md, phases.md, decisions.md, NEXT-<item>.md, the About page's credits) and one-line registrations in `config/api.py`, `pages/routes.tsx`, the shell menus and `e2e/smoke.mjs`. Expect small rebase conflicts there, and renumber clashing decisions at merge (as D-94 became D-95). "(?)" marks a low-confidence guess. A builder that has to leave its footprint says so in its report.
 
 1. **[M] Stage 0 housekeeping** (details below). Skip it if already done.
    - Status: done (2026-11-10)
@@ -58,6 +74,7 @@ Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhi
      - Adam approved G-6 (deleting real data is on CLAUDE.md's stop-and-ask list).
    - Reset the dev DB volume and delete the dev bulk directory's contents (`var/bulk`, D-84), so dev holds synthetic data only again (D-67's intent), **except the GPS Timeline raw import file(s) (batch 33's raw file), which Adam said must stay (G-6)**: keep them byte-identical (checksum before and after), moving them only within var/bulk if needed. Never touch `data/private/`.
    - Afterwards: `./dev up`, migrations, `./dev e2e`, the quick suite and `./dev restore-test` pass on the empty dev stack. The mock `dev-admin` login now opens an empty account.
+   - Footprint: the main dev stack (DB volume), `var/bulk` (real data). Flags: main-checkout. After it, only production-stack work needs the main checkout.
    - Status: todo (re-planned 2026-11-18; G-6 answered)
 5. **[H] T6:** raw-history map. ← my history becomes viewable
    - Status: done (2026-11-11)
@@ -92,8 +109,10 @@ Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhi
 10. **[M] T12 + T13:** flight datasets, the import template, and the conversion. Use my spreadsheet if it's present; otherwise synthetic data.
     - Status: done (2026-11-19, synthetic data; Adam's spreadsheet not yet provided)
 11. **[M] T14 + T15:** flights on the map, grouping into trips, and dedupe against Timeline. ← my flights become viewable
+    - Footprint: `flights` (grouping), `trips` (trips and legs from flights), `history` (dedupe against FLYING segments), fe:map (flight arcs), fe:flights (new: grouping review). Flags: api, migrations (?).
     - Status: todo
 12. **[M] T10:** coverage report, without the trip comparison.
+    - Footprint: `history` (coverage report), `core.jobs` (daily job), `tracking` (?), fe:history (bake-off page). Flags: api, migrations (?).
     - Status: todo
     - **→ Review pause A:** history, flights, and tracking are live. I'll try them.
 13. **[H] The rest of T18:** tags, stops, notes, media, tracks, the routes listing, bulk edit, duplicates/join/merge, leg reorder and list filters. Make sure a removed participant can no longer edit or delete their notes and tracks, matching the leg rule from item 6. Apply Adam's answer to Q-16.
@@ -112,6 +131,7 @@ Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhi
       - Natural Earth admin-0/1 and Census county loaders, same pattern as item 14.
       - Stops named offline ("near <town>, <state>", phases.md 6.1, D-20).
       - Runs before item 28 (territories), which needs the boundaries.
+      - Footprint: `geo` (loaders into the existing boundary tables, reverse geocoding), `trips` (offline stop names) (?), fe:trips (stop editor) (?). Flags: migrations (?), api (?).
       - Status: todo
     - **14b. [M] Stop and leg notes.** Adam's request, 2026-11-18; runs right after item 14.
       - A free-text `notes` field on each stop and each leg (new migration), edited by whoever can edit that stop or leg (travel.core.policy), readable by whoever can see it, like `Trip.notes`. Private: never in public snapshots (permissions.md §6.5).
@@ -119,28 +139,45 @@ Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhi
       - API + RLS tests per actor; matrix note if anything changes. Add Notes columns for stops and legs to the spreadsheet design (trip-sheet.md §28) and the template.
       - Not in scope: family members' own per-stop/leg contribution notes (decided 2026-11-18: not now).
       - Status: done (2026-11-18)
-    - **14c. [H] Trip spreadsheet importer** (D-95, docs/design/trip-sheet.md §28; Q-18 to Q-21 answered). Parser (add defusedxml), resolvers (gazetteer, airports, coordinates), preview/commit API and CLI, new tables with RLS, matrix rows, the preview UI, e2e upload. May need 2 dispatches (UI separately). Runs after the go-live slice (Adam, 2026-11-18: notes first, then go-live).
-      - Status: todo
-15. **[H] T9:** home-period detection.
+    - **14c. [H] Trip spreadsheet importer** (D-95, docs/design/trip-sheet.md §28; Q-18 to Q-21 answered). Two dispatches (split 2026-11-23). Runs in Lane B beside the go-live chain; it never delays a Lane A item (Adam, 2026-11-18: notes first, then go-live).
+      - **14c-1 [H] backend:** parser (add defusedxml), resolvers (gazetteer, airports, coordinates), the `trip_sheet` upload kind and worker step, new tables with RLS, matrix rows, preview/commit API and CLI, with API and RLS tests. Stay out of `accounts` and `config` so it can run beside 40c-1.
+        - Footprint: `trips`, `history` (upload kind, worker), `geo` (gazetteer exact match) (?), `core.policy`, backend requirements. Flags: migrations, api.
+        - Status: todo
+      - **14c-2 [H] preview UI:** upload, per-tab outcome and diff, problems by tab/row/column, the unticked "create these people" option (Q-20), commit and 409 handling, both shells; e2e upload of a SYNTHETIC sheet.
+        - Footprint: fe:tripsheet (new), fe:upload, fe:trips (query invalidation only) (?). Flags: none.
+        - Status: todo
+15. **[H] T9:** home-period detection. It also builds every home-period endpoint (suggestions; confirm, edit, reject; manual create and edit with the gap/overlap validation), so item 16 is frontend-only and can run beside item 18.
+    - Footprint: `history` (home periods, detection), `core.jobs`, `core.policy` (?). Flags: api, migrations (?).
     - Status: todo
-16. **[M] T9:** the review UI and manual entry.
+16. **[M] T9:** the review UI and manual entry, on item 15's endpoints.
+    - Footprint: fe:homes (new), fe:map (pin) (?). Flags: none.
     - Status: todo
 17. **[M] T17:** Valhalla with a Kansas extract. Check free disk first.
     - Status: done (2026-11-19)
 18. **[X] T20 core:** trip detection and data integrity, including the locking of confirmed trips.
+    - Footprint: `history` (detection runs), `trips` (candidates, review flags, rejected candidates, locking), `flights` (matching), `core.jobs`, `core.policy` (?). Flags: migrations, api (?).
     - Status: todo
 19. **[H] T20:** the review queue.
+    - Footprint: fe:review (new), `trips` (review actions) (?). Flags: api (?).
     - Status: todo
 20. **[H] T19 session 1:** catalog UI architecture plus `docs/design/frontend-patterns.md`.
     - Status: done (2026-11-19)
-21. **[M] The rest of T19,** following the patterns doc (2 dispatches).
-    - Status: todo
-    - **→ Review pause B:** the desktop catalog UI.
+21. **[M] The rest of T19,** following the patterns doc (2 dispatches, frontend-patterns.md §8).
+    - **21a [M] the list as a working tool** (§8): keyboard navigation, bulk bar, paging, more filters, the header search.
+      - Footprint: fe:trips (list, filters, selection store), fe:shells (header search, shortcut help), fe:map (selection highlight). Flags: none.
+      - Status: todo
+    - **21b [M] the trip page complete** (§8), plus 14b's leftover: participants edit the notes on their own contributed legs in the UI (the API already allows it).
+      - Footprint: fe:trips (trip page, leg form, tags page), `trips` (`PATCH /persons`, purposes), `geo` (`GET /reference/airlines`), `core.policy` (API tests per actor). Flags: api.
+      - Status: todo
+    - **→ Review pause B:** the desktop catalog UI, once 21, 27 and 40e are done (Adam reviews in production).
 22. **[M] T20 polish,** plus the T10 trip comparison.
+    - Footprint: `history` and `trips` (detection tuning), fe:review, fe:history (trip comparison on the bake-off page). Flags: api (?).
     - Status: todo
 23. **[H] T21:** vehicles.
+    - Footprint: `vehicles`, `core.policy`, fe:vehicles (new), fe:trips (leg vehicle picker). Flags: migrations, api.
     - Status: todo
 24. **[M] T22:** map-matched routes.
+    - Footprint: `routing` (trace_route), `trips` (frozen map-matched versions), `core.jobs`. Flags: migrations (?), api (?).
     - Status: todo
 25. **[M] T23 + T24:** routing proxy and manual trips. Without an ORS key, use Valhalla only and leave the ORS fallback stubbed.
     - Status: done (2026-11-18)
@@ -153,30 +190,47 @@ Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhi
     - re-proposing expired spans instead of resending them as drawn points.
 
     It runs before Review pause B, which reviews the desktop catalog including the route editor.
+    - Footprint: fe:routing (editor, version list). Flags: none (the routes API already returns `sources`; `api` only if re-proposing needs a backend change (?)).
     - Status: todo
 28. **[H] T27:** territory stats.
+    - Footprint: `geo` or a new stats app (the `territory_visit` cache) (?), `trips` (participation, read only), `core.jobs` (rebuild), fe:stats (new). Flags: migrations, api.
     - Status: todo
 29. **[M] T28:** distance and flight stats.
+    - Footprint: item 28's stats app, fe:stats. Flags: api.
     - Status: todo
-30. **[M] T29:** mobile features. Decide the final mobile tabs here.
+30. **[M] T29:** mobile features. Decide the final mobile tabs here. Pulled forward to run beside item 12 after Review pause B (frontend-only; depends only on T18 and T19).
+    - Footprint: fe:shells (mobile shell, final tabs), fe:trips (mobile variants) (?), fe:map (?). Flags: none.
     - Status: todo
 31. **[H] T31:** basic photos. Tests must prove no EXIF, XMP, IPTC, maker notes, or HEIC metadata survive.
+    - Footprint: `media`, `core.jobs` (orphan sweep), `config` (limits) (?), fe:trips (photos, cover), fe:upload (?). Flags: api, migrations (?).
     - Status: todo
-32. **[M] T30 + T32:** PWA polish (needs Q-8), plus upload docs and bearer-token photo upload.
-    - Status: todo
+32. **T30 + T32,** split 2026-11-23 into two items with different dependencies.
+    - **32a [M] T30 PWA polish:** install, offline shell, iOS meta, tested over Q-8's SSH port-forward (answered: (a)). Pulled forward to run beside item 11 after Review pause B.
+      - Footprint: fe:pwa, fe:platform (?). Flags: none.
+      - Status: todo
+    - **32b [H] T32 upload docs and bearer-token photo upload** (after item 31). [H]: auth surface, reusing item 7's hashed, revocable token pattern.
+      - Footprint: `history` (uploads), `media`, `accounts` (tokens) (?), docs. Flags: api, migrations (?).
+      - Status: todo
 33. **[H] T34:** roles and contributions.
+    - Footprint: fe:trips, `trips`, `core.policy`. Flags: api (?), migrations (?).
     - Status: todo
 34. **[X] T35:** the merge tool.
+    - Footprint: `trips`, `core.policy`, fe:trips. Flags: api, migrations (?).
     - Status: todo
 35. **[H] T36:** transfers.
+    - Footprint: `trips`, `vehicles`, `core.policy`, fe:transfers (new) (?). Flags: migrations, api.
     - Status: todo
 36. **[X] T33 core:** request access, the auth flows, and abuse protection.
+    - Footprint: `accounts`, `core.web` (public routes, rate limits), `config` (Turnstile, email), backend templates (landing), fe:landing (?). Flags: api, migrations (?).
     - Status: todo
 37. **[H] The rest of T33.**
+    - Footprint: `accounts` (push subscriptions, invites), fe:platform (notifications), fe:pwa (push in the service worker). Flags: api, migrations (?).
     - Status: todo
 38. **[X] T37 core:** the public snapshot builder, privacy-zone clipping, consent, and leak tests.
+    - Footprint: `public`, `core.policy` (`travel_public`), `core.web` (public routes), `config` (URLs), `history` and `trips` (snapshot sources, read only). Flags: migrations, api (?).
     - Status: todo
 39. **[H] The rest of T37.**
+    - Footprint: `public`, backend templates, fe:trips (sharing settings) (?). Flags: migrations (?), api (?).
     - Status: todo
 **Family go-live slice (40a–40e, 41a, 42a; planned 2026-11-18).**
 - **Goal:** Adam and a few family members sign in at https://travel.adamcasada.com through Authentik with 2FA and add trips.
@@ -244,13 +298,15 @@ P1. **[H] Parallel readiness (Adam, 2026-11-23; D-98).** Runs alone, in the main
    - `./dev` in a worktree: derive a distinct compose project name and port block from the worktree (for example `TH_LANE=<n>` → ports 8790+, 5180+), so `./dev up`, `test`, `test-quick`, `lint`, `manage`, `e2e` work in two worktrees at once beside the main stack.
    - Worktree stacks get their own DB volume and bulk directory under the worktree (`var/`), never the main `var/bulk` or the dev DB volume. Refuse `./dev prod …`, `restore-test` and `import-from-dev` from a worktree.
    - `./dev lane new <item>` / `./dev lane rm <item>`: create a worktree at `../travel-history-lanes/<item>` on branch `item/<item>` with its `.env` (copied from `.env.example`, never from the real `.env`), and tear it down (stack, volumes, worktree; refuse if the branch isn't merged unless `--force`).
-   - Prove it: two lanes running `./dev test-quick` at once, both green, with the main dev stack and batch 33 untouched; record the host's peak RAM in the report.
+   - Lane stacks need public reference data for the e2e (gazetteer, airports) and Valhalla for its routing step. Seed a lane's `var/bulk/reference` by copying only the main `var/bulk/reference` (public downloads; never `raw/` or `media/`, never a mount), because GeoNames pins can't be re-downloaded (D-94). Join lane stacks to the shared, stateless `valhalla` network.
+   - Prove it: two lanes running `./dev test-quick` at once, both green, and `./dev e2e` green in one lane, with the main dev stack and batch 33 untouched; record the host's peak RAM in the report.
    - Docs: a short "Parallel lanes" section in CLAUDE.md commands and docs/development (or the nearest existing dev doc).
+   - Footprint: `dev`, `scripts` (stack.sh), `.githooks`, `compose.dev.yaml`, `.env.example`, docs (CLAUDE.md commands, dev doc). Flags: main-checkout.
    - Status: not started
 
-40c. **[X] Authentik sign-in and the account handover (PROPOSED: G-3, G-4, G-5).** Two dispatches.
-   - **Dispatch 1 [X]: build.**
-     - **Authentik:** point production at Authentik per auth.md §7.2 (per-provider issuer, confidential client, `travel-users` group check, `auth_time`, end-session logout). Prove discovery and JWKS work from inside the prod web container through the public hostname; D-57's back channel is dev-only.
+40c. **[X] Authentik sign-in and the account handover (PROPOSED: G-3, G-4, G-5).** Three dispatches (split 2026-11-23: the build runs in a lane; only the production steps need the main checkout).
+   - **40c-1 [X]: build, in a lane.** Needs neither real data nor Adam's Authentik values.
+     - **Authentik:** point production at Authentik per auth.md §7.2 (per-provider issuer, confidential client, `travel-users` group check, `auth_time`, end-session logout). D-57's back channel is dev-only.
      - **Tests:** Authentik-shaped claims (issuer with a trailing slash, `email_verified=false`, group lists, a missing group refused, `auth_time`); the `amr` second-factor check (G-5).
      - **Pre-exposure sign-in:** make it work over an SSH port-forward to `localhost:8784` (G-4), without weakening the public-host settings.
      - **`rebind_identity`:** owner role only, dry-run by default, one transaction, logged.
@@ -258,11 +314,17 @@ P1. **[H] Parallel readiness (Adam, 2026-11-23; D-98).** Runs alone, in the main
        - It refuses in every other case, and never matches by email.
      - **`link_person <account> <person>`:** owner role, like `set_role`. It links a family member's new account to the person Adam already put on trips. This slice of T33's onboarding (auth.md §7.3) is pulled forward because trips default to `participants` visibility (§6.2): unlinked, family members can't see the trips they're on.
      - **Command tests:** RLS-level: rows untouched, sessions gone, every refusal.
-     - **Final copy:** run 40b's final copy after the orchestrator confirms Adam has stopped entering data in dev. Then end BLOCKED-ON-USER: Adam's first sign-in.
-   - **Dispatch 2 [H]: after Adam signs in.**
+     - Footprint: `accounts`, `core.web`, `config`, `compose.prod.yaml` and `.env.prod.example` (?), docs (auth.md, production.md). Flags: none (no migration expected (?)).
+   - **40c-2 [H]: deploy and final copy, main checkout.** Needs Adam's Authentik app/provider and OIDC values in `.env.prod`.
+     - Migrate dev to main's head and deploy the same commit to production (the copy needs identical migrations).
+     - Prove discovery and JWKS work from inside the prod web container through the public hostname.
+     - Run 40b's final copy after the orchestrator confirms Adam has stopped entering data in dev. Then end BLOCKED-ON-USER: Adam's first sign-in.
+     - Footprint: the production stack, the main dev stack (real data), docs (production.md). Flags: main-checkout.
+   - **40c-3 [H]: after Adam signs in, main checkout.**
      - Run `rebind_identity`, dry run first.
      - Adam signs in again and confirms he sees his history and trips; the counts are unchanged; his account is Admin.
      - Production now refuses `import-from-dev`.
+     - Footprint: the production stack. Flags: main-checkout.
    - Status: todo
 40d. **[M] Minimal go-live runbook and outside smoke test (the go-live slice of T38).**
    - **`docs/go-live.md`, for Adam:**
@@ -279,8 +341,9 @@ P1. **[H] Parallel readiness (Adam, 2026-11-23; D-98).** Runs alone, in the main
      - the trips → travel redirect;
      - ingest unchanged;
      - the Cloudflare robots.txt and 404 expectations noted 2026-11-19.
-     - Include a local mode that runs the production image with scope `all` on an unpublished port, so 41a can test the exact go-live configuration before the "go".
+     - Include a local mode that runs the production image with scope `all` on an unpublished port, so 41a can test the exact go-live configuration before the "go". It builds the image from the current checkout and uses a throwaway DB, never production's, so 40d and 41a need no main checkout.
    - **Docs:** update phases.md 8.6 and docs/tracking/exposure.md for the production stack. The rest of T38 stays in item 40.
+   - Footprint: `scripts` (smoke scripts), `dev`, docs (go-live.md, tracking/exposure.md, production.md). Flags: none.
    - Status: todo
 40e. **[H] Exposure, only after Adam's "go" and his tunnel change.**
    - Set production's scope to `all` (HSTS on) and redeploy.
@@ -288,8 +351,10 @@ P1. **[H] Parallel readiness (Adam, 2026-11-23; D-98).** Runs alone, in the main
    - Adam signs in at https://travel.adamcasada.com, and trips.* redirects.
    - Adam creates the first family account; it signs in as a Member and, linked, sees its trips.
    - Update PLAN.md, phases.md and the threat model's exposure row (D-73's tracker-only period ends).
+   - Footprint: the production stack (`.env.prod` scope, redeploy), docs (threat-model.md). Flags: main-checkout.
    - Status: todo
 40. **[M] The rest of T38:** the go-live checklist's SMTP, Turnstile, request-access and public-page parts, added to 40d's runbook.
+    - Footprint: docs (go-live.md). Flags: none.
     - Status: todo
 41a. **[R] Focused security review of the app as it will be exposed (read-only).**
    - **Anonymous surface** on travel.* and trips.* with scope `all` (via 40d's local mode):
@@ -321,29 +386,48 @@ P1. **[H] Parallel readiness (Adam, 2026-11-23; D-98).** Runs alone, in the main
      - the dev stack unreachable through the tunnel, and whether dev's :8780 was reachable via travel.* before 2026-11-17 (NEXT.md).
    - **Handover result:** no mock identities or synthetic accounts in production; raw checksums; `rebind_identity`, `link_person` and `import-from-dev` owner-only and refusing correctly; the backup encrypted and restorable.
    - **Out of scope, left for item 41:** public pages, request access, trip detection, merge, transfers, photos. None of these exist yet.
+   - **Baseline:** main at 41a's start, including whatever Lane B merged by then (for example 14c's `trip_sheet` upload: defusedxml, size and archive limits). Backend merges wait from here until 40e's smoke passes.
    - **Output:** findings by severity. Blockers stop go-live.
+   - Footprint: read-only (reviewer; doesn't count toward the lane limit); runs 40d's local mode. Flags: none.
    - Status: todo
    - **→ Pause:** 41a's findings summary, then ask for the exposure "go".
 41. **[R] Full security and data-integrity review, read-only** (builds on 41a):
     - RLS, public routes, tokens, rate limits, headers, secrets, dependencies, leak tests;
     - the integrity of trip-detection locking (T20), the merge tool (T35), and transfers (T36).
+    - Footprint: read-only (reviewer). Flags: none.
     - Status: todo
     - **→ Pause:** the findings summary.
 42a. **[H] Go-live blocker fixes from 41a.**
    - Skip this item if 41a finds no blockers.
    - Fixes to auth, RLS or the exposure guard are dispatched at [X].
    - Non-blocking findings go to item 43.
+   - Footprint: from 41a's findings, likely `accounts`, `core.web`, `config` (?). Flags: set when dispatched; `main-checkout` only if a fix must be applied to the production stack.
    - Status: todo
 42. **[H] Blocker fixes.**
+    - Footprint: from item 41's findings. Flags: set when dispatched.
     - Status: todo
 43. **[M] Other fixes.**
+    - Footprint: from item 41's findings. Flags: set when dispatched.
     - Status: todo
 44. **[H] T39 session 1:** Android architecture plus a patterns doc.
+    - Footprint: `android` (new top-level dir), docs/design (patterns doc). Flags: none. Can run beside items 33–39 once 32b is done.
     - Status: todo
 45. **[M] The rest of T39.**
+    - Footprint: `android`. Flags: none.
     - Status: todo
-46. **[M] Optional, in order:** T16, T41, T42, T45.
-    - Status: todo
+46. **[M] Optional, in order:** split 2026-11-23 into one item per task so each can pair.
+    - **46a [M] T16:** the other flight importers.
+      - Footprint: `flights`, `history` (import kinds). Flags: migrations (?), api (?).
+      - Status: todo
+    - **46b [M] T41:** the Tauri desktop wrapper.
+      - Footprint: `desktop` (new top-level dir), fe:platform. Flags: none.
+      - Status: todo
+    - **46c [M] T42:** a regional PMTiles basemap. Check its storage against resource-budget.md first; ask Adam if it would exceed the budget.
+      - Footprint: fe:map (basemap), compose files (tile serving) (?), docs. Flags: none.
+      - Status: todo
+    - **46d [M] T45:** backend type checking (mypy + django-stubs).
+      - Footprint: every backend app and `config`, `dev` (lint). Flags: none. It overlaps every backend item, so it pairs only with frontend-only or Android items.
+      - Status: todo
 
 **Later, only when I ask:**
 - T40 Immich [X, then H].
@@ -477,3 +561,18 @@ Nature: mech = mechanical, mod = moderate, hard. Size is S/M/L/XL with approxima
 - 2026-11-18: item 40a done and verified (`./dev test-quick` 2314 + 105 passed; prod web healthy on 127.0.0.1:8784 only; trips.* → travel.* 301 with forwarded HTTPS; public host stays 404 at scope `tracker`; unknown host 400). The orchestrator added the 8784 port and `./dev prod` to CLAUDE.md (G-1) and approved D-96 under Adam's delegation. Known: dev `./dev restore-test` fails at step 4 on two synthetic raw files lost with the HDD (40b's pruning drops them). Item 40b dispatched with a 10:05 pm CST stop (Adam asked to stop around 10:15 pm).
 - 2026-11-18: item 40b done and verified after a usage-limit stop and resume (`./dev test-quick` 2321 + 105 passed; rehearsal copy in prod: 1 account, batch 33 = 193,009 points, same as dev; dev untouched; no leftovers). Open gate: the encrypted backup needs AGE_RECIPIENT. Next: 40c dispatch 1 (build), which needs Adam's Authentik app/provider and the OIDC values in `.env.prod` to finish.
 - 2026-11-23: Adam approved parallel lanes (Max plan): up to two builders at once in git worktrees (three after the Ryzen move), the orchestrator merging serially (D-98; ORCHESTRATION.md "Parallel lanes"). Added P1 [H] parallel readiness before 40c. The planner adds footprints and lane pairings next.
+- 2026-11-23 (planner): added a footprint line and flags to every open item, with a key under the tiers. Reason: D-98 pairs items by footprint.
+- 2026-11-23 (planner): rewrote the execution order as Lane A (the go-live chain) and Lane B (14c, 21, 27 …), with the expected pairs, a fill rule and where three lanes help after the Ryzen move. Reason: D-98; Adam's priorities, pauses and gates are unchanged.
+- 2026-11-23 (planner): split 40c's first dispatch into 40c-1 [X] (build, in a lane) and 40c-2 [H] (deploy, discovery check, final copy; main checkout); the handover is now 40c-3 [H]. Reason: the build needs neither real data nor Adam's Authentik values, so it can run beside 14c-1.
+- 2026-11-23 (planner): moved 40d before 40c-2 (either order allowed). Reason: 40d doesn't need the handover, and 40c-2 waits on Adam's Authentik values.
+- 2026-11-23 (planner): 40d's local mode builds from the checkout and uses a throwaway DB. Reason: 40d can then run in a lane, and the go-live test never touches production's data.
+- 2026-11-23 (planner): split 14c into 14c-1 (backend) and 14c-2 (preview UI), both in Lane B beside the go-live chain. Reason: the item already planned two dispatches; the halves pair with 40c-1 and 40d without delaying go-live.
+- 2026-11-23 (planner): recorded 21's two dispatches as 21a and 21b with separate footprints; 21b takes 14b's leftover (participants editing notes on their own legs in the UI). Reason: NEXT.md queued that fix for item 21.
+- 2026-11-23 (planner): P1 now seeds lanes' public reference data, joins the `valhalla` network, and proves `./dev e2e` in a lane. Reason: GeoNames pins can't be re-downloaded (D-94), and without the gazetteer, airports and Valhalla no lane can pass the e2e.
+- 2026-11-23 (planner): 41a reviews main including Lane B's merges, and backend merges wait from 41a's start until 40e's smoke passes. Reason: 40e must deploy what 41a reviewed.
+- 2026-11-23 (planner): Review pause B waits for 40e. Reason: from 40c-2 on, Adam's data is only in production, so he reviews 21 and 27 there.
+- 2026-11-23 (planner): item 15 now builds every home-period endpoint, so item 16 is frontend-only. Reason: 16 can then run beside 18.
+- 2026-11-23 (planner): split 32 into 32a [M] (T30 PWA polish) and 32b [H] (T32 upload docs, bearer-token photo upload). Reason: 32a needs only Q-8 (answered) and is frontend-only; 32b needs item 31 and is auth surface, so [H] (item 7's token pattern exists).
+- 2026-11-23 (planner): pulled 32a and 30 forward to run beside 11 and 12 after Review pause B. Reason: both are frontend-only, don't wait on pause A, and would otherwise leave a lane idle.
+- 2026-11-23 (planner): split 46 into 46a–46d (T16, T41, T42, T45, same order). Reason: as one item it spans flights, a new desktop app, the basemap and backend-wide typing, so it couldn't pair with anything.
+- 2026-11-23 (planner): batched L-1 to L-5 for Adam, all PROPOSED. Reason: they interpret or amend D-98 and ORCHESTRATION.md, or set a production deploy cadence.
