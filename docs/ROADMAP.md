@@ -416,10 +416,14 @@ P1. **[H] Parallel readiness (Adam, 2026-11-23; D-98).** Runs alone, in the main
    - Today a write that arrives after the re-check is due gets 401, the SPA redirects and the form's input is lost. Let unsafe requests (POST/PUT/PATCH/DELETE) through during a grace window after the re-check falls due (for example up to 2× the interval), while safe requests trigger the re-check as now; past the window everything gets 401. Removing someone from travel-users still takes effect within the window; record the new bound in D-108's terms and go-live.md "Removing someone's access".
    - Tests: session and API tests for due, within grace and past grace, per method; the 43b redirect still fires on the next GET; the go-live smoke's F-3 check updated.
    - Footprint: `accounts` (sessions), fe:auth only if needed, scripts/golive-smoke.sh, docs. Flags: none.
-   - Status: todo
+   - Status: done (2026-11-24; D-122: writes get a grace equal to the interval, capped at 1 h; a refused read within the grace keeps the session, accepted by the orchestrator: same worst-case bound)
 
 43d. **[M] Flaky TitleSearch "fast typing" test** (added 2026-11-24 from 21b's report: fails about 1 run in 3). Make it deterministic (fake timers or awaiting the debounced URL write), and check the hook (`trips/useFollowedText.ts`) has no real race behind it.
    - Footprint: fe:trips (TitleSearch test, useFollowedText). Flags: none.
+   - Status: todo
+
+43e. **[H] Forms hold the re-check redirect while they have unsaved input** (added 2026-11-24 from 43c's report). A read during an edit after the check fell due (a refetch on tab focus, a place search while typing) still redirects and loses the form; the server already keeps the session for the save (D-122). Forms with unsaved input defer the redirect (or keep the draft in sessionStorage and restore it after sign-in). Runs after 21b merges (it changes many of those forms).
+   - Footprint: fe:auth (recheck), fe:trips forms, fe:routing editor (unsaved line). Flags: none.
    - Status: todo
 
 42a. **[X] Go-live hardening from 41a** (re-scoped 2026-11-24: 41a found no blockers, but these are cheap and should land before 40c-2 deploys; docs/review/2026-11-24-go-live.md).
@@ -614,3 +618,4 @@ Nature: mech = mechanical, mod = moderate, hard. Size is S/M/L/XL with approxima
 - 2026-11-24: item 42a done and verified in lane 2, merged (`./dev test-quick` 2696 + 184 passed in the main checkout; images rebuilt on refreshed digests; local go-live smoke passed in the lane). D-107–D-111. 14a-1 built in lane 1 (its D-107 renumbered D-112; merge after 40e). Added 43b [M] (hourly re-check UX, lane image tags) and folded the trip status enum fix into 21b; both build now, 21b merges after 40e.
 - 2026-11-24: item 43b done and verified in lane 3, merged (`./dev test-quick` 2696 + 192 passed in the main checkout; `./dev e2e --recheck` green in the lane). D-120, D-121. Added 43c [X]: a save that meets the hourly re-check loses its form input; let writes through for a grace window. Reason: family members editing trips would lose work hourly.
 - 2026-11-24: 21b built in lane 2 (backend quick 2811 passed, e2e green; merge after 40e). Added 43d [M] for the flaky TitleSearch test it found.
+- 2026-11-24: item 43c done and verified in lane 3, merged (`./dev test-quick` 2744 + 192 passed in the main checkout; `./dev e2e --recheck` and the local go-live smoke, 101 checks, green in the lane). D-122. Added 43e [H] (forms hold the redirect), after 21b merges.
