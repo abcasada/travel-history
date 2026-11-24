@@ -118,3 +118,20 @@ test("the trips layer draws the map payload on trip pages, not on History", asyn
   );
   expect(screen.getByTestId("source-trip-stops")).toHaveAttribute("data-features", "1");
 });
+
+test("the status filter goes into the URL and the API as TripStatus", async () => {
+  const user = userEvent.setup();
+  const { fetchMock } = renderAt("/trips", [
+    ...LISTS,
+    { path: "/api/v1/trips", body: { count: 0, items: [] } },
+  ]);
+  await screen.findByText(/No trips yet/);
+  await user.selectOptions(screen.getByLabelText("Status"), "candidate");
+  await waitFor(() =>
+    expect(screen.getByTestId("location")).toHaveTextContent("/trips?status=candidate"),
+  );
+  await waitFor(() =>
+    expect(requests(fetchMock)).toContain("GET /api/v1/trips?status=candidate&limit=200"),
+  );
+  expect(requests(fetchMock)).toContain("GET /api/v1/trips/map?status=candidate");
+});

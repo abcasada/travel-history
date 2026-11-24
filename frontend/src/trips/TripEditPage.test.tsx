@@ -413,3 +413,129 @@ test("saving the trip's fields sends only what the form holds and stays in the e
     notes: "old",
   });
 });
+
+test("a flight leg takes airports, an airline, a seat and a cabin", async () => {
+  const user = userEvent.setup();
+  const { fetchMock } = renderAt("/trips/10/edit", [
+    ...COMMON,
+    { path: "/api/v1/trips/10", body: makeDetail() },
+    {
+      path: "/api/v1/reference/airports",
+      body: [
+        {
+          id: 31,
+          iata_code: "SYA",
+          icao_code: "KSYA",
+          ident: "KSYA",
+          name: "Synthetic Intl",
+          municipality: "Synthville",
+          iso_country: "US",
+          type: "large_airport",
+          lon: -97,
+          lat: 38,
+        },
+      ],
+    },
+    {
+      path: "/api/v1/reference/airlines",
+      body: [
+        { id: 9, name: "Old Synthetic Air", iata: "OS", icao: "OSY", country: "", active: false },
+      ],
+    },
+    { method: "POST", path: "/api/v1/trips/10/legs", status: 201, body: makeLeg({ id: 201 }) },
+  ]);
+  await user.click(await screen.findByRole("button", { name: "Add leg" }));
+  const form = screen.getByRole("form", { name: "New leg" });
+  await user.selectOptions(within(form).getByLabelText("Mode"), "flight");
+  await user.type(within(form).getByLabelText("From airport"), "SYA");
+  await user.click(await within(form).findByRole("button", { name: /SYA Synthetic Intl/ }));
+  expect(within(form).getByRole("button", { name: "Clear origin airport" })).toBeInTheDocument();
+  await user.type(within(form).getByLabelText("Airline"), "old");
+  await user.click(await within(form).findByRole("button", { name: /OS Old Synthetic Air/ }));
+  await user.type(within(form).getByLabelText("Flight number"), "123");
+  await user.type(within(form).getByLabelText("Seat"), "12A");
+  await user.selectOptions(within(form).getByLabelText("Cabin"), "business");
+  await user.click(within(form).getByRole("button", { name: "Add leg" }));
+  await waitFor(() =>
+    expect(lastBody(fetchMock, "POST", "/api/v1/trips/10/legs")).toMatchObject({
+      mode: "flight",
+      origin_airport_id: 31,
+      destination_airport_id: null,
+      origin_label: "SYA Synthetic Intl, Synthville",
+      airline_id: 9,
+      flight_number: "123",
+      seat: "12A",
+      cabin_class: "business",
+    }),
+  );
+});
+
+test("a drive leg sends no flight fields", async () => {
+  const user = userEvent.setup();
+  const leg = makeLeg({
+    mode: "flight",
+    airline_id: 9,
+    airline: { id: 9, name: "Synthetic Air", code: "SY" },
+    seat: "1A",
+    cabin_class: "first",
+  });
+  const { fetchMock } = renderAt("/trips/10/edit", [
+    ...COMMON,
+    { path: "/api/v1/trips/10", body: makeDetail({ legs: [leg] }) },
+    { method: "PATCH", path: "/api/v1/legs/200", body: leg },
+  ]);
+  await user.click(await screen.findByRole("button", { name: "Edit" }));
+  const form = screen.getByRole("form", { name: "Edit leg" });
+  expect(within(form).getByText("SY Synthetic Air")).toBeInTheDocument();
+  expect(within(form).getByLabelText("Seat")).toHaveValue("1A");
+  await user.selectOptions(within(form).getByLabelText("Mode"), "drive");
+  await user.click(within(form).getByRole("button", { name: "Save leg" }));
+  await waitFor(() =>
+    expect(lastBody(fetchMock, "PATCH", "/api/v1/legs/200")).toMatchObject({
+      mode: "drive",
+      airline_id: null,
+      seat: "",
+      cabin_class: null,
+    }),
+  );
+});
+
+test("core editors set who was on each leg", async () => {
+  const user = userEvent.setup();
+  const trip = makeDetail({
+    participants: [makeParticipant(7, "Synthetic Parent"), makeParticipant(8, "Synthetic Kid")],
+    legs: [makeLeg({ participant_ids: [7, 8] })],
+  });
+  const { fetchMock } = renderAt("/trips/10/edit", [
+    // Before COMMON: the first matching route answers.
+    {
+      path: "/api/v1/persons",
+      body: [
+        { id: 7, display_name: "Synthetic Parent", visibility: "family", is_me: false },
+        { id: 9, display_name: "Synthetic Friend", visibility: "family", is_me: false },
+      ],
+    },
+    ...COMMON,
+    { path: "/api/v1/trips/10", body: trip },
+    { method: "PUT", path: "/api/v1/legs/200/participants/8", body: makeLeg() },
+    { method: "PUT", path: "/api/v1/legs/200/participants/9", body: makeLeg() },
+  ]);
+  await user.click(await screen.findByRole("button", { name: /^People on Drive/ }));
+  const box = screen.getByRole("group", { name: "People on this leg" });
+  await user.click(within(box).getByLabelText("Synthetic Kid"));
+  await waitFor(() =>
+    expect(lastBody(fetchMock, "PUT", "/api/v1/legs/200/participants/8")).toEqual({
+      on_leg: false,
+    }),
+  );
+  await user.selectOptions(
+    await within(box).findByLabelText("Someone only on this leg"),
+    "Synthetic Friend",
+  );
+  await user.click(within(box).getByRole("button", { name: "Add to leg" }));
+  await waitFor(() =>
+    expect(lastBody(fetchMock, "PUT", "/api/v1/legs/200/participants/9")).toEqual({
+      on_leg: true,
+    }),
+  );
+});
