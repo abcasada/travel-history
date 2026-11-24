@@ -20,5 +20,6 @@ Handoff for the orchestrator; fold into NEXT.md at merge.
 - **Finding for 41a (not fixed, out of scope):** anonymous `GET /app/assets/<unknown>` answers 200
   with the SPA shell (index.html, no data): the wall lets `/app/assets/` through and `spa_index`
   answers any `/app/` path. The smoke reports it as a note.
+- **Tests (lane 1):** lint clean; `./dev test-quick` 2580 passed + 31 deselected, frontend 105 passed.
 - **For the orchestrator:** CLAUDE.md's command list could gain `./dev golive-smoke` (I didn't
   edit CLAUDE.md). D-105 may collide with lane 2's numbers; renumber at merge if so.
