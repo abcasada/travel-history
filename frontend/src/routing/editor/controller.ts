@@ -70,7 +70,8 @@ export type PopupHandle = { remove: () => void };
 export type OpenPopup = (map: MapLibreMap, at: Coord, content: HTMLElement) => PopupHandle;
 
 const openMapLibrePopup: OpenPopup = (map, at, content) =>
-  new Popup({ closeOnClick: false, offset: 12, maxWidth: "16rem" })
+  // closed by a click elsewhere or Escape, both handled by the controller
+  new Popup({ closeButton: false, closeOnClick: false, offset: 12, maxWidth: "16rem" })
     .setLngLat([at[0], at[1]])
     .setDOMContent(content)
     .addTo(map);
@@ -480,6 +481,7 @@ export class RouteEditorController {
         this.closePopup();
         if (!this.actions.blocked()) this.actions.insert([anchor.lon, anchor.lat]);
       },
+      close: () => this.closePopup(),
     });
     this.popup = this.openPopup(this.map, [anchor.lon, anchor.lat], content);
     content.querySelector("button")?.focus();
@@ -550,9 +552,12 @@ export class RouteEditorController {
 /** The popup's DOM (MapLibre popups take DOM, not React). */
 export function anchorPopupContent(
   anchor: Anchor,
-  actions: { remove: () => void; keep: () => void },
+  actions: { remove: () => void; keep: () => void; close: () => void },
 ): HTMLElement {
   const root = document.createElement("div");
+  root.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") actions.close();
+  });
   root.className = "text-sm";
   root.dataset.testid = "route-editor-popup";
   const title = document.createElement("p");

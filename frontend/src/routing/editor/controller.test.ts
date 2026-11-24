@@ -179,9 +179,13 @@ test("a fixed point's popup can keep a shape point; a click elsewhere only close
   expect(actions.append).not.toHaveBeenCalled();
 
   map.hits = [ANCHORS_ID];
+  map.fire("click", click(toScreen([-97, 38])));
+  popups[1]?.content.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  expect(popups[1]?.remove).toHaveBeenCalled();
+
   map.hitAnchor = 1;
   map.fire("click", click(toScreen([-96.5, 38.2])));
-  popups[1]?.content.querySelectorAll("button")[1]?.click();
+  popups[2]?.content.querySelectorAll("button")[1]?.click();
   expect(actions.insert).toHaveBeenCalledWith([-96.5, 38.2]);
 });
 

@@ -123,9 +123,19 @@ await page.getByRole("button", { name: "Undo" }).and(page.locator(":enabled")).w
 const routesAfter = tripRequests.filter(([m, path]) => m === "POST" && path === "/api/v1/routing/route").length;
 if (routesAfter !== routesBefore + 1) throw new Error(`editor routed ${routesAfter - routesBefore} times`);
 await page.screenshot({ path: "out/route-editor.png" });
+// Item 27: a click on an anchor opens its popup (Escape closes it without editing).
+await page.waitForTimeout(500);
+const [px, py] = (await page.evaluate(() => window.__routeEditorAnchors()))[0];
+await page.mouse.click(box.x + px, box.y + py);
+await page.getByTestId("route-editor-popup").getByText("Fixed point").waitFor();
+await page.getByRole("button", { name: "Remove this point" }).waitFor();
+await page.keyboard.press("Escape");
+await page.getByTestId("route-editor-popup").waitFor({ state: "detached" });
 await page.getByLabel("Note for this version").fill("E2E drag");
 await page.getByRole("button", { name: "Save the edited route" }).click();
 await page.getByText(/Version 2 · hand_edited · \d+\.\d km \(current\)/).waitFor();
+// The version list says what the hand-edited version is made of (Route.sources).
+await page.getByTestId("route-sources").getByText(/Valhalla \(self-hosted\) route, [\d,]+ points, checked/).waitFor();
 await page.getByRole("link", { name: /Back to the trip/ }).click();
 await page.getByRole("heading", { name: title }).waitFor();
 await page.getByRole("link", { name: "Edit" }).click();
