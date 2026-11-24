@@ -6,7 +6,7 @@ and one unknown person, so the preview offers "create these people".
 Run in a throwaway container of the pinned Python image from backend/Dockerfile (nothing is
 installed on the host):
 
-    IMAGE=python:3.13.16-slim-trixie@sha256:70729b46c69b4f1e97c4822c1af3df53a1476cf5ddc6c087c0c10bc3a5678c2f
+    IMAGE=python:3.13.16-slim-trixie@sha256:cf50a4f6ac4f026458b08d5222023d700ac806410dff5e9ca8728fa44f2b850f
     docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD:/repo" -w /repo "$IMAGE" \
         sh -c 'pip install -q --target /tmp/py openpyxl==3.1.5 &&
                PYTHONPATH=/tmp/py python scripts/make_e2e_trip_sheet.py'

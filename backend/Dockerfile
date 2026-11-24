@@ -3,7 +3,7 @@
 # Build context: repository root.
 
 # --- Frontend build (production SPA, served by Django/WhiteNoise from the same origin) ------
-FROM node:24.22.0-trixie-slim@sha256:7f486cabe892bff8fef04c0f7da8dba84a560be3e4e2740b7a86afc57ebec315 AS frontend
+FROM node:24.22.0-trixie-slim@sha256:a6155384446670e9719bdc4fd0ebe4d4b29fb32a8d6aa523da3547a6cfbcf22c AS frontend
 WORKDIR /src
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
@@ -11,7 +11,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # --- Python base -----------------------------------------------------------------------------
-FROM python:3.13.16-slim-trixie@sha256:70729b46c69b4f1e97c4822c1af3df53a1476cf5ddc6c087c0c10bc3a5678c2f AS base
+FROM python:3.13.16-slim-trixie@sha256:cf50a4f6ac4f026458b08d5222023d700ac806410dff5e9ca8728fa44f2b850f AS base
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
@@ -19,8 +19,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     HOME=/tmp \
     GDAL_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/libgdal.so.36 \
     GEOS_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/libgeos_c.so.1
-# GeoDjango runtime libraries only (GDAL pulls in GEOS and PROJ); no compilers.
+# GeoDjango runtime libraries only (GDAL pulls in GEOS and PROJ); no compilers. The pinned base
+# image lags Debian's security updates (41a's F-6: openssl, krb5, zlib, …), so the build takes
+# them: rebuilding without the layer cache (a new digest, or `--no-cache`) picks up new ones.
 RUN apt-get update \
+ && apt-get upgrade -y --no-install-recommends \
  && apt-get install -y --no-install-recommends libgdal36 \
  && rm -rf /var/lib/apt/lists/*
 WORKDIR /app

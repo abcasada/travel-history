@@ -16,7 +16,7 @@ PROD_DIR="${TRAVEL_PROD_DIR:-$(dirname "$REPO_ROOT")/travel-history-prod}"
 PROD_ENV_FILE="$PROD_DIR/.env.prod"
 PROD_RELEASE="$PROD_DIR/release"
 PROD_WEB_PORT=8784
-POSTGIS_IMAGE=postgis/postgis:18-3.6@sha256:b4466ea2ba7e3af54fcbba996d45325720f4b3ecb4f43f99b2f41367dc196f23
+POSTGIS_IMAGE=postgis/postgis:18-3.6@sha256:4a43e3c3e5d55b9208240fc71db543b79c638766280c625a425bd0a2390989c4
 
 die() {
   echo "error: $*" >&2

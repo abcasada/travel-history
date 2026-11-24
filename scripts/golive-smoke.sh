@@ -17,7 +17,12 @@
 #       tracker checks the state before go-live (Cloudflare's own 404s allowed). The other
 #       public name defaults to trips.<domain> for a travel.<domain> canonical name.
 #
-# Checks: health and the landing page with production headers and HSTS; plain HTTP redirected;
+# Checks: health and the landing page with production headers and HSTS; the installed PWA's
+# index.html and sw.js with the CSP (F-1); plain HTTP redirected; a loopback Host through the
+# tunnel refused (F-8); no docs or schema and junk Bearer tokens refused cleanly (F-7); large
+# anonymous bodies refused (F-2); locally, scope all refusing to start without the provider
+# (F-9) and a signed-in Member: public visibility refused (F-10), the hourly provider check and
+# deactivate_account (F-3);
 # sign-in (redirect to the provider with state, nonce, PKCE S256 and the canonical callback;
 # cookie flags); every API operation in the OpenAPI schema and the private pages refuse anonymous
 # requests; unknown and public-renderer paths 404 without DEBUG pages; robots.txt (Cloudflare
@@ -30,7 +35,7 @@ set -euo pipefail
 source "$(dirname "$0")/stack.sh"
 cd "$REPO_ROOT"
 
-usage() { sed -n '2,29p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print; next } NR > 1 { exit }' "$0"; }
 
 # ---- the throwaway local stack ----
 # A distinct project and image tag: never travel-history-prod and never a 12-hex release tag, so
@@ -225,12 +230,39 @@ check_landing() {
     fail "plain HTTP: $status $location"
   fi
   expect "the SPA build is served (manifest)" 200 "$(request GET "$canonical" /app/manifest.webmanifest)"
+  # F-1: the service worker answers every in-app navigation with its precached /app/index.html,
+  # so that copy, and sw.js itself, must carry the CSP and X-Frame-Options too.
+  local file
+  for file in /app/index.html /app/sw.js; do
+    status="$(request GET "$canonical" "$file")"
+    if [ "$status" = 200 ]; then
+      production_headers "GET $file (the installed PWA's copy)"
+      [[ "$(header content-security-policy)" == *"script-src 'self'"* ]] &&
+        pass "  CSP script-src 'self'" || fail "  CSP without script-src 'self'"
+    elif [ "$status" = 302 ] && [[ "$(header location)" == /auth/login* ]]; then
+      pass "GET $file -> sign in"
+    else
+      fail "GET $file answered $status"
+    fi
+  done
+  if [ "$(request GET "$canonical" /app/index.html)" = 200 ]; then
+    # Inline scripts would be blocked by script-src 'self' (vite-plugin-pwa registers the
+    # worker from a file).
+    local inline
+    inline="$(grep -o '<script[^>]*>' "$work/body" | grep -cv 'src=' || true)"
+    expect "  the shell has no inline scripts" 0 "$inline"
+  fi
   if [ "$mode" = local ]; then
     expect "unknown Host refused" 400 "$(request GET evil.example /)"
     no_debug_page "  unknown Host"
     proto=http
     expect "loopback Host through the tunnel still redirected" 301 "$(request GET localhost /)"
     proto=https
+    # F-8: through the tunnel (CF-Connecting-IP) only the public names are served; a route with
+    # an "HTTP Host Header" override would otherwise skip the scope rule.
+    expect "loopback Host through the tunnel over HTTPS: 404" 404 "$(request GET localhost /)"
+    expect "  127.0.0.1 too (health check path)" 404 "$(request GET 127.0.0.1 /healthz)"
+    expect "  the tracker path too" 404 "$(request POST localhost:8784 /api/v1/ingest/owntracks)"
   fi
 }
 
@@ -306,6 +338,25 @@ PY
   expect "every API operation in the schema answers 401 ($total)" "$total" "$refused"
   [ "$total" -gt 40 ] || fail "too few API operations found ($total)"
   expect "GET /api/v1/openapi.json (schema not public)" 401 "$(request GET "$canonical" /api/v1/openapi.json)"
+  # F-7: a Bearer header passes the login wall for the API's own auth classes; the docs and the
+  # schema don't exist in production, and a token the provider can't vouch for is no user.
+  local bearer='header = "Authorization: Bearer smoke.junk.token"'
+  expect "GET /api/v1/openapi.json with a Bearer header: not served" 404 \
+    "$(request GET "$canonical" /api/v1/openapi.json "$bearer")"
+  no_debug_page "  openapi.json"
+  expect "GET /api/v1/docs with a Bearer header: not served" 404 \
+    "$(request GET "$canonical" /api/v1/docs "$bearer")"
+  expect "GET /api/v1/me with a junk Bearer token: 401, not 500" 401 \
+    "$(request GET "$canonical" /api/v1/me "$bearer")"
+  # F-2: a form POST with a well-formed csrftoken cookie used to be parsed (up to 40 MB) before
+  # any view or rate limit; above the 2.5 MiB default it is refused before anything reads it.
+  head -c $((3 * 1024 * 1024)) /dev/zero | tr '\0' 'x' | sed 's/^/a=/' > "$work/big-form"
+  local csrf
+  csrf="$(head -c 96 /dev/urandom | base64 -w0 | tr -dc 'A-Za-z0-9' | head -c 32)"
+  expect "an anonymous 3 MiB form POST to / is refused (413)" 413 "$(request POST "$canonical" / \
+    'header = "Content-Type: application/x-www-form-urlencoded"' \
+    "header = \"Cookie: csrftoken=$csrf\"" "header = \"Referer: https://$canonical/\"" \
+    "data-binary = \"@$work/big-form\"")"
 }
 
 # 404s: in scope `all` every path reaches the app, so its 404s carry its headers. Before go-live
@@ -451,6 +502,81 @@ check_local_stack() {
   else
     fail "Django's deploy checks: $(grep -E '^\?: \(' "$work/check" | cut -c1-90 | tr '\n' ' ')"
   fi
+  expect "sessions go back through the provider hourly (F-3)" 3600 \
+    "$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$web" | sed -n 's/^OIDC_SESSION_RECHECK_SECONDS=//p')"
+  # F-9: scope `all` without the provider must not start.
+  if local_compose --profile tools run --rm --no-deps -T -e OIDC_ISSUER= tools \
+    python manage.py check > "$work/no-issuer" 2>&1; then
+    fail "scope all started without OIDC_ISSUER"
+  elif grep -q "must be set once TRAVEL_PUBLIC_SCOPE=all" "$work/no-issuer"; then
+    pass "scope all refuses to start without OIDC_ISSUER (F-9)"
+  else
+    fail "scope all without OIDC_ISSUER: $(tail -1 "$work/no-issuer" | cut -c1-90)"
+  fi
+}
+
+# A synthetic Member with a trip and two sessions in the throwaway database: one the provider
+# vouched for just now, one two hours ago. Prints: account trip fresh-session stale-session.
+local_sessions() {
+  if ! local_compose --profile tools run --rm --no-deps -T tools python manage.py shell \
+    >"$work/sessions.log" 2>&1 <<'PY'
+import datetime as dt, time
+from django.contrib.auth import BACKEND_SESSION_KEY, HASH_SESSION_KEY, SESSION_KEY
+from django.contrib.sessions.backends.db import SessionStore
+from travel.accounts.models import User
+from travel.trips.models import Trip
+user, _ = User.objects.get_or_create(email="golive-smoke-member@example.invalid", defaults={"display_name": "SYNTHETIC smoke member"})
+user.set_unusable_password(); user.save()
+trip = Trip.objects.create(owner=user, title="SYNTHETIC smoke trip", start_date=dt.date(2024, 1, 1), end_date=dt.date(2024, 1, 2))
+def session(checked):
+    s = SessionStore()
+    s[SESSION_KEY], s[BACKEND_SESSION_KEY] = str(user.pk), "django.contrib.auth.backends.ModelBackend"
+    s[HASH_SESSION_KEY], s["oidc_checked_at"] = user.get_session_auth_hash(), checked
+    s.create()
+    return s.session_key
+print("SMOKE", user.pk, trip.pk, session(int(time.time())), session(int(time.time()) - 7200))
+PY
+  then
+    cat "$work/sessions.log" >&2
+    die "could not create the synthetic sessions"
+  fi
+  grep '^SMOKE ' "$work/sessions.log" | cut -d' ' -f2-
+}
+
+check_signed_in() {  # local only: a signed-in Member, as the session cookie makes one
+  echo "Signed in (a synthetic Member's sessions in the throwaway database):"
+  local account trip fresh stale csrf
+  read -r account trip fresh stale < <(local_sessions)
+  csrf="$(head -c 96 /dev/urandom | base64 -w0 | tr -dc 'A-Za-z0-9' | head -c 32)"
+  signed() {  # session method path [json]
+    local key="$1" method="$2" path="$3"
+    local extra=("header = \"Cookie: sessionid=$key; csrftoken=$csrf\"" "header = \"X-CSRFToken: $csrf\""
+      "header = \"Origin: https://$canonical\"" 'header = "Content-Type: application/json"')
+    [ -n "${4:-}" ] && extra+=("data = \"${4//\"/\\\"}\"")
+    request "$method" "$canonical" "$path" "${extra[@]}"
+  }
+  expect "GET /api/v1/me with the session" 200 "$(signed "$fresh" GET /api/v1/me)"
+  # F-10: nothing becomes public before T37.
+  expect "POST /api/v1/trips with visibility public: 422 (F-10)" 422 \
+    "$(signed "$fresh" POST /api/v1/trips '{"title":"SYNTHETIC","start_date":"2024-01-01","end_date":"2024-01-02","visibility":"public"}')"
+  expect "PATCH /api/v1/trips/$trip to public: 422" 422 \
+    "$(signed "$fresh" PATCH "/api/v1/trips/$trip" '{"visibility":"public"}')"
+  expect "POST /api/v1/trips/bulk to public: 422" 422 \
+    "$(signed "$fresh" POST /api/v1/trips/bulk "{\"trip_ids\":[$trip],\"visibility\":\"public\"}")"
+  expect "PATCH /api/v1/trips/$trip to family still works" 200 \
+    "$(signed "$fresh" PATCH "/api/v1/trips/$trip" '{"visibility":"family"}')"
+  # F-3: a session the provider last vouched for two hours ago is signed out.
+  expect "a session past the hourly provider check: 401 (F-3)" 401 "$(signed "$stale" GET /api/v1/me)"
+  grep -q "fresh check with the sign-in provider" "$work/body" && pass "  says why" || fail "  no reason given"
+  expect "  and it is gone" 401 "$(signed "$stale" GET /api/v1/me)"
+  # F-3: deactivate_account ends the account's access at once.
+  if local_compose --profile tools run --rm --no-deps -T tools \
+    python manage.py deactivate_account "$account" --execute >"$work/deactivate" 2>&1; then
+    pass "deactivate_account $account --execute (owner role)"
+  else
+    fail "deactivate_account: $(tail -1 "$work/deactivate" | cut -c1-90)"
+  fi
+  expect "  its session answers 401" 401 "$(signed "$fresh" GET /api/v1/me)"
 }
 
 run_checks() {  # token log-command...
@@ -496,6 +622,7 @@ local_checks() {
   local token
   token="$(local_token)"
   run_checks "$token" local_logs
+  check_signed_in
 }
 
 finish() {

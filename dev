@@ -9,7 +9,7 @@ source scripts/stack.sh
 compose() { dev_compose "$@"; }
 node_run() {
   docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -e npm_config_update_notifier=false \
-    -v "$PWD/frontend:/src" -w /src node:24.22.0-trixie-slim@sha256:7f486cabe892bff8fef04c0f7da8dba84a560be3e4e2740b7a86afc57ebec315 "$@"
+    -v "$PWD/frontend:/src" -w /src node:24.22.0-trixie-slim@sha256:a6155384446670e9719bdc4fd0ebe4d4b29fb32a8d6aa523da3547a6cfbcf22c "$@"
 }
 env_value() { env_file_value .env "$1"; }
 
@@ -129,7 +129,7 @@ case "$cmd" in
     oidc_port="$(env_value TRAVEL_OIDC_PORT)"; oidc_port="${oidc_port:-8781}"
     mkdir -p e2e/out
     [ -d e2e/node_modules ] || docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp \
-      -v "$PWD/e2e:/w" -w /w node:24.22.0-trixie-slim@sha256:7f486cabe892bff8fef04c0f7da8dba84a560be3e4e2740b7a86afc57ebec315 npm ci --no-audit --no-fund
+      -v "$PWD/e2e:/w" -w /w node:24.22.0-trixie-slim@sha256:a6155384446670e9719bdc4fd0ebe4d4b29fb32a8d6aa523da3547a6cfbcf22c npm ci --no-audit --no-fund
     docker rm -f "$chrome" >/dev/null 2>&1 || true  # a previous run's container may still be going away
     docker run -d --rm --name "$chrome" --network host --shm-size=1g zenika/alpine-chrome:124 \
       --no-sandbox --remote-debugging-address=127.0.0.1 --remote-debugging-port="$cdp" \
@@ -138,7 +138,7 @@ case "$cmd" in
     sleep 3
     docker run --rm --network host --user "$(id -u):$(id -g)" -e HOME=/tmp \
       -e CDP_PORT="$cdp" -e OIDC_PORT="$oidc_port" \
-      -v "$PWD/e2e:/w" -w /w node:24.22.0-trixie-slim@sha256:7f486cabe892bff8fef04c0f7da8dba84a560be3e4e2740b7a86afc57ebec315 node smoke.mjs "$base" && status=0 || status=$?
+      -v "$PWD/e2e:/w" -w /w node:24.22.0-trixie-slim@sha256:a6155384446670e9719bdc4fd0ebe4d4b29fb32a8d6aa523da3547a6cfbcf22c node smoke.mjs "$base" && status=0 || status=$?
     # Each run re-uploads the same synthetic fixture; drop the duplicate batches it leaves.
     "$0" manage e2e_cleanup "$(sha256sum e2e/fixtures/timeline-synthetic.json | cut -d' ' -f1)"
     exit "$status"
