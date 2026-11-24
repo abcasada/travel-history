@@ -7,8 +7,9 @@ set_role:
   ./dev prod manage deactivate_account ACCOUNT --reactivate --execute    let it in again
   ./dev prod manage deactivate_account ACCOUNT --sign-out --execute      only end its sessions
 
-Removing someone from `travel-users` in Authentik ends their access within the hour by itself
-(sessions go back through Authentik, OIDC_SESSION_RECHECK_SECONDS); this ends it at once. A
+Removing someone from `travel-users` in Authentik ends their reads within the hour and their
+writes within two by itself (sessions go back through Authentik, OIDC_SESSION_RECHECK_SECONDS,
+with a grace for saves: D-122); this ends both at once. A
 deactivated account reads nothing and its tracker tokens stop working; its data stays."""
 
 from django.core.management.base import BaseCommand, CommandError

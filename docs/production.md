@@ -115,7 +115,8 @@ auth.md §7.7 holds:
   rule (G-5) switched on, and no loopback name among the public host names (D-103);
 - with `TRAVEL_PUBLIC_SCOPE=all`, the provider configured (`OIDC_ISSUER`, client id and secret,
   D-107), and browser sessions re-checked with the provider every 60 s to 24 h
-  (`OIDC_SESSION_RECHECK_SECONDS`; `compose.prod.yaml` forces 3600, D-108).
+  (`OIDC_SESSION_RECHECK_SECONDS`; `compose.prod.yaml` forces 3600, D-108; writes get a grace of
+  the interval, at most an hour, D-122).
 
 Production serves no API docs and no `openapi.json` (D-107). A request through the tunnel
 (`CF-Connecting-IP`) whose Host isn't a public name answers 404, so a tunnel "HTTP Host Header"

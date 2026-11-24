@@ -183,6 +183,7 @@ Frontend conventions: [docs/design/frontend-patterns.md](docs/design/frontend-pa
 - D-111 Base digests refreshed; builds run `apt-get upgrade` (Debian security updates); CPU smoke passed (amends D-78)
 - D-120 After the hourly re-check's 401 the SPA goes straight to sign-in and back to the same page, at most once a minute per tab; other 401s keep the Sign in screen
 - D-121 Lane builds tag every image `lane-<item>` (backup included); the main checkout's tags and rendered config unchanged (amends D-98)
+- D-122 After the hourly re-check falls due, writes still land for a grace of the interval (at most an hour) and reads start the sign-in with the session kept; past it every request ends the session. Removal from travel-users: reads end within 1 h, writes within 2 h (amends D-108, D-120)
 
 ## 25. Open questions (for Adam, answer whenever — nothing is blocked on these)
 

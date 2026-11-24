@@ -131,10 +131,12 @@ Notes:
   no DELETE policy. Tests: `tests/permissions/test_account_commands.py` (as `travel_app` after
   each command: the kept account's rows, the moved identity, the sessions, the trips a linked
   person is on; every refusal leaves the database unchanged) and `tests/test_authentik.py`.
-- Ending access (work-order item 42a, D-108; auth.md §7.7, §7.8). Removing someone from
-  `travel-users` ends their access by itself within the hour: production sends every browser
-  session back through Authentik once it is an hour old (`OIDC_SESSION_RECHECK_SECONDS`), the
-  callback checks the group again, and a refused sign-in ends the browser's session; bearer
+- Ending access (work-order item 42a, D-108, D-122; auth.md §7.7, §7.8). Removing someone from
+  `travel-users` ends their access by itself: production sends every browser session back
+  through Authentik once it is an hour old (`OIDC_SESSION_RECHECK_SECONDS`), so reads end within
+  the hour; writes still land for a grace of the interval (at most an hour, so a save isn't lost
+  to the check) and end within two hours. The callback checks the group again, and a refused
+  sign-in ends the browser's session at once (tests: `tests/test_session_recheck.py`); bearer
   tokens are checked for the group on every request. `deactivate_account` (owner role, like
   `set_role`) ends it at once: the account is deactivated (it reads nothing, D-53; its tracker
   tokens are refused) and its sessions deleted; it refuses the only active Admin. In the app

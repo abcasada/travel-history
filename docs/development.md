@@ -66,9 +66,10 @@ branch.
 **The hourly re-check in a lane:** development turns it off (`OIDC_SESSION_RECHECK_SECONDS=0`).
 To see the SPA's automatic sign-in redirect (D-120), add `OIDC_SESSION_RECHECK_SECONDS=15` to
 the lane's `.env` (never the main one), `./dev up`, then `./dev e2e --recheck`: it signs in at
-the mock provider, waits until the session is due, opens Trips and expects the provider's page
-(no Sign in screen) and a return to `/app/trips`, then expects the Sign in screen for a second
-re-check within the minute. Remove the line afterwards: the ordinary `./dev e2e` takes longer
+the mock provider, waits until the session is due, saves a preference (`e2e_recheck`, left
+behind) within the grace for writes (D-122: 15 s with this interval), opens Trips and expects
+the provider's page (no Sign in screen), a return to `/app/trips` and the saved value, then
+expects the Sign in screen for a second re-check within the minute. Remove the line afterwards: the ordinary `./dev e2e` takes longer
 than 15 seconds and would be sent to sign-in midway.
 
 **Scratch files and logs:** lane builders run under one orchestrator session, so they share

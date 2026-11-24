@@ -1,7 +1,8 @@
 /**
- * The hourly provider re-check (D-108, D-120; docs/design/auth.md §7.2). When the server ends a
- * session because the sign-in provider hasn't vouched for it recently, its 401 carries this exact
- * sentence (backend `travel.accounts.sessions.DUE_DETAIL`). The SPA then goes straight back
+ * The hourly provider re-check (D-108, D-120; docs/design/auth.md §7.2). When the server signs a
+ * request out because the sign-in provider hasn't vouched for the session recently, its 401
+ * carries this exact sentence (backend `travel.accounts.sessions.DUE_DETAIL`). For a grace after
+ * that, writes still go through (D-122), so this comes from a read unless the grace is over. The SPA then goes straight back
  * through sign-in, which Authentik answers without asking while its own session lasts, and the
  * callback returns to the same page. Any other 401 (a real sign-out, an account removed from the
  * group) keeps the Sign in screen.

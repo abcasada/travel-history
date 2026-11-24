@@ -85,8 +85,10 @@ budget ~2–2.5 GB RAM (§21, §26).
    fixed sentence in `travel.accounts.sessions.DUE_DETAIL`) the SPA goes straight to
    `/auth/login?next=<the same page>` instead of showing its Sign in screen, at most once a
    minute per tab (a second re-check within the minute shows the screen, so a broken sign-in
-   can't loop). Any other 401 (signed out, refused) shows the Sign in screen. To check in 40c-2
-   against the deployed version.
+   can't loop). Any other 401 (signed out, refused) shows the Sign in screen. Writes don't
+   trigger the trip (D-122): for a grace of the interval, at most an hour, a POST, PUT, PATCH or
+   DELETE still goes through and the session stays, so a form filled in across the check is
+   saved and the next read makes the trip. To check in 40c-2 against the deployed version.
 6. **API token** for this app (user `travel-provisioner`, intent `api`) with permission to
    create users and invitations and add users to `travel-users`, used by the approval flow:
    `POST /api/v3/stages/invitation/invitations/` (+ `.../send_email/`) or
@@ -195,9 +197,9 @@ production has no API docs or schema URL; bearer tokens the provider can't vouch
 is too slow to check) are no user, with a 30-second back-off; a request through the tunnel whose
 Host isn't a public name answers 404; scope `all` needs the provider configured; browser
 sessions go back through the provider hourly (`OIDC_SESSION_RECHECK_SECONDS`; the SPA redirects
-to sign-in by itself, D-120), so an account removed from `travel-users` loses access within the
-hour, and a refused sign-in ends the
-browser's session; no trip can be made public until T37.
+to sign-in by itself, D-120; writes get a grace of the interval, at most an hour, D-122), so an
+account removed from `travel-users` can read nothing after the hour and write nothing after two,
+and a refused sign-in ends the browser's session; no trip can be made public until T37.
 
 ### 7.8 Account handover and linking (server commands)
 

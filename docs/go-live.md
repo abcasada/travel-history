@@ -188,8 +188,11 @@ person ([auth.md §7.8](design/auth.md)).
 ## Removing someone's access
 
 1. **Authentik:** remove them from `travel-users` (or deactivate the Authentik user). Every new
-   sign-in is refused, and their open sessions end by themselves within the hour: the app sends
-   each session back through Authentik once it is an hour old (D-108).
+   sign-in is refused, and their open sessions end by themselves: the app sends each session
+   back through Authentik once it is an hour old (D-108), so within the hour they can't read
+   anything (every page and every read goes to a sign-in Authentik refuses). A save already
+   under way still lands for up to another hour (D-122: the grace, so a form filled in across
+   the check isn't lost), and within two hours the session is gone.
 2. **Server, to end it now:** `./dev prod manage deactivate_account` lists the accounts with
    their sessions; `./dev prod manage deactivate_account ACCOUNT` shows what changes (dry run);
    the same with `--execute` deactivates the account and deletes its sessions. Their trips and
