@@ -38,11 +38,24 @@ test("the current route version is listed and drawn on the map", async () => {
     length_m: 12345,
     note: "",
     is_current: true,
+    sources: [],
+  };
+  const edited = {
+    ...route,
+    id: 10,
+    version: 3,
+    kind: "hand_edited",
+    engine: "valhalla",
+    is_current: false,
+    sources: [
+      { source: "proposal", engine: "valhalla", verified: true, points: 40 },
+      { source: "drawn", engine: "", verified: false, points: 2 },
+    ],
   };
   renderAt("/trips/10/legs/200/route", [
     MAP,
     { path: "/api/v1/legs/200", body: makeLeg({ current_route_id: 9 }) },
-    { path: "/api/v1/legs/200/routes", body: [route] },
+    { path: "/api/v1/legs/200/routes", body: [edited, route] },
     {
       path: "/api/v1/routes/9",
       body: {
@@ -62,6 +75,11 @@ test("the current route version is listed and drawn on the map", async () => {
   ]);
   expect(await screen.findByText(/Version 2 · manual · 12.3 km/)).toHaveTextContent("(current)");
   await waitFor(() => expect(screen.getByTestId("source-leg-route")).toBeInTheDocument());
+  // only the hand-edited version lists what it is made of
+  expect(screen.getAllByTestId("route-sources")).toHaveLength(1);
+  expect(screen.getByTestId("route-sources")).toHaveTextContent(
+    "Made from: Valhalla (self-hosted) route, 40 points, checked; 2 points drawn by hand, not checked",
+  );
 });
 
 test("a leg the caller can't see is not found", async () => {

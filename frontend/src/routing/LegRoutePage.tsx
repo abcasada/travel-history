@@ -22,6 +22,7 @@ import { label, MODE_LABELS } from "../trips/labels";
 import { paths } from "../trips/paths";
 import { Button, Field, inputClass, Section } from "../ui/form";
 import { QueryState } from "../ui/QueryState";
+import { describeSources } from "./sources";
 import { ENGINE_LABELS, FIX_THE_MAP_URL, formatDuration, useRoutingStore } from "./store";
 
 /** Modes a car route fits; the server enforces the same list (trips/route_versions.py). */
@@ -97,6 +98,7 @@ function LegRoute({ leg }: { leg: LegOut }) {
 }
 
 function VersionRow({ route: r }: { route: RouteOut }) {
+  const parts = describeSources(r.sources);
   return (
     <li>
       Version {r.version} · {r.kind} · {(r.length_m / 1000).toFixed(1)} km
@@ -107,6 +109,11 @@ function VersionRow({ route: r }: { route: RouteOut }) {
           {r.engine_version && ` ${r.engine_version}`}
           {r.engine_data_date && `, road data ${r.engine_data_date}`}
           {r.attribution && ` · ${r.attribution}`}
+        </span>
+      )}
+      {parts.length > 0 && (
+        <span className="block text-xs text-slate-500" data-testid="route-sources">
+          Made from: {parts.join("; ")}
         </span>
       )}
     </li>

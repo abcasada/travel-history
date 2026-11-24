@@ -131,8 +131,7 @@ async function initialState(
 }
 
 function Toolbar({ leg }: { leg: LegOut }) {
-  const { state, past, future, busy, error, saveStatus, undo, redo, save, stop } =
-    useEditorStore();
+  const { state, past, future, busy, error, saveStatus, undo, redo, save, stop } = useEditorStore();
   const setEditing = useRoutingStore((s) => s.setEditing);
   const clearProposal = useRoutingStore((s) => s.clear);
   const [note, setNote] = useState("");

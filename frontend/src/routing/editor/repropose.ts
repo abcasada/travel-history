@@ -9,8 +9,9 @@
  * engine's credit). The line itself is never replaced here: what the user saw is what is saved,
  * and nothing touches a saved version (rule 5).
  */
-import type { RouteProposalOut, RouteRequestIn } from "../../api/generated";
+
 import { ApiError } from "../../api/client";
+import type { RouteProposalOut, RouteRequestIn } from "../../api/generated";
 import type { EditorState } from "./model";
 
 /** The proxy allows 10 requests per 10 s per user (bursts of 5): about one a second is safe. */
