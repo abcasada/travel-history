@@ -635,7 +635,7 @@ def update_tag(tag: Tag, data: dict[str, Any]) -> Tag:
 # --- Purposes --------------------------------------------------------------------------------
 
 
-def _apply_purpose(purpose: Purpose, data: dict[str, Any]) -> None:
+def _apply_purpose_fields(purpose: Purpose, data: dict[str, Any]) -> None:
     _require(data, {"name", "default_visibility", "sort", "archived"})
     if "name" in data:
         purpose.name = data["name"].strip()
@@ -650,14 +650,14 @@ def create_purpose(user, data: dict[str, Any]) -> Purpose:
     """A new purpose of the user's own, last in their list unless `sort` says otherwise."""
     last = Purpose.objects.filter(owner_id=user.pk).aggregate(Max("sort"))["sort__max"]
     purpose = Purpose(owner_id=user.pk, sort=0 if last is None else last + 1)
-    _apply_purpose(purpose, data)
+    _apply_purpose_fields(purpose, data)
     _save(purpose)
     return purpose
 
 
 def update_purpose(purpose: Purpose, data: dict[str, Any]) -> Purpose:
     """Purposes are archived, never deleted: trips keep theirs."""
-    _apply_purpose(purpose, data)
+    _apply_purpose_fields(purpose, data)
     _save(purpose)
     return purpose
 
