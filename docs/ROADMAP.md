@@ -620,3 +620,4 @@ Nature: mech = mechanical, mod = moderate, hard. Size is S/M/L/XL with approxima
 - 2026-11-24: 21b built in lane 2 (backend quick 2811 passed, e2e green; merge after 40e). Added 43d [M] for the flaky TitleSearch test it found.
 - 2026-11-24: item 43c done and verified in lane 3, merged (`./dev test-quick` 2744 + 192 passed in the main checkout; `./dev e2e --recheck` and the local go-live smoke, 101 checks, green in the lane). D-122. Added 43e [H] (forms hold the redirect), after 21b merges.
 - 2026-11-24: item 43d done and verified in lane 4, merged (`./dev test-quick` 2744 + 193 passed in the main checkout). Lanes now idle: Lane A waits on Adam (exposure "go", Authentik values, AGE_RECIPIENT); 21b and 14a-1 wait for 40e; 11/12 wait for Review pause B; 43e waits for 21b.
+- 2026-11-24: milestone check: full suite `./dev test` 2776 + 193 passed on main 0674b52.
