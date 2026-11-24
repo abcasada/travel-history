@@ -91,11 +91,58 @@ await page.getByLabel("From stop").selectOption({ label: "E2E Start" });
 await page.getByLabel("To stop").selectOption({ label: "Salina, KS" });
 await page.getByRole("form", { name: "New leg" }).getByRole("button", { name: "Add leg" }).click();
 await page.getByText(/Drive\s+E2E Start\s+→\s+Salina, KS/).first().waitFor();
+// A flight leg (item 21b): airports and an airline from the reference data (OurAirports and
+// OpenFlights, loaded by ./dev load-reference), a seat and a cabin.
+await page.getByRole("button", { name: "Add leg" }).click();
+const flightForm = page.getByRole("form", { name: "New leg" });
+await flightForm.getByLabel("Mode").selectOption("flight");
+await flightForm.getByLabel("From airport").fill("ICT");
+await flightForm.getByRole("button", { name: /^ICT / }).first().click();
+await flightForm.getByLabel("To airport").fill("DEN");
+await flightForm.getByRole("button", { name: /^DEN / }).first().click();
+await flightForm.getByLabel("Airline").fill("United Airlines");
+await flightForm.getByRole("button", { name: /^UA United Airlines/ }).first().click();
+await flightForm.getByLabel("Flight number", { exact: true }).fill("1234");
+await flightForm.getByLabel("Seat", { exact: true }).fill("12A");
+await flightForm.getByLabel("Cabin", { exact: true }).selectOption("economy");
+await flightForm.getByRole("button", { name: "Add leg" }).click();
+await page.getByText(/Flight\s+ICT .*→\s+DEN/).first().waitFor();
+// Who was on the first leg: the editor's per-leg people (Dev Member stays on it).
+await page.getByRole("button", { name: /^People on Drive E2E Start/ }).click();
+await page.getByRole("group", { name: "People on this leg" }).getByLabel("Dev Member").waitFor();
 await page.getByRole("link", { name: "Done" }).click();
 await page.waitForURL(new RegExp(`/app/trips/${tripId}$`));
 await page.getByRole("heading", { name: title }).waitFor();
 await page.getByRole("region", { name: "Who went" }).getByText("Dev Member").waitFor();
 await page.getByRole("region", { name: "Itinerary" }).getByText(/E2E Start → Salina, KS/).waitFor();
+// The rest of the trip page (item 21b): the flight's codes, a tag added by a new name, a note
+// written and edited, the owner's own leg switch and public-consent switch.
+const itinerary = page.getByRole("region", { name: "Itinerary" });
+await itinerary.getByText(/ICT → DEN · UA 1234 · seat 12A · Economy/).waitFor();
+const tripTag = `e2e-21b-${Date.now()}`;
+await page.getByLabel("Tag name").fill(tripTag);
+await page.getByRole("button", { name: "Tag", exact: true }).click();
+await page.getByRole("region", { name: "Tags" }).getByText(`#${tripTag}`).waitFor();
+const notes = page.getByRole("region", { name: "Notes" });
+await notes.getByRole("button", { name: "Add note" }).click();
+await notes.getByLabel("Note", { exact: true }).fill("E2E note");
+await notes.getByRole("form", { name: "New note" }).getByRole("button", { name: "Add note" }).click();
+await notes.getByText("E2E note", { exact: true }).waitFor();
+await notes.getByRole("button", { name: "Edit note by Dev Member" }).click();
+await notes.getByLabel("Note", { exact: true }).fill("E2E note (edited)");
+await notes.getByRole("button", { name: "Save note" }).click();
+await notes.getByText("E2E note (edited)", { exact: true }).waitFor();
+const onLeg = itinerary.getByLabel(/^I was on Drive E2E Start/);
+const answered = (part) => page.waitForResponse((r) => r.url().includes(part) && r.ok());
+// Controlled checkboxes: they flip once the server answered and the trip is reloaded, so click
+// (check() would see the old state) and then wait for the new one.
+const consent = page.getByLabel("Dev Member may appear on public pages");
+await Promise.all([answered("/my-participation"), onLeg.click()]);
+await page.waitForFunction((el) => !el.checked, await onLeg.elementHandle());
+await Promise.all([answered("/my-participation"), onLeg.click()]);
+await page.waitForFunction((el) => el.checked, await onLeg.elementHandle());
+await Promise.all([answered("/consent"), consent.click()]);
+await page.waitForFunction((el) => el.checked, await consent.elementHandle());
 await page.waitForTimeout(2000);
 await page.screenshot({ path: "out/trip-detail.png" });
 // Routing (work-order item 25): propose a road route for the Kansas leg through the routing
@@ -150,8 +197,25 @@ await page.getByText(/^Saved at /).waitFor();
 await page.getByRole("link", { name: "Done" }).click();
 await page.getByRole("heading", { name: `${title} (edited)` }).waitFor();
 page.once("dialog", (dialog) => dialog.accept());
-await page.getByRole("button", { name: "Delete" }).click();
+await page.getByRole("button", { name: "Delete", exact: true }).click();
 await page.waitForURL(/\/app\/trips$/);
+// The trip took its tag along; the tag itself is renamed on /tags (item 21b), then deleted.
+await page.goto(`${base}/app/tags`);
+await page.getByRole("heading", { name: "My tags" }).waitFor();
+await page.getByRole("button", { name: `Edit #${tripTag}` }).click();
+await page.getByRole("form", { name: `Edit tag ${tripTag}` }).getByLabel("Colour").fill("#16a34a");
+await page.getByRole("form", { name: `Edit tag ${tripTag}` }).getByRole("button", { name: "Save" }).click();
+page.once("dialog", (dialog) => dialog.accept());
+await page.getByRole("button", { name: `Delete #${tripTag}` }).click();
+await page.getByText(`#${tripTag}`).waitFor({ state: "detached" });
+// Purposes and people (item 21b): archive and restore a seeded purpose; see yourself listed.
+await page.goto(`${base}/app/purposes`);
+await page.getByRole("button", { name: "Archive Other" }).click();
+await page.getByText("Other (archived)").waitFor();
+await page.getByRole("button", { name: "Restore Other" }).click();
+await page.getByText("Other (archived)").waitFor({ state: "detached" });
+await page.goto(`${base}/app/people`);
+await page.getByRole("button", { name: "Rename Dev Member" }).waitFor();
 const failedTrips = tripRequests.filter(([, , status]) => status >= 400);
 const sawMap = tripRequests.some(([, path]) => path === "/api/v1/trips/map");
 const routed = tripRequests.some(([m, path, status]) => m === "POST" && path === "/api/v1/routing/route" && status === 200);
@@ -177,6 +241,11 @@ try {
   await page.keyboard.type(bulkTitle);
   await page.keyboard.press("Enter");
   await page.getByText("2 trips", { exact: true }).waitFor();
+  // The status filter (item 21b's TripStatus fix): both trips are confirmed.
+  await page.getByLabel("Status", { exact: true }).selectOption("confirmed");
+  await page.waitForURL(/status=confirmed/);
+  await page.getByText("2 trips", { exact: true }).waitFor();
+  await page.evaluate(() => document.activeElement?.blur()); // list keys don't work in a field
   // Newest first: j puts the cursor on B, x selects it, Shift+J extends the selection to A.
   await page.keyboard.press("j");
   await page.keyboard.press("x");
