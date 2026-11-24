@@ -93,9 +93,7 @@ function page(extra: { method?: string; path: string; status?: number; body?: un
 
 test("tags show who added them; only removable ones get a remove button", async () => {
   const user = userEvent.setup();
-  const { fetchMock } = page([
-    { method: "DELETE", path: "/api/v1/trips/10/tags/4", status: 204 },
-  ]);
+  const { fetchMock } = page([{ method: "DELETE", path: "/api/v1/trips/10/tags/4", status: 204 }]);
   const tags = await screen.findByRole("region", { name: "Tags" });
   expect(tags).toHaveTextContent("#lakes");
   expect(tags).toHaveTextContent("#mine(Me)");
@@ -192,9 +190,7 @@ test("a participant edits the notes of their own leg, not the owner's legs", asy
     }),
   );
   // A contributed leg never sends a participant scope (the API fixes it to the author).
-  expect(lastBody(fetchMock, "PATCH", "/api/v1/legs/201")).not.toHaveProperty(
-    "participant_scope",
-  );
+  expect(lastBody(fetchMock, "PATCH", "/api/v1/legs/201")).not.toHaveProperty("participant_scope");
 });
 
 test("a participant adds their own leg", async () => {
