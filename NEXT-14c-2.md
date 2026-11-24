@@ -1,6 +1,0 @@
-# NEXT-14c-2 (lane 2, branch item/14c-2)
-
-- **Done (2026-11-24):** trip spreadsheet preview UI in `frontend/src/imports/` (ImportsPage `/imports`, TripSheetPreviewPage `/imports/:id`, TabCard, SheetLayers map layer, sheet.ts logic, paths.ts); `saveFile` in platform/files.ts; links from the trip list ("Import") and the account menu. Frontend only, no backend change. Docs: trip-sheet.md §28.13, frontend-patterns.md.
-- **Tests:** 28 new Vitest tests (133 frontend total), backend quick suite 2472 passed, lint green. e2e green twice in the lane (first run: create people + new trip; second run: re-create the deleted trip). Lane stack stopped.
-- **e2e fixture:** `e2e/fixtures/trip-sheet-synthetic.xlsx` (SYNTHETIC; rebuilt by `scripts/make_e2e_trip_sheet.py`). Each e2e run leaves one `done` trip-sheet batch and its record (the trip itself is deleted; the person "E2E Sheet Cousin" and tag "e2e" stay); `e2e_cleanup` only removes duplicates.
-- **For later:** the parser warns "arrives after leaving <start>" on a round trip whose last leg returns to the first stop (backend heuristic, harmless); the template's Instructions say "Import, Trip spreadsheet" while the UI says "Import" / "Import trips from a spreadsheet" (rebuild the template if wording matters); the pre-existing basemap glyph 404 still shows in e2e.

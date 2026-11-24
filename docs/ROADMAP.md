@@ -145,7 +145,7 @@ Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhi
         - Status: done (2026-11-24)
       - **14c-2 [H] preview UI:** upload, per-tab outcome and diff, problems by tab/row/column, the unticked "create these people" option (Q-20), commit and 409 handling, both shells; e2e upload of a SYNTHETIC sheet.
         - Footprint: fe:tripsheet (new), fe:upload, fe:trips (query invalidation only) (?). Flags: none.
-        - Status: todo
+        - Status: done (2026-11-24)
 15. **[H] T9:** home-period detection. It also builds every home-period endpoint (suggestions; confirm, edit, reject; manual create and edit with the gap/overlap validation), so item 16 is frontend-only and can run beside item 18.
     - Footprint: `history` (home periods, detection), `core.jobs`, `core.policy` (?). Flags: api, migrations (?).
     - Status: todo
@@ -580,3 +580,4 @@ Nature: mech = mechanical, mod = moderate, hard. Size is S/M/L/XL with approxima
 - 2026-11-23: item P1 done and verified (pushed, tree clean, `./dev test-quick` 2321 + 105 passed in the main checkout; two lanes ran test-quick at once, e2e green in a lane; lowest available RAM 3.7 GiB; lane ports from 8800, D-99). Dispatching 40c-1 [X] ∥ 14c-1 [H] in lanes.
 - 2026-11-24: item 14c-1 done and verified in lane 2, merged (rebased on main, `./dev test-quick` 2472 + 105 passed in the main checkout; images rebuilt for defusedxml; dev migrated to history 0014 / trips 0008; batch 33 intact). D-100–D-102. Lane 2 takes 14c-2 next.
 - 2026-11-24: item 40c-1 done and verified in lane 1, merged (rebased on main; its decisions renumbered D-100/D-101 → D-103/D-104 because 14c-1 took D-100–D-102; `./dev test-quick` 2580 + 105 passed in the main checkout). 40c-2 waits on Adam's Authentik values. Lane 1 takes 40d.
+- 2026-11-24: item 14c-2 done and verified in lane 2, merged (rebased cleanly; `./dev test-quick` 2580 + 133 passed in the main checkout; e2e green twice in the lane, not run in the main checkout because it writes to the real dev DB). Lane 2 takes 21a.
