@@ -9,9 +9,13 @@ const browser = await chromium.connectOverCDP(`http://127.0.0.1:${cdpPort}`);
 const context = await browser.newContext({ viewport: { width: 1400, height: 850 } });
 const page = await context.newPage();
 const log = [];
-page.on("console", (m) => { if (m.type() === "error") log.push(m.text()); });
+// An upstream gap, not ours: OpenFreeMap's Noto Sans stacks have no glyphs for U+10400-U+104FF
+// (Deseret, Osage), which some OSM place names in the basemap use; MapLibre draws those labels
+// without them. Only this exact URL is ignored (checked 2026-11-24: neighbouring ranges are 200).
+const glyphGap = "https://tiles.openfreemap.org/fonts/Noto%20Sans%20Regular/66560-66815.pbf";
+page.on("console", (m) => { if (m.type() === "error" && m.location().url !== glyphGap) log.push(m.text()); });
 // Name the URL of any 404, since the console line alone doesn't say which request failed.
-page.on("response", (r) => { if (r.status() === 404) log.push(`404 ${new URL(r.url()).pathname}`); });
+page.on("response", (r) => { if (r.status() === 404 && r.url() !== glyphGap) log.push(`404 ${new URL(r.url()).pathname}`); });
 try {
 await page.goto(`${base}/app/`);
 // Production redirects straight to the provider (login wall); the dev server shows the SPA's link.
