@@ -1,5 +1,9 @@
 """Turning verified OIDC claims into a local user (PLAN.md §7.1). Runs in the narrow `auth`
-RLS context: users are matched by (issuer, subject) only - never linked by email."""
+RLS context: users are matched by (issuer, subject) only - never linked by email.
+
+Before any account is found or created, the ID token must come from the configured provider,
+name the app's group (auth.md §7.2) and, when it lists its authentication methods, show a
+second factor (G-5, D-100)."""
 
 from __future__ import annotations
 
@@ -8,6 +12,7 @@ from django.conf import settings
 from travel.core.rls import set_context
 from travel.trips.models import Purpose
 
+from . import oidc
 from .models import Role, User
 
 DEFAULT_PURPOSES = (
@@ -29,16 +34,47 @@ def has_required_group(claims: dict) -> bool:
     required = settings.OIDC_REQUIRED_GROUP
     if not required:
         return True
-    groups = claims.get("groups") or []
-    return required in groups
+    # Authentik sends a list of group names. Anything else is no membership: a missing claim
+    # (the provider's "include claims in id_token" switched off), or a string, which `in` would
+    # search as a substring ("travel-users" in "old-travel-users").
+    groups = claims.get("groups")
+    return isinstance(groups, list) and required in groups
+
+
+def shows_second_factor(claims: dict) -> bool:
+    """G-5: when the ID token lists its authentication methods (`amr`, RFC 8176), one of them
+    must be a second factor (`OIDC_SECOND_FACTOR_AMR`). Authentik sends `["pwd", "mfa"]` after
+    a password and an authenticator, `["user"]` after a passkey, and `["pwd"]` alone if its flow
+    ever stops asking for a second factor, which is the case this refuses. A token without the
+    claim passes: Authentik omits it when it recorded no login method, and the check is defence
+    in depth behind the flow's own Authenticator Validation stage."""
+    accepted = settings.OIDC_SECOND_FACTOR_AMR
+    if not accepted or "amr" not in claims:
+        return True
+    methods = claims["amr"]
+    return isinstance(methods, list) and any(method in accepted for method in methods)
+
+
+def check_claims(claims: dict) -> tuple[str, str]:
+    """Raises AccessDenied unless the claims may sign in; returns (issuer, subject)."""
+    issuer, subject = claims.get("iss"), claims.get("sub")
+    if not (isinstance(issuer, str) and issuer and isinstance(subject, str) and subject):
+        raise AccessDenied("the identity provider sent an incomplete identity")
+    if settings.OIDC_ISSUER and not oidc.same_issuer(issuer, settings.OIDC_ISSUER):
+        raise AccessDenied("the identity comes from an unexpected provider")
+    if not has_required_group(claims):
+        raise AccessDenied("not in the group for this app")
+    if not shows_second_factor(claims):
+        raise AccessDenied(
+            "this sign-in used no second factor; sign in with a passkey or an authenticator app"
+        )
+    return issuer, subject
 
 
 def user_for_claims(claims: dict) -> User:
     """Find or create the user for verified ID-token claims. Must run inside the request
     transaction; leaves the RLS context set to the returned user."""
-    if not has_required_group(claims):
-        raise AccessDenied("not in the group for this app")
-    issuer, subject = claims["iss"], claims["sub"]
+    issuer, subject = check_claims(claims)
     email = (claims.get("email") or "").strip().lower()
     name = claims.get("name") or claims.get("preferred_username") or email
 

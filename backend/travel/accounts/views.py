@@ -13,6 +13,7 @@ from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_GET, require_POST
+from joserfc.errors import JoseError
 
 from travel.core import ratelimit
 from travel.core.rls import set_context
@@ -80,11 +81,17 @@ def reauth_view(request: HttpRequest) -> HttpResponse:
 def callback_view(request: HttpRequest) -> HttpResponse:
     try:
         token = oidc.client().authorize_access_token(request)
-    except OAuthError:
+    except (OAuthError, JoseError, ValueError):
+        # OAuthError: state or code refused; JoseError: the ID token's signature or claims (iss,
+        # aud, exp, nonce, at_hash) failed Authlib's validation; ValueError: a malformed token.
         return render(request, "auth_error.html", {"reason": "login_failed"}, status=400)
     except requests.RequestException:
         return _provider_unreachable(request)
     claims = token.get("userinfo") or {}
+    if not claims:
+        # Without a validated ID token there is no identity (Authlib validates it only when the
+        # provider sends one).
+        return render(request, "auth_error.html", {"reason": "login_failed"}, status=400)
     next_url = request.session.pop("login_next", "/")
     reauth_user = request.session.pop("reauth_user", None)
     try:
@@ -99,9 +106,13 @@ def callback_view(request: HttpRequest) -> HttpResponse:
             request, "auth_error.html", {"reason": "re-login as another user"}, status=403
         )
     login(request, user, backend=BACKEND)
-    # When re-authenticating, the provider's auth_time proves the login was fresh; providers
-    # that omit it (the dev mock) are trusted to have honoured prompt=login.
-    request.session["auth_at"] = int(claims.get("auth_time") or time.time())
+    # When re-authenticating, the provider's auth_time proves the login was fresh (Authentik
+    # sends it, D-58); providers that omit it (the dev mock) are trusted to have honoured
+    # prompt=login. A clock ahead of ours must not stretch the freshness window.
+    now = int(time.time())
+    auth_time = claims.get("auth_time")
+    fresh = isinstance(auth_time, int | float) and not isinstance(auth_time, bool)
+    request.session["auth_at"] = min(int(auth_time), now) if fresh else now
     request.session["id_token"] = token.get("id_token", "")
     return redirect(next_url)
 

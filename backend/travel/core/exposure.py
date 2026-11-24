@@ -23,6 +23,12 @@ This guard enforces that inside the app, so it never rests on a tunnel or dashbo
 It runs right after SecurityMiddleware (so its 404s carry HSTS and the other security headers)
 and before WhiteNoise, which would otherwise serve static files and the SPA bundle.
 
+`HttpsRedirectMiddleware` sits between the two: with `DJANGO_SSL_REDIRECT` (production) plain
+HTTP answers a permanent redirect to HTTPS, except the container's own `/healthz` and plain HTTP
+on the server's loopback names (`is_local_http`), which is how the production app is reached
+over an SSH port-forward before go-live (G-4, D-100). Requests through the tunnel always carry
+the public host name, `X-Forwarded-Proto` and `CF-Connecting-IP`, so none of them is local.
+
 `production_problems` lists why a production server must not start (auth.md §7.7, D-85 (3),
 D-96); settings.py raises ImproperlyConfigured when it isn't empty.
 """
@@ -48,6 +54,12 @@ INGEST_PATH = re.compile(r"/api/v1/ingest/(?:owntracks|overland)/?")
 HEALTHZ = "/healthz"
 LOOPBACK = frozenset({"127.0.0.1", "::1"})
 SCOPES = ("tracker", "all")
+# Host names (as request_domain returns them) that only reach the server from the server itself:
+# the production web port is published on 127.0.0.1 only (D-28), and an SSH port-forward
+# arrives there too. G-4's temporary redirect URI is http://localhost:8784/auth/callback.
+LOCAL_NAMES = frozenset({"localhost", "127.0.0.1", "[::1]"})
+# Cloudflare's tunnel adds both to every request it forwards (cloudflared passes them on).
+TUNNEL_HEADERS = ("HTTP_X_FORWARDED_PROTO", "HTTP_CF_CONNECTING_IP")
 
 
 def request_domain(request: HttpRequest) -> str:
@@ -111,6 +123,41 @@ def canonical_redirect(request: HttpRequest) -> str | None:
     return f"https://{canonical}{request.get_full_path()}"
 
 
+def is_local_http(request: HttpRequest) -> bool:
+    """Plain HTTP to one of the server's loopback names, not through the tunnel: the SSH
+    port-forward to localhost (G-4) or the server itself. Only the HTTPS redirect is skipped for
+    these; cookies stay Secure (Chrome and Firefox accept Secure cookies from
+    http://localhost, Safari doesn't) and everything else is unchanged."""
+    return (
+        not request.is_secure()
+        and request_domain(request) in LOCAL_NAMES
+        and not is_public_host(request)
+        and not any(header in request.META for header in TUNNEL_HEADERS)
+    )
+
+
+class HttpsRedirectMiddleware:
+    """HTTPS only (auth.md §7.7): with `TRAVEL_SSL_REDIRECT` (DJANGO_SSL_REDIRECT), a plain-HTTP
+    request answers a permanent redirect to the same URL over HTTPS, as Django's
+    SECURE_SSL_REDIRECT would (same target, same refusal of hosts outside ALLOWED_HOSTS), except
+    `/healthz` (the container's own health check) and `is_local_http` requests."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request: HttpRequest) -> HttpResponse:
+        if (
+            settings.TRAVEL_SSL_REDIRECT
+            and not request.is_secure()
+            and request.path_info != HEALTHZ
+            and not is_local_http(request)
+        ):
+            return HttpResponsePermanentRedirect(
+                f"https://{request.get_host()}{request.get_full_path()}"
+            )
+        return self.get_response(request)
+
+
 def not_found() -> HttpResponse:
     response = HttpResponseNotFound(b"Not Found\n", content_type="text/plain; charset=utf-8")
     # This response skips the inner middleware (CSP, X-Frame-Options), so it sets its own.
@@ -145,6 +192,7 @@ MIN_SECRET_KEY_LENGTH = 50
 MIN_SECRET_KEY_UNIQUE = 5
 REQUIRED_MIDDLEWARE = (
     "django.middleware.security.SecurityMiddleware",
+    "travel.core.exposure.HttpsRedirectMiddleware",
     "travel.core.exposure.ExposureGuardMiddleware",
     "django.middleware.csp.ContentSecurityPolicyMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
@@ -171,7 +219,7 @@ def production_problems(conf: Mapping[str, Any]) -> list[str]:
         )
     if conf["SECURE_PROXY_SSL_HEADER"] is None:
         problems.append("DJANGO_BEHIND_TLS_PROXY must be true (the tunnel terminates TLS)")
-    if not conf["SECURE_SSL_REDIRECT"]:
+    if not conf["TRAVEL_SSL_REDIRECT"]:
         problems.append("DJANGO_SSL_REDIRECT must be true (HTTPS only)")
     hsts_required = conf["TRAVEL_INGEST_ONLY"] or conf["TRAVEL_PUBLIC_SCOPE"] == "all"
     if hsts_required and conf["SECURE_HSTS_SECONDS"] <= 0:
@@ -180,6 +228,8 @@ def production_problems(conf: Mapping[str, Any]) -> list[str]:
         problems.append("DJANGO_SECURE_COOKIES must be true")
     if not conf["TRAVEL_PUBLIC_HOSTS"]:
         problems.append("TRAVEL_PUBLIC_HOSTS must name the public host name")
+    if LOCAL_NAMES & {_bracketed(host) for host in conf["TRAVEL_PUBLIC_HOSTS"]}:
+        problems.append("TRAVEL_PUBLIC_HOSTS must not name localhost or a loopback address")
     allowed = conf["ALLOWED_HOSTS"]
     if "*" in allowed or any(host.startswith(".") for host in allowed):
         problems.append("DJANGO_ALLOWED_HOSTS must not contain '*' or '.domain' wildcards")
@@ -204,4 +254,19 @@ def production_problems(conf: Mapping[str, Any]) -> list[str]:
     issuer = conf["OIDC_ISSUER"]
     if issuer and not issuer.startswith("https://"):
         problems.append("OIDC_ISSUER must be an https:// address (no mock provider)")
+    # The ingest-only service never signs anyone in (compose.prod.yaml blanks its secret).
+    if issuer and not conf["TRAVEL_INGEST_ONLY"]:
+        if not (conf["OIDC_CLIENT_ID"] and conf["OIDC_CLIENT_SECRET"]):
+            problems.append(
+                "OIDC_CLIENT_ID and OIDC_CLIENT_SECRET must be set (a confidential client)"
+            )
+    if not conf["OIDC_REQUIRED_GROUP"]:
+        problems.append("OIDC_REQUIRED_GROUP must name the app's group (travel-users)")
+    if not conf["OIDC_SECOND_FACTOR_AMR"]:
+        problems.append("OIDC_SECOND_FACTOR_AMR must list the second-factor methods (G-5)")
     return problems
+
+
+def _bracketed(host: str) -> str:
+    """A host as request_domain spells it: IPv6 addresses in brackets."""
+    return f"[{host}]" if ":" in host and not host.startswith("[") else host

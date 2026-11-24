@@ -48,6 +48,7 @@ NAMES = [
     "CSRF_TRUSTED_ORIGINS",
     "SECURE_PROXY_SSL_HEADER",
     "SECURE_SSL_REDIRECT",
+    "TRAVEL_SSL_REDIRECT",
     "SECURE_HSTS_SECONDS",
     "SESSION_COOKIE_SECURE",
     "CSRF_COOKIE_SECURE",
@@ -76,7 +77,8 @@ def test_the_production_stack_starts_with_production_settings():
     assert result["ALLOWED_HOSTS"] == ["localhost", "127.0.0.1", CANONICAL, OTHER]
     assert result["CSRF_TRUSTED_ORIGINS"] == [f"https://{CANONICAL}", f"https://{OTHER}"]
     assert result["SECURE_PROXY_SSL_HEADER"] == ["HTTP_X_FORWARDED_PROTO", "https"]
-    assert result["SECURE_SSL_REDIRECT"] is True
+    assert result["TRAVEL_SSL_REDIRECT"] is True  # HttpsRedirectMiddleware (G-4, D-100)
+    assert result["SECURE_SSL_REDIRECT"] is False  # Django's own can't exempt localhost
     assert result["SECURE_HSTS_SECONDS"] == 31536000
     assert result["SESSION_COOKIE_SECURE"] is True
     assert result["CSRF_COOKIE_SECURE"] is True
@@ -122,6 +124,10 @@ def test_production_needs_hsts_once_the_whole_app_is_public():
         ({"OIDC_ISSUER": "http://192.0.2.1:8781/default"}, "OIDC_ISSUER must be an https://"),
         ({"TRAVEL_CANONICAL_HOST": "elsewhere.example"}, "TRAVEL_CANONICAL_HOST must be one of"),
         ({"TRAVEL_PUBLIC_SCOPE": "everything"}, "TRAVEL_PUBLIC_SCOPE must be"),
+        ({"TRAVEL_PUBLIC_HOSTS": f"{CANONICAL},localhost"}, "must not name localhost"),
+        ({"OIDC_ISSUER": "https://auth.example.org/application/o/travel/"}, "confidential"),
+        ({"OIDC_REQUIRED_GROUP": ""}, "OIDC_REQUIRED_GROUP must name"),
+        ({"OIDC_SECOND_FACTOR_AMR": ""}, "OIDC_SECOND_FACTOR_AMR must list"),
     ],
 )
 def test_production_refuses_to_start_without_production_settings(override, problem):
@@ -147,13 +153,15 @@ def production_conf(**overrides) -> dict:
             "MIDDLEWARE",
             "DATA_UPLOAD_MAX_MEMORY_SIZE",
             "TRAVEL_UPLOAD_MAX_BYTES",
+            "OIDC_REQUIRED_GROUP",
+            "OIDC_SECOND_FACTOR_AMR",
         )
     }
     conf.update(
         DEBUG=False,
         SECRET_KEY=TEST_SECRET_KEY,
         SECURE_PROXY_SSL_HEADER=("HTTP_X_FORWARDED_PROTO", "https"),
-        SECURE_SSL_REDIRECT=True,
+        TRAVEL_SSL_REDIRECT=True,
         SECURE_HSTS_SECONDS=31536000,
         SESSION_COOKIE_SECURE=True,
         CSRF_COOKIE_SECURE=True,
@@ -164,6 +172,8 @@ def production_conf(**overrides) -> dict:
         RATELIMIT_CLIENT_IP_HEADER="CF-Connecting-IP",
         OIDC_BACKCHANNEL_URL="",
         OIDC_ISSUER="https://auth.example.org/application/o/travel/",
+        OIDC_CLIENT_ID="travel-web",
+        OIDC_CLIENT_SECRET="synthetic-client-secret",
     )
     conf.update(overrides)
     return conf
@@ -171,6 +181,28 @@ def production_conf(**overrides) -> dict:
 
 def test_production_problems_lists_nothing_for_production_settings():
     assert exposure.production_problems(production_conf()) == []
+
+
+def test_the_ingest_only_service_needs_no_client_secret():
+    conf = production_conf(TRAVEL_INGEST_ONLY=True, TRAVEL_PUBLIC_SCOPE="tracker")
+    conf["OIDC_CLIENT_SECRET"] = ""  # compose.prod.yaml blanks it for `ingest`
+    assert exposure.production_problems(conf) == []
+
+
+def test_production_starts_with_the_authentik_client_configured():
+    result = loaded(
+        load_settings(
+            {
+                **PROD_ENV,
+                "OIDC_ISSUER": "https://auth.example.org/application/o/travel/",
+                "OIDC_CLIENT_ID": "travel-web",
+                "OIDC_CLIENT_SECRET": "synthetic-client-secret",
+            },
+            ["OIDC_ISSUER", "OIDC_REQUIRED_GROUP", "OIDC_SECOND_FACTOR_AMR"],
+        )
+    )
+    assert result["OIDC_REQUIRED_GROUP"] == "travel-users"
+    assert result["OIDC_SECOND_FACTOR_AMR"] == ["mfa", "user"]
 
 
 @pytest.mark.parametrize(
@@ -194,6 +226,17 @@ def test_production_problems_lists_nothing_for_production_settings():
             },
             "HSTS",
         ),
+        ({"TRAVEL_SSL_REDIRECT": False}, "DJANGO_SSL_REDIRECT must be true"),
+        (
+            {"MIDDLEWARE": [m for m in django_settings.MIDDLEWARE if "HttpsRedirect" not in m]},
+            "HttpsRedirectMiddleware",
+        ),
+        ({"TRAVEL_PUBLIC_HOSTS": [CANONICAL, "127.0.0.1"]}, "loopback"),
+        ({"TRAVEL_PUBLIC_HOSTS": [CANONICAL, "::1"]}, "loopback"),
+        ({"OIDC_CLIENT_SECRET": ""}, "confidential client"),
+        ({"OIDC_CLIENT_ID": ""}, "confidential client"),
+        ({"OIDC_REQUIRED_GROUP": ""}, "OIDC_REQUIRED_GROUP"),
+        ({"OIDC_SECOND_FACTOR_AMR": []}, "OIDC_SECOND_FACTOR_AMR"),
     ],
 )
 def test_production_problems_catch_each_missing_header_and_limit(override, problem):
@@ -406,3 +449,144 @@ def test_the_landing_page_offers_only_sign_in(client):
     assert ">Sign in<" in html
     assert 'name="robots" content="noindex, nofollow"' in html
     assert "Set-Cookie" not in response
+
+
+# --- Sign-in before exposure, over an SSH port-forward to localhost:8784 (G-4, D-100) --------
+
+LOCAL = "localhost:8784"
+
+
+@pytest.fixture
+def production_web(settings):
+    """The production web service's request handling (compose.prod.yaml), without DEBUG."""
+    settings.DEBUG = False
+    settings.SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    settings.TRAVEL_SSL_REDIRECT = True
+    settings.SESSION_COOKIE_SECURE = True
+    settings.CSRF_COOKIE_SECURE = True
+    settings.SECURE_HSTS_SECONDS = 31536000
+    settings.RATELIMIT_CLIENT_IP_HEADER = "CF-Connecting-IP"
+    settings.TRAVEL_PUBLIC_HOSTS = [CANONICAL, OTHER]
+    settings.TRAVEL_CANONICAL_HOST = CANONICAL
+    settings.TRAVEL_PUBLIC_SCOPE = "tracker"
+    settings.ALLOWED_HOSTS = ["localhost", "127.0.0.1", CANONICAL, OTHER]
+    return settings
+
+
+@pytest.mark.parametrize("host", [LOCAL, "localhost", "127.0.0.1:8784", "LOCALHOST:8784"])
+def test_plain_http_on_localhost_is_served_not_redirected(production_web, host):
+    response = Client(HTTP_HOST=host).get("/")
+    assert response.status_code == 200
+    # HSTS only ever goes out over HTTPS; the other production headers stay.
+    assert "Strict-Transport-Security" not in response
+    assert response["X-Frame-Options"] == "DENY"
+    assert "frame-ancestors 'none'" in response["Content-Security-Policy"]
+
+
+@pytest.mark.parametrize(
+    ("host", "headers", "target"),
+    [
+        # Through the tunnel: the visitor used plain HTTP.
+        (CANONICAL, {"HTTP_X_FORWARDED_PROTO": "http"}, f"https://{CANONICAL}/"),
+        (CANONICAL, {}, f"https://{CANONICAL}/"),
+        # A loopback name, but with the tunnel's headers: never treated as local.
+        (LOCAL, {"HTTP_X_FORWARDED_PROTO": "http"}, f"https://{LOCAL}/"),
+        (LOCAL, {"HTTP_CF_CONNECTING_IP": "203.0.113.9"}, f"https://{LOCAL}/"),
+    ],
+)
+def test_plain_http_elsewhere_is_still_redirected_to_https(production_web, host, headers, target):
+    for scope in ("tracker", "all"):
+        production_web.TRAVEL_PUBLIC_SCOPE = scope
+        response = Client(HTTP_HOST=host, **headers).get("/")
+        assert response.status_code == 301
+        assert response["Location"] == target
+
+
+def test_the_redirect_keeps_path_and_query_and_refuses_unknown_hosts(production_web):
+    response = Client(HTTP_HOST=CANONICAL).get("/app/trips?year=2024")
+    assert response["Location"] == f"https://{CANONICAL}/app/trips?year=2024"
+    assert Client(HTTP_HOST="evil.example").get("/").status_code == 400
+    assert Client(HTTP_HOST="localhost.evil.example").get("/").status_code == 400
+    # The container's own health check stays plain HTTP, whatever the host.
+    assert Client(HTTP_HOST="127.0.0.1:8000").get("/healthz").status_code == 200
+
+
+def test_https_on_the_public_name_is_unchanged(production_web):
+    production_web.TRAVEL_PUBLIC_SCOPE = "all"
+    response = Client(HTTP_HOST=CANONICAL).get("/", secure=True)
+    assert response.status_code == 200
+    assert response["Strict-Transport-Security"].startswith("max-age=31536000")
+
+
+@pytest.fixture
+def local_idp(monkeypatch, production_web):
+    from django.http import HttpResponseRedirect
+
+    from travel.accounts import oidc
+
+    class Fake:
+        redirect_uris: list[str] = []
+
+        def authorize_redirect(self, request, redirect_uri, **kwargs):
+            self.redirect_uris.append(redirect_uri)
+            return HttpResponseRedirect("https://auth.example.org/application/o/authorize/")
+
+        def authorize_access_token(self, request):
+            return {
+                "userinfo": {
+                    "iss": "https://auth.example.org/application/o/travel/",
+                    "sub": "synthetic-hashed-subject",
+                    "email": "member@example.test",
+                    "name": "Synthetic Member",
+                    "groups": ["travel-users"],
+                    "amr": ["pwd", "mfa"],
+                },
+                "id_token": "header.payload.sig",
+            }
+
+        def load_server_metadata(self):
+            return {
+                "end_session_endpoint": "https://auth.example.org/application/o/travel/end-session/"
+            }
+
+    fake = Fake()
+    monkeypatch.setattr(oidc, "client", lambda: fake)
+    production_web.OIDC_ISSUER = "https://auth.example.org/application/o/travel/"
+    production_web.OIDC_CLIENT_ID = "travel-web"
+    return fake
+
+
+def test_signing_in_over_the_port_forward_works_with_secure_cookies(local_idp):
+    browser = Client(HTTP_HOST=LOCAL, enforce_csrf_checks=True)
+    response = browser.get("/auth/login?next=/app/")
+    assert response.status_code == 302
+    # G-4's temporary redirect URI in Authentik.
+    assert local_idp.redirect_uris == [f"http://{LOCAL}/auth/callback"]
+    response = browser.get("/auth/callback?code=c&state=s")
+    assert response.status_code == 302
+    assert response["Location"] == "/app/"
+    session_cookie = response.cookies["sessionid"]
+    assert session_cookie["secure"] is True  # not weakened; browsers accept it on localhost
+    assert session_cookie["httponly"] is True
+    assert browser.get("/api/v1/me").json()["email"] == "member@example.test"
+    # CSRF checks the plain-HTTP origin of the port-forward (Origin: http://localhost:8784).
+    browser.get("/")
+    token = browser.cookies["csrftoken"].value
+    assert browser.cookies["csrftoken"]["secure"] is True
+    ok = browser.post(
+        "/api/v1/me/privacy-ack", HTTP_X_CSRFTOKEN=token, HTTP_ORIGIN=f"http://{LOCAL}"
+    )
+    assert ok.status_code == 200
+    forged = browser.post(
+        "/api/v1/me/privacy-ack", HTTP_X_CSRFTOKEN=token, HTTP_ORIGIN="https://evil.example"
+    )
+    assert forged.status_code == 403
+    response = browser.post("/auth/logout", HTTP_X_CSRFTOKEN=token, HTTP_ORIGIN=f"http://{LOCAL}")
+    assert response.status_code == 302
+    location = response["Location"]
+    assert "post_logout_redirect_uri=http%3A%2F%2Flocalhost%3A8784%2F" in location
+
+
+def test_the_port_forward_does_not_open_the_public_name_before_go_live(local_idp):
+    assert Client(HTTP_HOST=CANONICAL).get("/auth/login", secure=True).status_code == 404
+    assert Client(HTTP_HOST=CANONICAL).get("/app/", secure=True).status_code == 404

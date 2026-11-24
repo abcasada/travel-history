@@ -79,8 +79,29 @@ def client():
     )
 
 
+def reset_client() -> None:
+    """Forget the registered client and its cached discovery document (tests; settings change)."""
+    _oauth._clients.pop("idp", None)
+    _oauth._registry.pop("idp", None)
+
+
 def metadata() -> dict:
     return client().load_server_metadata()
+
+
+def normalize_issuer(issuer: str) -> str:
+    """Authentik's per-provider issuers end in a slash (`https://<host>/application/o/<slug>/`),
+    and `OIDC_ISSUER` may be written with or without it. Issuers are compared through this;
+    accounts store the `iss` claim exactly as the provider sent it."""
+    return (issuer or "").strip().rstrip("/")
+
+
+def same_issuer(a: str, b: str) -> bool:
+    return bool(normalize_issuer(a)) and normalize_issuer(a) == normalize_issuer(b)
+
+
+def is_accepted_issuer(issuer: str) -> bool:
+    return any(same_issuer(issuer, accepted) for accepted in settings.OIDC_ACCEPTED_ISSUERS)
 
 
 # --- Bearer access tokens ------------------------------------------------------------------
@@ -116,7 +137,7 @@ def validate_access_token(token: str, key_set: KeySet | None = None) -> dict:
         raise InvalidToken("expired")
     if claims.get("nbf", 0) > now + 30:
         raise InvalidToken("not yet valid")
-    if claims.get("iss") not in settings.OIDC_ACCEPTED_ISSUERS:
+    if not isinstance(claims.get("iss"), str) or not is_accepted_issuer(claims["iss"]):
         raise InvalidToken("unexpected issuer")
     audiences = claims.get("aud")
     audiences = {audiences} if isinstance(audiences, str) else set(audiences or [])

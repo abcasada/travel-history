@@ -226,7 +226,7 @@ def test_ingest_only_ignores_the_go_live_scope(ingest_only):
 
 def test_plain_http_is_redirected_to_https_behind_the_proxy(ingest_only, member_secret):
     ingest_only.SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-    ingest_only.SECURE_SSL_REDIRECT = True
+    ingest_only.TRAVEL_SSL_REDIRECT = True  # HttpsRedirectMiddleware (D-100)
     client = Client(HTTP_HOST=PUBLIC)
     plain = client.post(
         OWNTRACKS, location(), content_type="application/json", HTTP_X_FORWARDED_PROTO="http"
@@ -269,7 +269,7 @@ SETTING_NAMES = [
     "CSRF_TRUSTED_ORIGINS",
     "SECURE_PROXY_SSL_HEADER",
     "SECURE_SSL_REDIRECT",
-    "SECURE_REDIRECT_EXEMPT",
+    "TRAVEL_SSL_REDIRECT",
     "SECURE_HSTS_SECONDS",
     "SECURE_HSTS_INCLUDE_SUBDOMAINS",
     "SECURE_CONTENT_TYPE_NOSNIFF",
@@ -295,8 +295,9 @@ def test_the_ingest_service_runs_with_production_settings():
     assert result["ALLOWED_HOSTS"] == ["127.0.0.1", "localhost", PUBLIC]
     assert result["CSRF_TRUSTED_ORIGINS"] == [f"https://{PUBLIC}"]
     assert result["SECURE_PROXY_SSL_HEADER"] == ["HTTP_X_FORWARDED_PROTO", "https"]
-    assert result["SECURE_SSL_REDIRECT"] is True
-    assert result["SECURE_REDIRECT_EXEMPT"] == ["^healthz$"]
+    # The redirect (and its /healthz exemption) is HttpsRedirectMiddleware's (D-100).
+    assert result["TRAVEL_SSL_REDIRECT"] is True
+    assert result["SECURE_SSL_REDIRECT"] is False
     assert result["SECURE_HSTS_SECONDS"] == 31536000
     assert result["SECURE_HSTS_INCLUDE_SUBDOMAINS"] is True
     assert result["SECURE_CONTENT_TYPE_NOSNIFF"] is True

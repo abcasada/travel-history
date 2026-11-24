@@ -71,6 +71,9 @@ MIDDLEWARE = [
     # First: takes a tracker's `?token=` out of the URL before anything can log or echo it.
     "travel.tracking.middleware.IngestTokenScrubMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    # HTTPS only (DJANGO_SSL_REDIRECT), except plain HTTP on localhost: the SSH port-forward
+    # (G-4). Replaces Django's SECURE_SSL_REDIRECT, which can't exempt by host.
+    "travel.core.exposure.HttpsRedirectMiddleware",
     # Before WhiteNoise: public host names reach only the tracker endpoints until go-live.
     "travel.core.exposure.ExposureGuardMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
@@ -180,8 +183,13 @@ OIDC_CLIENT_ID = env.str("OIDC_CLIENT_ID", "")
 OIDC_CLIENT_SECRET = env.str("OIDC_CLIENT_SECRET", "")
 # Development only: internal base URL for server-to-server calls to the provider (see oidc.py).
 OIDC_BACKCHANNEL_URL = env.str("OIDC_BACKCHANNEL_URL", "")
-# Only members of this provider group may use the app ("" disables the check).
+# Only members of this provider group may use the app ("" disables the check; production
+# refuses that).
 OIDC_REQUIRED_GROUP = env.str("OIDC_REQUIRED_GROUP", "travel-users")
+# G-5 (D-100): when an ID token lists its authentication methods (`amr`), one must be one of
+# these. Authentik: "mfa" = password plus an authenticator, "user" = a passkey; ["pwd"] alone
+# is refused. Tokens without `amr` pass ("" disables the check; production refuses that).
+OIDC_SECOND_FACTOR_AMR = env.list("OIDC_SECOND_FACTOR_AMR", ["mfa", "user"])
 # Bearer tokens: Authentik issues one issuer per provider (web + Android).
 OIDC_ACCEPTED_ISSUERS = [i for i in [OIDC_ISSUER, *env.list("OIDC_EXTRA_ISSUERS", [])] if i]
 OIDC_ACCEPTED_AUDIENCES = [a for a in [OIDC_CLIENT_ID, *env.list("OIDC_EXTRA_AUDIENCES", [])] if a]
@@ -227,13 +235,19 @@ X_FRAME_OPTIONS = "DENY"
 # HTTP is redirected (the container's own health check excepted) and HSTS is on.
 BEHIND_TLS_PROXY = env.bool("DJANGO_BEHIND_TLS_PROXY", False)
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https") if BEHIND_TLS_PROXY else None
-SECURE_SSL_REDIRECT = env.bool("DJANGO_SSL_REDIRECT", BEHIND_TLS_PROXY)
-SECURE_REDIRECT_EXEMPT = [r"^healthz$"]
+# The redirect to HTTPS is travel.core.exposure.HttpsRedirectMiddleware's (the container's own
+# /healthz excepted), so Django's own stays off: it can't exempt plain HTTP on localhost, which
+# the pre-exposure sign-in over an SSH port-forward needs (G-4, D-100). Public host names and
+# every request through the tunnel are still redirected.
+TRAVEL_SSL_REDIRECT = env.bool("DJANGO_SSL_REDIRECT", BEHIND_TLS_PROXY)
+SECURE_SSL_REDIRECT = False
 SECURE_HSTS_SECONDS = env.int("DJANGO_HSTS_SECONDS", 365 * 24 * 3600 if BEHIND_TLS_PROXY else 0)
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 # Not on the browsers' preload list on purpose (a commitment that is slow to undo), so Django's
-# reminder about SECURE_HSTS_PRELOAD is silenced; `check --deploy` must otherwise pass (D-96).
-SILENCED_SYSTEM_CHECKS = ["security.W021"]
+# reminder about SECURE_HSTS_PRELOAD is silenced, and W008 (SECURE_SSL_REDIRECT off) because
+# HttpsRedirectMiddleware redirects instead (production_problems requires it); `check --deploy`
+# must otherwise pass (D-96).
+SILENCED_SYSTEM_CHECKS = ["security.W021", "security.W008"]
 DATA_UPLOAD_MAX_MEMORY_SIZE = 40 * 1024 * 1024  # one upload chunk (32 MB) plus headroom
 
 SECURE_CSP = {
