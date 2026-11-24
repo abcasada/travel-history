@@ -214,9 +214,10 @@ It does not see the database, the backups (encrypted with your age key before th
 server), Immich, or anything sent over the LAN, the SSH port-forward or the VPN. Authentik at
 `auth.adamcasada.com` goes through the same tunnel, so the same applies to sign-in pages.
 
-This is the same trust you already place in Cloudflare for the other sites. Cloudflare stores
-nothing on purpose: the app sends `Cache-Control: no-store` on the tracker endpoints and private
-responses aren't cacheable by Cloudflare's defaults. Cloudflare's **managed robots.txt** answers
+This is the same trust you already place in Cloudflare for the other sites. Nothing is meant to
+be stored there: by default Cloudflare caches only static files by extension (scripts, styles,
+images: the app's code and icons, no data), and the tracker endpoints send
+`Cache-Control: no-store`. Don't add a "cache everything" rule for these names. Cloudflare's **managed robots.txt** answers
 `/robots.txt` at the edge (the app serves none), and the landing page carries `noindex`.
 
 If you'd rather a large Timeline upload not cross Cloudflare, upload it on the LAN: on the
