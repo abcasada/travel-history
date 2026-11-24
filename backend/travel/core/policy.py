@@ -395,6 +395,18 @@ def can_import(user) -> bool:
     return can_create(user)
 
 
+def can_commit_trip_sheet(user, batch) -> bool:
+    """Preview, commit or discard a trip spreadsheet import (§28.10): only its owner, never the
+    Admin (imports are raw history)."""
+    return can_import(user) and batch.owner_id == user.pk
+
+
+def can_reimport_trip(user, trip: Trip) -> bool:
+    """A spreadsheet key stands only for the importer's own trip (§28.10): the importer never
+    edits someone else's trip, even one the Admin could edit in the app."""
+    return can_import(user) and trip.owner_id == user.pk
+
+
 # --- Device tokens and tracker ingestion (PLAN.md §9.1) ------------------------------------
 
 

@@ -196,6 +196,7 @@ class StopOut(Schema):
     arrive_utc: dt.datetime | None
     depart_utc: dt.datetime | None
     tz: str
+    time_precision: str = Field(description="exact; day, month or year: a date-only stop")
     notes: str = Field(description="private free text; never in a public snapshot")
     place: PlaceOut
     author: UserRef
@@ -731,6 +732,7 @@ def _stop(stop: Stop, authors: dict[int, dict], can_edit: bool) -> dict:
         "arrive_utc": stop.arrive_utc,
         "depart_utc": stop.depart_utc,
         "tz": stop.tz,
+        "time_precision": stop.time_precision,
         "notes": stop.notes,
         "place": _place(stop.place),
         "author": authors[stop.author_id],
@@ -1744,3 +1746,10 @@ def delete_media(request, media_id: int):
     except TripError as error:
         _fail(error)
     return Status(204, None)
+
+
+# Trip spreadsheet preview, commit and the template (§28.8): their own module, mounted here so
+# the trips app keeps one router.
+from .sheet.api import router as sheet_router  # noqa: E402
+
+router.add_router("", sheet_router)

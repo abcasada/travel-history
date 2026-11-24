@@ -19,6 +19,9 @@ from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
 
 OUT = Path("docs/trips/trip-template.xlsx")
+# The copy the app serves at GET /trips/sheet-template.xlsx (the backend image holds only
+# backend/); both are written from the same workbook.
+SERVED = Path("backend/travel/trips/sheet/trip-template.xlsx")
 FIXED_TIME = dt.datetime(2026, 11, 18)  # stable document properties between rebuilds
 
 BOLD = Font(bold=True)
@@ -251,9 +254,10 @@ def main() -> None:
     wb.properties.lastModifiedBy = "travel-history"
     wb.properties.created = FIXED_TIME
     wb.properties.modified = FIXED_TIME
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    wb.save(OUT)
-    print(f"wrote {OUT}")
+    for path in (OUT, SERVED):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        wb.save(path)
+        print(f"wrote {path}")
 
 
 if __name__ == "__main__":
