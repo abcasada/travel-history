@@ -51,8 +51,17 @@ What `./dev lane new <item>` sets up:
   scans the staged changes there. It also refuses if gitleaks logs an error.
 
 `./dev lane rm <item>` stops the lane's stack and deletes its volumes, image tag and worktree,
-then deletes `item/<item>` once it is merged into `main`. It refuses an unmerged branch or
-uncommitted changes unless `--force` is given, which keeps the branch.
+then deletes `item/<item>`, locally and on `origin`, once it is merged into `main`. "Merged"
+means an ancestor of `main`, or, after a rebase that wasn't written back to the branch, every
+commit has a patch-equivalent commit in `main` (`git cherry`). It deletes with `git branch -D`
+because `-d` compares with the branch's upstream, which still holds the pre-rebase commits. It
+refuses an unmerged branch or uncommitted changes unless `--force` is given, which keeps the
+branch.
+
+**Scratch files and logs:** lane builders run under one orchestrator session, so they share
+its scratchpad directory. Put the item in every scratch file and log name
+(`<scratchpad>/43a-test-quick.log`, not `test-quick.log`) so two lanes never overwrite each
+other's output. Files inside the worktree (`e2e/out/`, `var/`) are already per lane.
 
 **Memory:** each lane's test DB plus test run costs roughly a gigabyte, and a full lane stack
 (with Vite and the mock OIDC server) more. When the host drops under about 2 GiB available

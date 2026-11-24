@@ -115,6 +115,7 @@ lane $n ready: $path (branch $branch, compose project $LANE_PROJECT_PREFIX$item)
   web http://localhost:$web  vite http://localhost:$vite/app/  mock OIDC :$oidc  Mailpit :$mail
   cd $path && ./dev test-quick
   for the e2e: ./dev up && ./dev load-reference && ./dev e2e
+  scratch files and logs: name them with the item ($item-test-quick.log); lanes share a scratchpad
   when merged: ./dev lane rm $item   (from the main checkout)
 EOF
 }
