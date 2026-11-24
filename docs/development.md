@@ -27,8 +27,13 @@ What `./dev lane new <item>` sets up:
   It names the lane (`TH_LANE`, `TH_LANE_ITEM`), and `./dev` refuses compose commands in a
   worktree whose `.env` doesn't.
 - **Its own stack:** compose project `travel-history-lane-<item>`, so the DB volume, networks
-  and containers are its own. Its backend image tag is `lane-<item>`, so a lane's rebuild never
-  retags the main stack's image. The DB runs with `shared_buffers=256MB`.
+  and containers are its own. Every image it builds is tagged `lane-<item>`
+  (`travel-history-backend-dev`, `travel-history-backend`, `travel-history-backup`; D-121):
+  `./dev` passes `TRAVEL_DEV_IMAGE_TAG` and `TRAVEL_IMAGE_TAG` from the lane's name, overriding
+  its `.env`, so `./dev build` or `./dev up` in a lane never retags the main stack's images
+  (`travel-history-backup:latest` included), also in lanes made before this. The main checkout
+  passes neither, so its tags and rendered compose config are unchanged. The DB runs with
+  `shared_buffers=256MB`.
 - **Port block** (lane number n = 1, 2, …), bound to 127.0.0.1 only:
 
   | lane | web | mock OIDC | Mailpit | Vite | e2e browser (CDP) |
@@ -50,13 +55,21 @@ What `./dev lane new <item>` sets up:
 - **The pre-commit hook** works in a worktree too: it mounts the common git dir, so gitleaks
   scans the staged changes there. It also refuses if gitleaks logs an error.
 
-`./dev lane rm <item>` stops the lane's stack and deletes its volumes, image tag and worktree,
+`./dev lane rm <item>` stops the lane's stack and deletes its volumes, image tags and worktree,
 then deletes `item/<item>`, locally and on `origin`, once it is merged into `main`. "Merged"
 means an ancestor of `main`, or, after a rebase that wasn't written back to the branch, every
 commit has a patch-equivalent commit in `main` (`git cherry`). It deletes with `git branch -D`
 because `-d` compares with the branch's upstream, which still holds the pre-rebase commits. It
 refuses an unmerged branch or uncommitted changes unless `--force` is given, which keeps the
 branch.
+
+**The hourly re-check in a lane:** development turns it off (`OIDC_SESSION_RECHECK_SECONDS=0`).
+To see the SPA's automatic sign-in redirect (D-120), add `OIDC_SESSION_RECHECK_SECONDS=15` to
+the lane's `.env` (never the main one), `./dev up`, then `./dev e2e --recheck`: it signs in at
+the mock provider, waits until the session is due, opens Trips and expects the provider's page
+(no Sign in screen) and a return to `/app/trips`, then expects the Sign in screen for a second
+re-check within the minute. Remove the line afterwards: the ordinary `./dev e2e` takes longer
+than 15 seconds and would be sent to sign-in midway.
 
 **Scratch files and logs:** lane builders run under one orchestrator session, so they share
 its scratchpad directory. Put the item in every scratch file and log name

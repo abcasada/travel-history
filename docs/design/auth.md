@@ -80,7 +80,13 @@ budget ~2–2.5 GB RAM (§21, §26).
    browser session back through Authentik every hour (D-108) to see whether the account is still
    in `travel-users`; while Authentik's session lives that trip asks nothing, otherwise it is a
    full sign-in with the second factor each time (an installed phone app loses a browser-session
-   cookie whenever it is closed). To check in 40c-2 against the deployed version.
+   cookie whenever it is closed). The app makes the trip itself (D-120): a page load is
+   redirected by the server, and when an API call gets the re-check's 401 (its `detail` is the
+   fixed sentence in `travel.accounts.sessions.DUE_DETAIL`) the SPA goes straight to
+   `/auth/login?next=<the same page>` instead of showing its Sign in screen, at most once a
+   minute per tab (a second re-check within the minute shows the screen, so a broken sign-in
+   can't loop). Any other 401 (signed out, refused) shows the Sign in screen. To check in 40c-2
+   against the deployed version.
 6. **API token** for this app (user `travel-provisioner`, intent `api`) with permission to
    create users and invitations and add users to `travel-users`, used by the approval flow:
    `POST /api/v3/stages/invitation/invitations/` (+ `.../send_email/`) or
@@ -188,8 +194,9 @@ before anything reads them (32 MiB upload chunks, 5 MiB tracker posts, 2.5 MiB e
 production has no API docs or schema URL; bearer tokens the provider can't vouch for (or that it
 is too slow to check) are no user, with a 30-second back-off; a request through the tunnel whose
 Host isn't a public name answers 404; scope `all` needs the provider configured; browser
-sessions go back through the provider hourly (`OIDC_SESSION_RECHECK_SECONDS`), so an account
-removed from `travel-users` loses access within the hour, and a refused sign-in ends the
+sessions go back through the provider hourly (`OIDC_SESSION_RECHECK_SECONDS`; the SPA redirects
+to sign-in by itself, D-120), so an account removed from `travel-users` loses access within the
+hour, and a refused sign-in ends the
 browser's session; no trip can be made public until T37.
 
 ### 7.8 Account handover and linking (server commands)

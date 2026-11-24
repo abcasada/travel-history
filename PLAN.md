@@ -16,7 +16,8 @@ runs separately from dev (item 40a, 2026-11-19: `./dev prod …`, web on `127.0.
 exposed; [docs/production.md](docs/production.md), D-96); the copy of the real data from dev
 into production is built and rehearsed (item 40b, `./dev prod import-from-dev`, D-97); the
 Authentik sign-in and the handover commands are built (item 40c-1, D-103, D-104; deployed in 40c-2);
-41a's go-live review fixes are in (item 42a, D-107 to D-111).
+41a's go-live review fixes are in (item 42a, D-107 to D-111), with their follow-ups (item 43b:
+the SPA's silent re-sign-in, lane image tags; D-120, D-121).
 
 | Phase | Status | Detail |
 |---|---|---|
@@ -180,6 +181,8 @@ Frontend conventions: [docs/design/frontend-patterns.md](docs/design/frontend-pa
 - D-109 No trip becomes public before T37: 422 on create, edit, bulk; services refuse it everywhere else
 - D-110 e2e leftovers: dev copy and `e2e_cleanup` remove E2E persons, e2e tags and SYNTHETIC trip-sheet batches (by workbook title); raw files kept
 - D-111 Base digests refreshed; builds run `apt-get upgrade` (Debian security updates); CPU smoke passed (amends D-78)
+- D-120 After the hourly re-check's 401 the SPA goes straight to sign-in and back to the same page, at most once a minute per tab; other 401s keep the Sign in screen
+- D-121 Lane builds tag every image `lane-<item>` (backup included); the main checkout's tags and rendered config unchanged (amends D-98)
 
 ## 25. Open questions (for Adam, answer whenever — nothing is blocked on these)
 

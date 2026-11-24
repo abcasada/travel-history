@@ -127,7 +127,9 @@ No form library. Every editor follows the same shape (see `TripFieldsForm`, `Sto
 - The server decides; the UI only hides what it knows the user can't do and explains refusals.
   The API's rules (api.md §17): **401** signed out, **403** a visible thing you may not change,
   **404** something you can't see (never "forbidden", so existence isn't revealed), **409**
-  duplicate, **422** invalid data or an unusable reference.
+  duplicate, **422** invalid data or an unusable reference. A 401 from the hourly provider
+  re-check is handled once, in `apiFetch` (`auth/recheck.ts`, D-120): the tab goes back through
+  sign-in by itself; pages don't handle it.
 - **Loading one thing**: `<QueryState query what="trip">` renders loading, then for 404 "This
   trip doesn't exist or isn't shared with you.", for 403 the server's reason, for 5xx/network a
   message with "Try again". Use it for every by-id page.
