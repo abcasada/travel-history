@@ -91,22 +91,6 @@ await page.getByLabel("From stop").selectOption({ label: "E2E Start" });
 await page.getByLabel("To stop").selectOption({ label: "Salina, KS" });
 await page.getByRole("form", { name: "New leg" }).getByRole("button", { name: "Add leg" }).click();
 await page.getByText(/Drive\s+E2E Start\s+→\s+Salina, KS/).first().waitFor();
-// A flight leg (item 21b): airports and an airline from the reference data (OurAirports and
-// OpenFlights, loaded by ./dev load-reference), a seat and a cabin.
-await page.getByRole("button", { name: "Add leg" }).click();
-const flightForm = page.getByRole("form", { name: "New leg" });
-await flightForm.getByLabel("Mode").selectOption("flight");
-await flightForm.getByLabel("From airport").fill("ICT");
-await flightForm.getByRole("button", { name: /^ICT / }).first().click();
-await flightForm.getByLabel("To airport").fill("DEN");
-await flightForm.getByRole("button", { name: /^DEN / }).first().click();
-await flightForm.getByLabel("Airline").fill("United Airlines");
-await flightForm.getByRole("button", { name: /^UA United Airlines/ }).first().click();
-await flightForm.getByLabel("Flight number", { exact: true }).fill("1234");
-await flightForm.getByLabel("Seat", { exact: true }).fill("12A");
-await flightForm.getByLabel("Cabin", { exact: true }).selectOption("economy");
-await flightForm.getByRole("button", { name: "Add leg" }).click();
-await page.getByText(/Flight\s+ICT .*→\s+DEN/).first().waitFor();
 // Who was on the first leg: the editor's per-leg people (Dev Member stays on it).
 await page.getByRole("button", { name: /^People on Drive E2E Start/ }).click();
 await page.getByRole("group", { name: "People on this leg" }).getByLabel("Dev Member").waitFor();
@@ -115,10 +99,9 @@ await page.waitForURL(new RegExp(`/app/trips/${tripId}$`));
 await page.getByRole("heading", { name: title }).waitFor();
 await page.getByRole("region", { name: "Who went" }).getByText("Dev Member").waitFor();
 await page.getByRole("region", { name: "Itinerary" }).getByText(/E2E Start → Salina, KS/).waitFor();
-// The rest of the trip page (item 21b): the flight's codes, a tag added by a new name, a note
+// The rest of the trip page (item 21b): a tag added by a new name, a note
 // written and edited, the owner's own leg switch and public-consent switch.
 const itinerary = page.getByRole("region", { name: "Itinerary" });
-await itinerary.getByText(/ICT → DEN · UA 1234 · seat 12A · Economy/).waitFor();
 const tripTag = `e2e-21b-${Date.now()}`;
 await page.getByLabel("Tag name").fill(tripTag);
 await page.getByRole("button", { name: "Tag", exact: true }).click();
@@ -194,8 +177,27 @@ await page.getByRole("heading", { name: "Edit trip" }).waitFor();
 await page.getByLabel("Title", { exact: true }).fill(`${title} (edited)`);
 await page.getByRole("button", { name: "Save", exact: true }).click();
 await page.getByText(/^Saved at /).waitFor();
+// A flight leg (item 21b), added after the drag editor (a wider map would change its anchors): airports and an airline from the reference data (OurAirports and
+// OpenFlights, loaded by ./dev load-reference), a seat and a cabin.
+await page.getByRole("button", { name: "Add leg" }).click();
+const flightForm = page.getByRole("form", { name: "New leg" });
+await flightForm.getByLabel("Mode").selectOption("flight");
+// A new leg starts at the last one's stop; this one starts at the airport instead.
+await flightForm.getByLabel("From stop").selectOption({ label: "No stop" });
+await flightForm.getByLabel("From airport").fill("MCI");
+await flightForm.getByRole("button", { name: /^MCI / }).first().click();
+await flightForm.getByLabel("To airport").fill("DEN");
+await flightForm.getByRole("button", { name: /^DEN / }).first().click();
+await flightForm.getByLabel("Airline").fill("United Airlines");
+await flightForm.getByRole("button", { name: /^UA United Airlines/ }).first().click();
+await flightForm.getByLabel("Flight number", { exact: true }).fill("1234");
+await flightForm.getByLabel("Seat", { exact: true }).fill("12A");
+await flightForm.getByLabel("Cabin", { exact: true }).selectOption("economy");
+await flightForm.getByRole("button", { name: "Add leg" }).click();
+await page.getByText(/Flight\s+MCI .*→\s+DEN/).first().waitFor();
 await page.getByRole("link", { name: "Done" }).click();
 await page.getByRole("heading", { name: `${title} (edited)` }).waitFor();
+await page.getByRole("region", { name: "Itinerary" }).getByText(/MCI → DEN · UA 1234 · seat 12A · Economy/).waitFor();
 page.once("dialog", (dialog) => dialog.accept());
 await page.getByRole("button", { name: "Delete", exact: true }).click();
 await page.waitForURL(/\/app\/trips$/);
@@ -242,7 +244,7 @@ try {
   await page.keyboard.press("Enter");
   await page.getByText("2 trips", { exact: true }).waitFor();
   // The status filter (item 21b's TripStatus fix): both trips are confirmed.
-  await page.getByLabel("Status", { exact: true }).selectOption("confirmed");
+  await page.getByRole("combobox", { name: /^Status/ }).selectOption("confirmed");
   await page.waitForURL(/status=confirmed/);
   await page.getByText("2 trips", { exact: true }).waitFor();
   await page.evaluate(() => document.activeElement?.blur()); // list keys don't work in a field
