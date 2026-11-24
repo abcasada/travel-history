@@ -21,3 +21,6 @@ Handoff for item 14a-1 (lane 1, branch `item/14a-1`). Fold into NEXT.md at merge
   plus `region_geonames_id`, `county.code` (GEOID) and `place.geonameid`; `place` carries the
   town's own admin-1 and country, which can differ from the point's region near a border. The
   label is "" at sea. Central Tokyo gives "near Chūō" (wards are populated places in GeoNames).
+- **Tests (lane, 2026-11-24):** backend quick suite 2592 passed (31 slow deselected); frontend
+  184 passed on rerun (one Vitest test failed once in the first `./dev test-quick`; no frontend
+  change in this item, so treat as a flake and watch for it); lint clean.
