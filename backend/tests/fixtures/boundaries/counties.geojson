@@ -1,0 +1,9 @@
+{"type": "FeatureCollection", "name": "SYNTHETIC Census county subset (fake boxes, not real counties; Census field names)",
+"features": [
+{"type": "Feature", "properties": {"GEOID": "20901", "STATEFP": "20", "STUSPS": "KS", "NAME": "Synth", "NAMELSAD": "Synth County"},
+ "geometry": {"type": "Polygon", "coordinates": [[[-98, 37], [-97, 37], [-97, 38], [-98, 38], [-98, 37]]]}},
+{"type": "Feature", "properties": {"GEOID": "20903", "STATEFP": "20", "STUSPS": "KS", "NAME": "Fake", "NAMELSAD": ""},
+ "geometry": {"type": "Polygon", "coordinates": [[[-97, 37], [-96, 37], [-96, 38], [-97, 38], [-97, 37]]]}},
+{"type": "Feature", "properties": {"GEOID": "209", "STATEFP": "20", "STUSPS": "KS", "NAME": "Broken", "NAMELSAD": "Broken County"},
+ "geometry": {"type": "Polygon", "coordinates": [[[-90, 37], [-89, 37], [-89, 38], [-90, 38], [-90, 37]]]}}
+]}

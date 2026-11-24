@@ -81,19 +81,23 @@ class AircraftType(models.Model):
 
 
 class Country(models.Model):
-    """Natural Earth admin-0 (public domain). `iso_a2` comes from ISO_A2_EH."""
+    """Natural Earth admin-0 (public domain). `iso_a2` comes from ISO_A2_EH ("" where Natural
+    Earth has none, e.g. Northern Cyprus); `ne_id` is the upsert key (travel/geo/boundaries.py)."""
 
     iso_a2 = models.CharField(max_length=2, db_index=True)
     iso_a3 = models.CharField(max_length=3, blank=True)
     name = models.CharField(max_length=200)
     geom = gis.MultiPolygonField(srid=4326)
+    ne_id = models.BigIntegerField(unique=True, null=True, blank=True)
+    adm0_a3 = models.CharField(max_length=3, blank=True)
 
     def __str__(self) -> str:
         return self.name
 
 
 class Region(models.Model):
-    """Natural Earth admin-1 states/provinces (public domain)."""
+    """Natural Earth admin-1 states/provinces (public domain). `geonames_id` is Natural Earth's
+    `gn_id`; `ne_id` is the upsert key."""
 
     iso_3166_2 = models.CharField(max_length=16, db_index=True)
     name = models.CharField(max_length=200)
@@ -101,6 +105,7 @@ class Region(models.Model):
     adm1_code = models.CharField(max_length=16, blank=True)
     geonames_id = models.BigIntegerField(null=True, blank=True)
     geom = gis.MultiPolygonField(srid=4326)
+    ne_id = models.BigIntegerField(unique=True, null=True, blank=True)
 
     def __str__(self) -> str:
         return self.name

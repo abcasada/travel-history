@@ -1,0 +1,13 @@
+{"type": "FeatureCollection", "name": "SYNTHETIC Natural Earth admin-0 subset (fake boxes, not real boundaries)",
+"features": [
+{"type": "Feature", "properties": {"NE_ID": 9200001, "ISO_A2_EH": "US", "ISO_A3_EH": "USA", "ADM0_A3": "USA", "NAME": "Synthetic States"},
+ "geometry": {"type": "MultiPolygon", "coordinates": [[[[-101, 33], [-94, 33], [-94, 40], [-101, 40], [-101, 33]]]]}},
+{"type": "Feature", "properties": {"NE_ID": 9200002, "ISO_A2_EH": "XS", "ISO_A3_EH": "XSY", "ADM0_A3": "XSY", "NAME": "Synthetic Republic"},
+ "geometry": {"type": "Polygon", "coordinates": [[[0, 46], [10, 46], [10, 50], [0, 50], [0, 46]]]}},
+{"type": "Feature", "properties": {"NE_ID": 9200003, "ISO_A2_EH": "-99", "ISO_A3_EH": "-99", "ADM0_A3": "XDZ", "NAME": "Synthetic Disputed Zone"},
+ "geometry": {"type": "Polygon", "coordinates": [[[20, 10], [21, 11], [21, 10], [20, 11], [20, 10]]]}},
+{"type": "Feature", "properties": {"NE_ID": 9200004, "ISO_A2_EH": "XE", "ISO_A3_EH": "XSE", "ADM0_A3": "XSE", "NAME": "Synthetic Enclave"},
+ "geometry": {"type": "Polygon", "coordinates": [[[4, 47], [5, 47], [5, 48], [4, 48], [4, 47]]]}},
+{"type": "Feature", "properties": {"NE_ID": -99, "ISO_A2_EH": "XN", "ISO_A3_EH": "XSN", "ADM0_A3": "XSN", "NAME": "No Id"},
+ "geometry": {"type": "Polygon", "coordinates": [[[30, 10], [31, 10], [31, 11], [30, 11], [30, 10]]]}}
+]}

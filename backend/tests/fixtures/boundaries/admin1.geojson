@@ -1,0 +1,9 @@
+{"type": "FeatureCollection", "name": "SYNTHETIC Natural Earth admin-1 subset (fake boxes, not real boundaries)",
+"features": [
+{"type": "Feature", "properties": {"ne_id": 9300001, "iso_3166_2": "US-KS", "iso_a2": "US", "name": "Kansas", "adm1_code": "USA-9001", "gn_id": 4273857},
+ "geometry": {"type": "Polygon", "coordinates": [[[-101, 37], [-94, 37], [-94, 40], [-101, 40], [-101, 37]]]}},
+{"type": "Feature", "properties": {"ne_id": 9300002, "iso_3166_2": "US-OK", "iso_a2": "US", "name": "Oklahoma", "adm1_code": "USA-9002", "gn_id": 4544379},
+ "geometry": {"type": "Polygon", "coordinates": [[[-101, 33], [-94, 33], [-94, 37], [-101, 37], [-101, 33]]]}},
+{"type": "Feature", "properties": {"ne_id": 9300003, "iso_3166_2": "XS-01", "iso_a2": "XS", "name": "Synth Canton", "adm1_code": "XSY-9001", "gn_id": -99},
+ "geometry": {"type": "Polygon", "coordinates": [[[0, 46], [10, 46], [10, 50], [0, 50], [0, 46]]]}}
+]}
