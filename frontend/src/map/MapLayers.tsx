@@ -1,3 +1,4 @@
+import { SheetLayers } from "../imports/SheetLayers";
 import { LegRouteLayer } from "../routing/LegRouteLayer";
 import { HistoryLayers } from "./HistoryLayers";
 import { MapPickHandler, MapViewTracker } from "./MapPick";
@@ -11,6 +12,7 @@ export function MapLayers() {
       <HistoryLayers />
       <TripLayers />
       <LegRouteLayer />
+      <SheetLayers />
       <MapPickHandler />
       <MapViewTracker />
     </>

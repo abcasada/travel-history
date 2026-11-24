@@ -1,4 +1,6 @@
 import { Route, Routes } from "react-router";
+import { ImportsPage } from "../imports/ImportsPage";
+import { TripSheetPreviewPage } from "../imports/TripSheetPreviewPage";
 import { LegRoutePage } from "../routing/LegRoutePage";
 import { TripDetailPage } from "../trips/TripDetailPage";
 import { TripEditPage, TripNewPage } from "../trips/TripEditPage";
@@ -22,6 +24,8 @@ export function ListRoutes() {
       <Route path="review" element={<Placeholder title="Review queue" phase="phase 4" />} />
       <Route path="stats" element={<Placeholder title="Statistics" phase="phase 6" />} />
       <Route path="vehicles" element={<Placeholder title="Vehicles" phase="phase 4" />} />
+      <Route path="imports" element={<ImportsPage />} />
+      <Route path="imports/:batchId" element={<TripSheetPreviewPage />} />
       <Route path="history" element={<HistoryPage />} />
       <Route path="trackers" element={<TrackersPage />} />
       <Route path="about" element={<AboutPage />} />

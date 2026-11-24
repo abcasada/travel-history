@@ -15,3 +15,17 @@ export function pickFiles(options: { accept?: string; multiple?: boolean } = {})
     input.click();
   });
 }
+
+/** Save text the app made (a report) as a file. The PWA downloads it through a temporary link;
+ * a wrapper can show a native save dialog behind the same call. */
+export function saveFile(name: string, content: string, type = "text/plain"): void {
+  const url = URL.createObjectURL(new Blob([content], { type }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = name;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  // Revoke after the click has been handled, or some browsers cancel the download.
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}

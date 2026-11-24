@@ -34,6 +34,15 @@ export function ShellMenu() {
             </option>
           ))}
         </select>
+        {me.role !== "viewer" && (
+          <Link
+            to="/imports"
+            className="mb-1 block rounded px-2 py-1 hover:bg-slate-100"
+            onClick={(e) => e.currentTarget.closest("details")?.removeAttribute("open")}
+          >
+            Import trips from a spreadsheet
+          </Link>
+        )}
         <Link
           to="/trackers"
           className="mb-1 block rounded px-2 py-1 hover:bg-slate-100"

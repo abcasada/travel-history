@@ -2,6 +2,7 @@ import { keepPreviousData } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router";
 import { type TripOut, useListTrips } from "../api/generated";
 import { useMe } from "../auth/AuthGate";
+import { importPaths } from "../imports/paths";
 import { formatDateRange } from "../lib/time";
 import { useMapStore } from "../map/store";
 import { QueryState } from "../ui/QueryState";
@@ -29,12 +30,17 @@ export function TripListPage({ title = "Trips" }: { title?: string }) {
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-lg font-semibold">{title}</h2>
         {me.role !== "viewer" && (
-          <Link
-            to={paths.create}
-            className="rounded-md bg-blue-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-800"
-          >
-            New trip
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link to={importPaths.list} className="text-sm text-blue-700 hover:underline">
+              Import
+            </Link>
+            <Link
+              to={paths.create}
+              className="rounded-md bg-blue-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-800"
+            >
+              New trip
+            </Link>
+          </div>
         )}
       </div>
       <TripFilters />
