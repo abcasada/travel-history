@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import { ApiError } from "../api/client";
 import { errorKind, errorMessage } from "../api/errors";
@@ -119,14 +119,13 @@ function Preview({ batchId }: { batchId: number }) {
   );
 }
 
-type Notice = { tone: "error" | "ok"; text: string } | null;
-
 function PreviewBody({ preview }: { preview: TripSheetPreviewOut }) {
   const queryClient = useQueryClient();
   const [params, setParams] = useSearchParams();
   const [choices, setChoices] = useState<Choices>(emptyChoices);
-  const [notice, setNotice] = useState<Notice>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [results, setResults] = useState<SheetTabResultOut[] | null>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
   const commit = useCommitTripSheet();
   const discard = useDiscardTripSheet();
   const id = preview.batch_id;
@@ -160,6 +159,8 @@ function PreviewBody({ preview }: { preview: TripSheetPreviewOut }) {
         onSuccess: async (result) => {
           setResults(result.results);
           setChoices(emptyChoices());
+          // The bar that was clicked sits at the bottom; the results are at the top.
+          resultsRef.current?.scrollIntoView?.({ behavior: "smooth", block: "nearest" });
           // Every trip list, the trip map and each trip the commit wrote.
           const tripIds = new Set(result.results.flatMap((r) => (r.trip_id ? [r.trip_id] : [])));
           await Promise.all([
@@ -175,17 +176,15 @@ function PreviewBody({ preview }: { preview: TripSheetPreviewOut }) {
               : [];
           const kind = errorKind(error);
           if (kind === "conflict" && records.length) {
-            setNotice({
-              tone: "error",
-              text: `Changed in the app since this preview: ${records.map(tabName).join(", ")}. The preview has been refreshed; check it and import again.`,
-            });
+            setNotice(
+              `Changed in the app since this preview: ${records.map(tabName).join(", ")}. The preview has been refreshed; check it and import again.`,
+            );
           } else if (kind === "invalid" && records.length) {
-            setNotice({
-              tone: "error",
-              text: `Can't be imported as it is now: ${records.map(tabName).join(", ")}. The preview has been refreshed; untick that tab or fix the sheet.`,
-            });
+            setNotice(
+              `Can't be imported as it is now: ${records.map(tabName).join(", ")}. The preview has been refreshed; untick that tab or fix the sheet.`,
+            );
           } else {
-            setNotice({ tone: "error", text: errorMessage(error, "import") });
+            setNotice(errorMessage(error, "import"));
           }
           if (kind === "conflict" || kind === "invalid") await refresh();
         },
@@ -236,20 +235,7 @@ function PreviewBody({ preview }: { preview: TripSheetPreviewOut }) {
         </p>
       )}
 
-      {results && <CommitResults results={results} />}
-      {notice && (
-        <p
-          className={`mb-3 text-sm ${notice.tone === "error" ? "text-red-700" : "text-green-800"}`}
-          role="alert"
-        >
-          {notice.text}
-        </p>
-      )}
-
-      {batchOpen && (
-        <CommitBar count={chosen.length} busy={busy} onCommit={onCommit} onDiscard={onDiscard} />
-      )}
-      <MutationError error={discard.error} what="import" />
+      <div ref={resultsRef}>{results && <CommitResults results={results} />}</div>
 
       {preview.tabs.map((tab) => (
         <TabCard
@@ -263,8 +249,24 @@ function PreviewBody({ preview }: { preview: TripSheetPreviewOut }) {
         />
       ))}
 
-      {batchOpen && preview.tabs.length > 1 && (
-        <CommitBar count={chosen.length} busy={busy} onCommit={onCommit} onDiscard={onDiscard} />
+      {/* One bar, kept in view at the bottom of the list pane however long the sheet is. */}
+      {(batchOpen || notice) && (
+        <div className="sticky bottom-0 -mx-4 border-t bg-white px-4 py-3">
+          {notice && (
+            <p className="mb-2 text-sm text-red-700" role="alert">
+              {notice}
+            </p>
+          )}
+          <MutationError error={discard.error} what="import" />
+          {batchOpen && (
+            <CommitBar
+              count={chosen.length}
+              busy={busy}
+              onCommit={onCommit}
+              onDiscard={onDiscard}
+            />
+          )}
+        </div>
       )}
     </div>
   );
@@ -282,7 +284,7 @@ function CommitBar({
   onDiscard: () => void;
 }) {
   return (
-    <div className="mb-4 flex flex-wrap gap-2">
+    <div className="flex flex-wrap gap-2">
       <Button variant="primary" onClick={onCommit} disabled={busy || count === 0}>
         {count === 1 ? "Import 1 trip" : `Import ${count} trips`}
       </Button>
