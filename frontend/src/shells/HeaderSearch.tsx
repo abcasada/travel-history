@@ -1,7 +1,8 @@
-import { type Ref, useEffect, useRef, useState } from "react";
+import type { Ref } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { readTripFilter, writeTripFilter } from "../trips/filter";
 import { paths } from "../trips/paths";
+import { useFollowedText } from "../trips/useFollowedText";
 
 /** The trip list is on the map home and `/trips`; elsewhere the search box opens `/trips`. */
 function onTripList(pathname: string): boolean {
@@ -19,21 +20,11 @@ export function HeaderSearch({ ref }: { ref?: Ref<HTMLInputElement> }) {
   const navigate = useNavigate();
   const listed = onTripList(pathname);
   const urlQ = listed ? readTripFilter(params).q : "";
-  // The text is local state: the URL updates a moment after each keystroke, and a box bound
-  // to it directly drops letters typed faster than that. It follows the URL only when the URL
-  // changes from elsewhere (Clear filters, leaving the list).
-  const [text, setText] = useState(urlQ);
-  const sent = useRef(urlQ);
-  useEffect(() => {
-    if (urlQ !== sent.current) {
-      sent.current = urlQ;
-      setText(urlQ);
-    }
-  }, [urlQ]);
+  // Local text, so fast typing keeps every letter (useFollowedText).
+  const [text, setText] = useFollowedText(urlQ);
 
   const onChange = (q: string) => {
     setText(q);
-    sent.current = q;
     if (listed) {
       setParams(writeTripFilter(params, { ...readTripFilter(params), q }), { replace: true });
     } else if (q.trim()) {

@@ -16,6 +16,7 @@ import {
   writeTripFilter,
 } from "./filter";
 import { MODE_LABELS, MODES, VISIBILITY_LABELS } from "./labels";
+import { useFollowedText } from "./useFollowedText";
 
 function toggle<T>(values: T[], value: T): T[] {
   return values.includes(value) ? values.filter((v) => v !== value) : [...values, value];
@@ -23,6 +24,27 @@ function toggle<T>(values: T[], value: T): T[] {
 
 const chip = (on: boolean) =>
   `rounded-full border px-2 py-0.5 text-xs ${on ? "border-blue-700 bg-blue-700 text-white" : "hover:bg-slate-100"}`;
+
+/**
+ * The mobile shell's title search (the desktop one is in the header). It keeps its own text,
+ * like the header box (21a), so letters typed faster than the URL updates aren't dropped.
+ */
+export function TitleSearch({ q, onSearch }: { q: string; onSearch: (q: string) => void }) {
+  const [text, setText] = useFollowedText(q);
+  return (
+    <input
+      type="search"
+      aria-label="Search trip titles"
+      placeholder="Search titles…"
+      className={inputClass}
+      value={text}
+      onChange={(e) => {
+        setText(e.target.value);
+        onSearch(e.target.value);
+      }}
+    />
+  );
+}
 
 /** Filters for the trip list and map; they edit the URL (see filter.ts). */
 export function TripFilters() {
@@ -38,16 +60,7 @@ export function TripFilters() {
 
   return (
     <section aria-label="Trip filters" className="mb-3 space-y-2 text-sm">
-      {shell === "mobile" && (
-        <input
-          type="search"
-          aria-label="Search trip titles"
-          placeholder="Search titles…"
-          className={inputClass}
-          value={filter.q}
-          onChange={(e) => update({ q: e.target.value })}
-        />
-      )}
+      {shell === "mobile" && <TitleSearch q={filter.q} onSearch={(q) => update({ q })} />}
       <div className="flex flex-wrap items-end gap-2">
         <label className="flex flex-col text-xs">
           From
