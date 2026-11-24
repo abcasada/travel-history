@@ -142,6 +142,51 @@ const failedTrips = tripRequests.filter(([, , status]) => status >= 400);
 const sawMap = tripRequests.some(([, path]) => path === "/api/v1/trips/map");
 const routed = tripRequests.some(([m, path, status]) => m === "POST" && path === "/api/v1/routing/route" && status === 200);
 if (failedTrips.length || !sawMap || !routed) throw new Error(`trip requests: ${JSON.stringify(tripRequests.slice(0, 20))}`);
+// The list as a working tool (item 21a): two trips made through the API are found with the
+// header search ("/"), selected with the keyboard (j, x, Shift+J) and tagged with a new tag in
+// one bulk request. The trips and the tag are deleted again.
+const api = async (method, path, data) => {
+  const token = (await context.cookies()).find((c) => c.name === "csrftoken")?.value ?? "";
+  const r = await page.request.fetch(`${base}${path}`, { method, data, headers: { "X-CSRFToken": token } });
+  if (!r.ok()) throw new Error(`${method} ${path}: ${r.status()}`);
+  return r.status() === 204 ? null : r.json();
+};
+const bulkTitle = `E2E bulk ${Date.now()}`;
+const bulkTag = `e2e-bulk-${Date.now()}`;
+const bulkTrips = [
+  await api("POST", "/api/v1/trips", { title: `${bulkTitle} A`, start_date: "2023-06-01", end_date: "2023-06-02" }),
+  await api("POST", "/api/v1/trips", { title: `${bulkTitle} B`, start_date: "2023-06-03", end_date: "2023-06-04" }),
+];
+try {
+  await page.getByRole("link", { name: "Trips" }).click();
+  await page.keyboard.press("/");
+  await page.keyboard.type(bulkTitle);
+  await page.keyboard.press("Enter");
+  await page.getByText("2 trips", { exact: true }).waitFor();
+  // Newest first: j puts the cursor on B, x selects it, Shift+J extends the selection to A.
+  await page.keyboard.press("j");
+  await page.keyboard.press("x");
+  await page.keyboard.press("Shift+J");
+  await page.getByText("2 selected", { exact: true }).waitFor();
+  await page.keyboard.press("t");
+  await page.getByLabel("New tag name").fill(bulkTag);
+  await page.getByRole("button", { name: "Add tag" }).click();
+  await page.getByText("Tag added: 2 trips updated.").waitFor();
+  for (const suffix of ["A", "B"]) {
+    await page.locator("li", { hasText: `${bulkTitle} ${suffix}` }).getByText(`#${bulkTag}`).waitFor();
+  }
+  await page.keyboard.press("f");
+  await page.waitForTimeout(1000);
+  await page.screenshot({ path: "out/trip-list-bulk.png" });
+  // Esc closes the tag panel, a second Esc clears the selection.
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape");
+  await page.getByText("2 selected", { exact: true }).waitFor({ state: "detached" });
+} finally {
+  for (const trip of bulkTrips) await api("DELETE", `/api/v1/trips/${trip.id}`).catch(() => {});
+  const tag = (await api("GET", "/api/v1/tags")).find((t) => t.name === bulkTag);
+  if (tag) await api("DELETE", `/api/v1/tags/${tag.id}`);
+}
 // The raw-history map (milestone 2.3): point and segment tiles and the coverage strip load for
 // the signed-in user, with no failed history requests.
 const historyRequests = [];
