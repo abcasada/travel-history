@@ -144,6 +144,12 @@ case "$cmd" in
     exit "$status"
     ;;
   import-scale-test) scripts/import-scale-test.sh "$@" ;;
+  golive-smoke)
+    # The go-live smoke test (item 40d, docs/go-live.md): `local` builds HEAD's production image
+    # and runs it with scope `all` against a throwaway DB on 127.0.0.1 (lanes too); a https URL
+    # checks the public names through Cloudflare.
+    exec scripts/golive-smoke.sh "$@"
+    ;;
   load-reference)
     # The public reference data (GeoNames gazetteer, airports, airlines) from the cached copies
     # in var/bulk/reference; a lane gets those copied by ./dev lane new (GeoNames pins can't be
@@ -170,6 +176,9 @@ case "$cmd" in
 ./dev restore-test        backup -> restore into a scratch DB -> verify (throwaway key)
 ./dev import-scale-test [size_mb|cleanup]  realistic-size Timeline import on the dev stack (default 1024 MB; deletes its data after)
 ./dev e2e [base-url]      browser smoke test (sign-in, notice, map, both shells; screenshots in e2e/out/)
+./dev golive-smoke local [--keep]   production image of HEAD, scope all, throwaway DB, 127.0.0.1
+                          only; every go-live check, then removed (local-check, local-down)
+./dev golive-smoke https://<host> [--scope all|tracker]   the same checks through Cloudflare
 ./dev load-reference      load the gazetteer and flight reference data from var/bulk/reference
 ./dev lane new <item>     parallel lane: worktree ../travel-history-lanes/<item>, branch item/<item>,
                           own .env, compose project, ports, DB volume and var/bulk (D-98)
