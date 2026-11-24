@@ -15,7 +15,7 @@ orchestrated work order in [docs/ROADMAP.md](docs/ROADMAP.md) (process:
 runs separately from dev (item 40a, 2026-11-19: `./dev prod …`, web on `127.0.0.1:8784`, not
 exposed; [docs/production.md](docs/production.md), D-96); the copy of the real data from dev
 into production is built and rehearsed (item 40b, `./dev prod import-from-dev`, D-97); the
-Authentik sign-in and the handover commands are built (item 40c-1, D-100, D-101; deployed in 40c-2).
+Authentik sign-in and the handover commands are built (item 40c-1, D-103, D-104; deployed in 40c-2).
 
 | Phase | Status | Detail |
 |---|---|---|
