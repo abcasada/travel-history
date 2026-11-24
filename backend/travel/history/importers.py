@@ -1,9 +1,12 @@
 """Dispatch an import batch to the importer for its kind. Importers run in the worker, as the
-batch owner, and write their summary into the batch."""
+batch owner, and write their summary into the batch. An importer returns its summary (the batch
+is then done), or a `Result` to end in another status: the trip spreadsheet importer stops at
+`preview` until the user commits (§28.8), or `failed` for a file it refuses."""
 
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import dataclass
 
 from django.utils import timezone
 
@@ -11,7 +14,15 @@ from travel.core.rls import rls_context
 
 from .models import ImportBatch
 
-Importer = Callable[[ImportBatch], dict]
+
+@dataclass
+class Result:
+    summary: dict
+    status: str = ImportBatch.Status.DONE
+    error: str = ""
+
+
+Importer = Callable[[ImportBatch], "dict | Result"]
 _REGISTRY: dict[str, Importer] = {}
 
 
@@ -38,7 +49,7 @@ def run(batch_id: int, owner_id: int) -> ImportBatch:
             batch.save(update_fields=["status", "summary", "finished_at"])
         return batch
     try:
-        summary = importer(batch)
+        result = importer(batch)
     except Exception as exc:
         with rls_context(owner_id):
             ImportBatch.objects.filter(pk=batch_id).update(
@@ -47,8 +58,13 @@ def run(batch_id: int, owner_id: int) -> ImportBatch:
                 finished_at=timezone.now(),
             )
         raise
+    if not isinstance(result, Result):
+        result = Result(summary=result)
     with rls_context(owner_id):
         ImportBatch.objects.filter(pk=batch_id).update(
-            status=ImportBatch.Status.DONE, summary=summary, finished_at=timezone.now()
+            status=result.status,
+            summary=result.summary,
+            error=result.error[:2000],
+            finished_at=timezone.now(),
         )
         return ImportBatch.objects.get(pk=batch_id)

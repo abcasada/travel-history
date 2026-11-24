@@ -20,4 +20,5 @@ polyline==2.0.4
 gpxpy==1.6.2
 puremagic==2.2.0
 openpyxl==3.1.5
+defusedxml==0.7.1  # openpyxl parses XML through it when installed (trip spreadsheets, §28.1)
 PyYAML==6.0.3

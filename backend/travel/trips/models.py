@@ -53,6 +53,7 @@ class Trip(models.Model):
         DETECTED = "detected", "Detected"
         FLIGHT_IMPORT = "flight_import", "Flight import"
         MERGED = "merged", "Merged"
+        SHEET_IMPORT = "sheet_import", "Spreadsheet import"
 
     owner = models.ForeignKey(User, on_delete=models.DO_NOTHING, related_name="trips")
     title = models.CharField(max_length=200)
@@ -173,6 +174,9 @@ class Leg(models.Model):
     cabin_class = models.CharField(max_length=16, choices=CabinClass.choices, blank=True)
     # Private free text, like Trip.notes: never copied into a public snapshot (§6.5).
     notes = models.TextField(blank=True)
+    # Identity of a leg imported from a trip spreadsheet (§28.9): its label, else a key derived
+    # from mode, ends and local date. Empty for legs made in the app.
+    sheet_key = models.CharField(max_length=300, blank=True)
     # Provenance: references to raw data (never copies of points)
     source_segments = ArrayField(models.BigIntegerField(), default=list, blank=True)
     import_batch = models.ForeignKey(
@@ -336,9 +340,23 @@ class Stop(models.Model):
     arrive_utc = models.DateTimeField(null=True, blank=True)
     depart_utc = models.DateTimeField(null=True, blank=True)
     tz = models.CharField(max_length=64, blank=True)
+    # A date-only arrival or departure is stored as local midnight with precision `day`, so it
+    # isn't shown as midnight (§28.6).
+    time_precision = models.CharField(
+        max_length=16, choices=DatePrecision.choices, default=DatePrecision.EXACT
+    )
     # Private free text, like Trip.notes: never copied into a public snapshot (§6.5).
     notes = models.TextField(blank=True)
     author = models.ForeignKey(User, on_delete=models.DO_NOTHING, related_name="+")
+    # Identity of a stop imported from a trip spreadsheet (§28.9); empty for stops made in the app.
+    sheet_key = models.CharField(max_length=300, blank=True)
+    import_batch = models.ForeignKey(
+        "history.ImportBatch",
+        null=True,
+        blank=True,
+        on_delete=models.DB_SET_NULL,
+        related_name="+",
+    )
     source_segment = models.ForeignKey(
         "history.TimelineSegment",
         null=True,
@@ -466,3 +484,75 @@ class TransferOffer(models.Model):
 
     def __str__(self) -> str:
         return f"{self.kind} {self.object_id} → {self.to_user_id} ({self.status})"
+
+
+class TripSheetRecord(models.Model):
+    """One trip tab of an uploaded trip spreadsheet (§28.8), as the worker parsed it: the
+    normalised content (trip fields, stops, legs with resolved ids and UTC times), its hash and
+    its issues. Raw history of its owner (own-only RLS). The parsed columns never change (a
+    trigger refuses it); only the commit's outcome is filled in later."""
+
+    class Outcome(models.TextChoices):
+        PENDING = "", "Not committed"
+        CREATED = "created", "New trip"
+        UPDATED = "updated", "Updated"
+        IDENTICAL = "identical", "Identical"
+        REVIEW = "review", "Sent to review (edited in the app)"
+        SKIPPED = "skipped", "Skipped"
+
+    owner = models.ForeignKey(User, on_delete=models.DO_NOTHING, related_name="+")
+    import_batch = models.ForeignKey(
+        "history.ImportBatch", on_delete=models.DO_NOTHING, related_name="trip_sheet_records"
+    )
+    tab_name = models.CharField(max_length=255)
+    position = models.PositiveSmallIntegerField()
+    key = models.CharField(max_length=100)
+    content = models.JSONField(default=dict)
+    content_hash = models.CharField(max_length=64)
+    issues = models.JSONField(default=list)
+    blocked = models.BooleanField(default=False)
+    outcome = models.CharField(max_length=16, choices=Outcome.choices, blank=True)
+    trip = models.ForeignKey(
+        Trip, null=True, blank=True, on_delete=models.DB_SET_NULL, related_name="+"
+    )
+    committed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["import_batch", "position"], name="tripsheetrecord_unique_tab"
+            )
+        ]
+        ordering = ["import_batch", "position"]
+
+    def __str__(self) -> str:
+        return f"sheet tab {self.tab_name!r} of batch {self.import_batch_id}"
+
+
+class TripSheetLink(models.Model):
+    """Which trip a spreadsheet key stands for (§28.9). A row of its own rather than a column
+    on the trip, so a trip deleted in the app is remembered (`trip` becomes null) and a later
+    import skips it instead of bringing it back (rule 7). Own-only RLS; a key only ever matches
+    the owner's own trips."""
+
+    owner = models.ForeignKey(User, on_delete=models.DO_NOTHING, related_name="+")
+    key = models.CharField(max_length=100)
+    trip = models.ForeignKey(
+        Trip, null=True, blank=True, on_delete=models.DB_SET_NULL, related_name="+"
+    )
+    last_record = models.ForeignKey(
+        TripSheetRecord, null=True, blank=True, on_delete=models.DB_SET_NULL, related_name="+"
+    )
+    applied_hash = models.CharField(max_length=64, blank=True)
+    applied_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["owner", "key"], name="tripsheetlink_unique_key")
+        ]
+
+    def __str__(self) -> str:
+        return f"sheet key {self.key!r} -> trip {self.trip_id}"

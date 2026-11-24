@@ -19,6 +19,9 @@ from . import importers, rawstore
 from .models import ImportBatch, RawFile, UploadSession
 
 STALE_AFTER = dt.timedelta(days=7)
+# Kinds with a tighter limit than TRAVEL_UPLOAD_MAX_BYTES. A trip spreadsheet is hand-typed;
+# anything bigger is a mistake or a zip bomb (§28.1).
+KIND_MAX_BYTES = {ImportBatch.Kind.TRIP_SHEET: 10 * 1024 * 1024}
 
 
 class UploadError(Exception):
@@ -68,7 +71,7 @@ def create_session(
         raise UploadError(422, "unknown import kind")
     if size <= 0:
         raise UploadError(422, "empty file")
-    if size > settings.TRAVEL_UPLOAD_MAX_BYTES:
+    if size > min(settings.TRAVEL_UPLOAD_MAX_BYTES, KIND_MAX_BYTES.get(kind, size)):
         raise UploadError(413, "file is larger than the upload limit")
     drop_stale_sessions(owner_id)
     if _bytes_in_use(owner_id) + size > settings.TRAVEL_USER_QUOTA_BYTES:
@@ -146,6 +149,21 @@ def abort(session: UploadSession) -> None:
     part_path(session).unlink(missing_ok=True)
 
 
+def reparse_identical(batch: ImportBatch, raw: RawFile) -> bool:
+    """A trip spreadsheet's outcome depends on the trips as they are now, so identical bytes are
+    parsed again into a new preview, unless a preview of them is still open: then that one is
+    shown again (the duplicate status points at it; §28.8, D-100)."""
+    if batch.kind != ImportBatch.Kind.TRIP_SHEET:
+        return False
+    return (
+        not ImportBatch.objects.filter(
+            raw_file=raw, kind=batch.kind, status=ImportBatch.Status.PREVIEW
+        )
+        .exclude(pk=batch.pk)
+        .exists()
+    )
+
+
 def process_upload(upload_id: str, owner_id: int) -> ImportBatch:
     """Worker job: checksum, detect identical re-uploads, archive the raw file, run the importer.
     Each step runs in its own short transaction as the owner."""
@@ -159,13 +177,16 @@ def process_upload(upload_id: str, owner_id: int) -> ImportBatch:
         digest = rawstore.sha256_file(part)
         with rls_context(owner_id):
             existing = rawstore.find_existing(owner_id, digest)
+            if existing is not None and reparse_identical(batch, existing):
+                batch.raw_file = existing
+                batch.save(update_fields=["raw_file"])
+                part.unlink(missing_ok=True)
+                return importers.run(batch.pk, owner_id)
             if existing is not None:
-                first = (
-                    ImportBatch.objects.filter(raw_file=existing)
-                    .exclude(pk=batch.pk)
-                    .order_by("created_at")
-                    .first()
-                )
+                earlier = ImportBatch.objects.filter(raw_file=existing).exclude(pk=batch.pk)
+                if batch.kind == ImportBatch.Kind.TRIP_SHEET:
+                    earlier = earlier.filter(status=ImportBatch.Status.PREVIEW)
+                first = earlier.order_by("created_at").first()
                 batch.raw_file = existing
                 batch.status = ImportBatch.Status.DUPLICATE
                 batch.summary = {"duplicate_of_batch": first.pk if first else None}

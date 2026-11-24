@@ -164,8 +164,15 @@ def _apply_core(trip: Trip, data: dict[str, Any]) -> None:
         setattr(trip, field, data[field])
 
 
-def create_trip(user, data: dict[str, Any]) -> Trip:
-    trip = Trip(owner_id=user.pk, status=Trip.Status.CONFIRMED, source=Trip.Source.MANUAL)
+# `in_app=False` marks a write made by an importer on the user's behalf (the trip spreadsheet,
+# §28.9): the same checks and RLS, but it doesn't count as an in-app edit (rule 7), which is
+# what sends later imports of the trip to the review queue.
+
+
+def create_trip(
+    user, data: dict[str, Any], *, source: str = Trip.Source.MANUAL, in_app: bool = True
+) -> Trip:
+    trip = Trip(owner_id=user.pk, status=Trip.Status.CONFIRMED, source=source)
     _apply_core(trip, data)
     check_dates(trip.start_date, trip.end_date)
     _apply_purpose(user, trip, data.get("purpose_id"))
@@ -174,13 +181,14 @@ def create_trip(user, data: dict[str, Any]) -> Trip:
         # PLAN.md §6.2: the default comes from the purpose (Work -> private, else participants).
         visibility = trip.purpose.default_visibility if trip.purpose else Visibility.PARTICIPANTS
     _apply_visibility(trip, visibility, data.get("public_mode"))
-    trip.edited_in_app_at = timezone.now()
+    if in_app:
+        trip.edited_in_app_at = timezone.now()
     with guarded_write():
         trip.save()
     return trip
 
 
-def update_trip(user, trip: Trip, data: dict[str, Any]) -> Trip:
+def update_trip(user, trip: Trip, data: dict[str, Any], *, in_app: bool = True) -> Trip:
     _apply_core(trip, data)
     check_dates(trip.start_date, trip.end_date)
     if "purpose_id" in data:
@@ -190,7 +198,8 @@ def update_trip(user, trip: Trip, data: dict[str, Any]) -> Trip:
         if wanted is not None and not policy.can_set_trip_visibility(user, trip, wanted):
             raise TripError(403, "you would no longer see this trip; only its owner can do that")
         _apply_visibility(trip, wanted, data.get("public_mode"))
-    trip.edited_in_app_at = timezone.now()
+    if in_app:
+        trip.edited_in_app_at = timezone.now()
     with guarded_write():
         trip.save()
     return trip
@@ -205,10 +214,14 @@ def delete_trip(trip: Trip) -> None:
         raise TripError(403, "not allowed")
 
 
-def touch(trip: Trip) -> None:
-    """Record an in-app edit of the trip's core (rule 7: in-app edits beat imported changes)."""
+def touch(trip: Trip, *, in_app: bool = True) -> None:
+    """Record an in-app edit of the trip's core (rule 7: in-app edits beat imported changes).
+    An importer's change (`in_app=False`) only moves `updated_at`."""
     now = timezone.now()
-    Trip.objects.filter(pk=trip.pk).update(edited_in_app_at=now, updated_at=now)
+    if in_app:
+        Trip.objects.filter(pk=trip.pk).update(edited_in_app_at=now, updated_at=now)
+    else:
+        Trip.objects.filter(pk=trip.pk).update(updated_at=now)
 
 
 def parse_bbox(value: str) -> list[Polygon]:
@@ -387,7 +400,16 @@ def _next_sequence(trip: Trip) -> int:
     return (current or 0) + 1
 
 
-def create_leg(user, trip: Trip, kind: str, data: dict[str, Any]) -> Leg:
+def create_leg(
+    user,
+    trip: Trip,
+    kind: str,
+    data: dict[str, Any],
+    *,
+    in_app: bool = True,
+    provenance: dict[str, Any] | None = None,
+) -> Leg:
+    """`provenance`: import-only columns (`sheet_key`, `import_batch_id`), never from the API."""
     contribution = kind == "contribution"
     leg = Leg(
         trip=trip,
@@ -396,32 +418,33 @@ def create_leg(user, trip: Trip, kind: str, data: dict[str, Any]) -> Leg:
         participant_scope=(
             Leg.ParticipantScope.AUTHOR if contribution else Leg.ParticipantScope.TRIP
         ),
+        **(provenance or {}),
     )
     _apply_leg_fields(user, leg, data)
     with guarded_write():
         leg.sequence = _next_sequence(trip)
         leg.save()
     if not contribution:
-        touch(trip)
+        touch(trip, in_app=in_app)
     return leg
 
 
-def update_leg(user, leg: Leg, data: dict[str, Any]) -> Leg:
+def update_leg(user, leg: Leg, data: dict[str, Any], *, in_app: bool = True) -> Leg:
     _apply_leg_fields(user, leg, data)
     with guarded_write():
         leg.save()
     if not leg.is_contribution:
-        touch(leg.trip)
+        touch(leg.trip, in_app=in_app)
     return leg
 
 
-def delete_leg(leg: Leg) -> None:
+def delete_leg(leg: Leg, *, in_app: bool = True) -> None:
     with guarded_write():
         deleted, _ = Leg.objects.filter(pk=leg.pk).delete()
     if not deleted:
         raise TripError(403, "not allowed")
     if not leg.is_contribution:
-        touch(leg.trip)
+        touch(leg.trip, in_app=in_app)
 
 
 # --- Participants ----------------------------------------------------------------------------
@@ -464,12 +487,12 @@ def _base_people(leg: Leg, trip_people: set[int], authors: dict[int, int | None]
     return trip_people
 
 
-def add_participant(user, trip: Trip, person: Person) -> TripParticipant:
+def add_participant(user, trip: Trip, person: Person, *, in_app: bool = True) -> TripParticipant:
     if TripParticipant.objects.filter(trip=trip, person=person).exists():
         raise TripError(409, "already a participant")
     with guarded_write():
         row = TripParticipant.objects.create(trip=trip, person=person, added_by_id=user.pk)
-    touch(trip)
+    touch(trip, in_app=in_app)
     return row
 
 
@@ -497,7 +520,9 @@ def set_consent(trip: Trip, person: Person, consent: bool) -> TripParticipant:
     return row
 
 
-def set_leg_participation(user, leg: Leg, person: Person, on_leg: bool) -> None:
+def set_leg_participation(
+    user, leg: Leg, person: Person, on_leg: bool, *, in_app: bool = True
+) -> None:
     """Store only the difference from the leg's base set: an include or exclude override when
     the wish differs from the base, nothing when it matches."""
     trip_people = set(
@@ -518,7 +543,7 @@ def set_leg_participation(user, leg: Leg, person: Person, on_leg: bool) -> None:
                 leg=leg, person=person, include=on_leg, set_by_id=user.pk
             )
     if policy.can_edit_trip_core(user, leg.trip):
-        touch(leg.trip)
+        touch(leg.trip, in_app=in_app)
 
 
 def remove_participant_if_present(trip: Trip, person: Person) -> bool:
@@ -534,7 +559,7 @@ def remove_participant_if_present(trip: Trip, person: Person) -> bool:
 # --- Leg order -------------------------------------------------------------------------------
 
 
-def reorder_legs(trip: Trip, leg_ids: list[int]) -> None:
+def reorder_legs(trip: Trip, leg_ids: list[int], *, in_app: bool = True) -> None:
     """Renumber every leg of the trip in the given order (1, 2, ...). Contributed legs are
     otherwise only their author's to change, so this goes through app.reorder_legs, which
     checks the caller is a core editor and changes nothing but the order."""
@@ -543,7 +568,7 @@ def reorder_legs(trip: Trip, leg_ids: list[int]) -> None:
         raise invalid("list every leg of the trip exactly once")
     with guarded_write(), connection.cursor() as cursor:
         cursor.execute("SELECT app.reorder_legs(%s, %s::bigint[])", [trip.pk, leg_ids])
-    touch(trip)
+    touch(trip, in_app=in_app)
 
 
 # --- Contributions: shared helpers -----------------------------------------------------------
@@ -699,7 +724,8 @@ def _new_place(user, data: dict[str, Any]) -> Place:
 
 def _apply_stop(user, stop: Stop, data: dict[str, Any]) -> None:
     _require(data, {"kind"})
-    for field in {"kind", "arrive_utc", "depart_utc"} & data.keys():
+    _require(data, {"time_precision"})
+    for field in {"kind", "arrive_utc", "depart_utc", "time_precision"} & data.keys():
         setattr(stop, field, data[field])
     if "tz" in data:
         stop.tz = data["tz"] or ""
@@ -728,27 +754,35 @@ def _apply_stop(user, stop: Stop, data: dict[str, Any]) -> None:
         raise invalid("a stop needs a place_id or a new place")
 
 
-def create_stop(user, trip: Trip, data: dict[str, Any]) -> Stop:
-    stop = Stop(trip=trip, author_id=user.pk)
+def create_stop(
+    user,
+    trip: Trip,
+    data: dict[str, Any],
+    *,
+    in_app: bool = True,
+    provenance: dict[str, Any] | None = None,
+) -> Stop:
+    """`provenance`: import-only columns (`sheet_key`, `import_batch_id`), never from the API."""
+    stop = Stop(trip=trip, author_id=user.pk, **(provenance or {}))
     with guarded_write():
         _apply_stop(user, stop, data)
         stop.save()
-    touch(trip)
+    touch(trip, in_app=in_app)
     return stop
 
 
-def update_stop(user, stop: Stop, data: dict[str, Any]) -> Stop:
+def update_stop(user, stop: Stop, data: dict[str, Any], *, in_app: bool = True) -> Stop:
     with guarded_write():
         _apply_stop(user, stop, data)
         stop.save()
-    touch(stop.trip)
+    touch(stop.trip, in_app=in_app)
     return stop
 
 
-def delete_stop(stop: Stop) -> None:
+def delete_stop(stop: Stop, *, in_app: bool = True) -> None:
     """Legs and photos that pointed at the stop keep going without it (SET NULL)."""
     delete_row(Stop, stop.pk)
-    touch(stop.trip)
+    touch(stop.trip, in_app=in_app)
 
 
 # --- Photos (metadata only; uploads and files are T31) ---------------------------------------

@@ -57,11 +57,14 @@ class ImportBatch(models.Model):
         JETLOG = "jetlog", "JetLog"
         BYAIR = "byair", "byAir"
         GPX = "gpx", "GPX"
+        TRIP_SHEET = "trip_sheet", "Trip spreadsheet"
 
     class Status(models.TextChoices):
         QUEUED = "queued", "Queued"
         PROCESSING = "processing", "Processing"
+        PREVIEW = "preview", "Parsed; waiting for the user to commit"
         DONE = "done", "Done"
+        DISCARDED = "discarded", "Discarded"
         DUPLICATE = "duplicate", "Identical file already imported"
         UNSUPPORTED = "unsupported", "No importer for this format yet"
         FAILED = "failed", "Failed"
