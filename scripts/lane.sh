@@ -17,9 +17,9 @@ usage() {
   cat <<'HELP'
 ./dev lane new <item>          create the lane (main checkout only)
 ./dev lane rm <item> [--force] stop its stack, delete its volumes, image tag and worktree, and
-                               delete branch item/<item> once merged into main. Refuses an
-                               unmerged branch or uncommitted changes unless --force (which
-                               keeps the branch).
+                               delete branch item/<item> (local and on origin) once merged
+                               into main, also after a rebase. Refuses an unmerged branch or
+                               uncommitted changes unless --force (which keeps the branch).
 ./dev lane list                lanes, their numbers and port blocks
 HELP
 }
@@ -119,6 +119,16 @@ lane $n ready: $path (branch $branch, compose project $LANE_PROJECT_PREFIX$item)
 EOF
 }
 
+# Merged into main: either an ancestor of it, or (after a rebase onto main that wasn't written back
+# to this branch) every commit has a patch-equivalent one in main (`git cherry` lists none with +).
+branch_merged() {  # branch
+  git -C "$MAIN_ROOT" show-ref --verify --quiet "refs/heads/$1" || return 1
+  git -C "$MAIN_ROOT" merge-base --is-ancestor "$1" main 2>/dev/null && return 0
+  local cherry
+  cherry="$(git -C "$MAIN_ROOT" cherry main "$1" 2>/dev/null)" || return 1
+  ! grep -q '^+' <<<"$cherry"
+}
+
 cmd_rm() {
   local item="" force=0 a
   for a in "$@"; do
@@ -135,7 +145,7 @@ cmd_rm() {
   [ "$(env_file_value "$path/.env" TH_LANE_ITEM)" = "$item" ] || die "$path/.env doesn't name lane $item"
 
   local merged=0
-  if git -C "$MAIN_ROOT" merge-base --is-ancestor "$branch" main 2>/dev/null; then merged=1; fi
+  if branch_merged "$branch"; then merged=1; fi
   if [ "$merged" = 0 ] && [ "$force" = 0 ]; then
     die "$branch isn't merged into main (use --force to remove the lane anyway; the branch is kept)"
   fi
@@ -153,7 +163,13 @@ cmd_rm() {
     git -C "$MAIN_ROOT" worktree remove "$path"
   fi
   if [ "$merged" = 1 ]; then
-    git -C "$MAIN_ROOT" branch -d "$branch"
+    # -D, not -d: branch_merged already checked main, and -d would compare with the branch's
+    # upstream, which still holds the pre-rebase commits after the orchestrator's rebase.
+    git -C "$MAIN_ROOT" branch -D "$branch"
+    if git -C "$MAIN_ROOT" ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+      git -C "$MAIN_ROOT" push origin --delete "$branch" ||
+        echo "warning: couldn't delete origin/$branch (git push origin --delete $branch)"
+    fi
   else
     echo "kept unmerged branch $branch (git branch -D $branch deletes it)"
   fi
