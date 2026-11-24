@@ -55,11 +55,22 @@ env_file_value() { grep -E "^$2=" "$1" 2>/dev/null | head -1 | cut -d= -f2- || t
 
 LANE_ITEM=""
 LANE_NUMBER=""
+LANE_IMAGE_TAG=""
 if in_worktree; then
   LANE_ITEM="$(env_file_value "$REPO_ROOT/.env" TH_LANE_ITEM)"
   LANE_NUMBER="$(env_file_value "$REPO_ROOT/.env" TH_LANE)"
   DEV_PROJECT="$LANE_PROJECT_PREFIX${LANE_ITEM:-unset}"
+  LANE_IMAGE_TAG="lane-${LANE_ITEM:-unset}"
 fi
+
+# Images a lane builds carry its tag (D-121), so `./dev build` or `./dev up --build` in a lane
+# never retags the main checkout's images (travel-history-backup:latest and the rest).
+lane_image_tags() {  # item -> image references
+  local repo
+  for repo in travel-history-backend-dev travel-history-backend travel-history-backup; do
+    echo "$repo:lane-$1"
+  done
+}
 
 # Port block of lane n: web 8800+10(n-1), mock OIDC +1, Mailpit +2, Vite 5180+10(n-1), the
 # e2e browser's debugging port 9222+n. (8790 belongs to another app on this host.)
@@ -122,9 +133,16 @@ env_from_example() {  # example dest [KEY=value ...]
 
 # The project name is explicit, so a stray COMPOSE_PROJECT_NAME can't point dev commands
 # at production (or a lane at the main dev stack).
+# In a lane the image tags come from the lane's name, not its .env (older lanes' .env files have
+# no TRAVEL_IMAGE_TAG), and the shell's values override the file's. The main checkout passes
+# nothing, so its tags and rendered config are what its .env says.
 dev_compose() {
-  if in_worktree; then lane_check; fi
-  docker compose -p "$DEV_PROJECT" --project-directory "$REPO_ROOT" \
+  local tags=()
+  if in_worktree; then
+    lane_check
+    tags=(TRAVEL_IMAGE_TAG="$LANE_IMAGE_TAG" TRAVEL_DEV_IMAGE_TAG="$LANE_IMAGE_TAG")
+  fi
+  env "${tags[@]}" docker compose -p "$DEV_PROJECT" --project-directory "$REPO_ROOT" \
     -f "$REPO_ROOT/compose.yaml" -f "$REPO_ROOT/compose.dev.yaml" "$@"
 }
 

@@ -20,7 +20,7 @@ case "$stack" in
     rt="$REPO_ROOT/var/restore-test"
     init_dir="$REPO_ROOT/db/init"
     dev_compose build backup >/dev/null
-    img=travel-history-backup:latest
+    img="travel-history-backup:${LANE_IMAGE_TAG:-latest}"
     ;;
   prod)
     stack_compose() { prod_compose "$@"; }

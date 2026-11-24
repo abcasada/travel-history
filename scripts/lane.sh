@@ -55,8 +55,10 @@ lane_compose() {  # path project args...
     "$LANE_PROJECT_PREFIX"?*) ;;
     *) die "refusing to touch compose project '$project': not a lane" ;;
   esac
-  docker compose -p "$project" --project-directory "$path" \
-    -f "$path/compose.yaml" -f "$path/compose.dev.yaml" --profile tools "$@"
+  local tag="lane-${project#"$LANE_PROJECT_PREFIX"}"
+  TRAVEL_IMAGE_TAG="$tag" TRAVEL_DEV_IMAGE_TAG="$tag" docker compose -p "$project" \
+    --project-directory "$path" -f "$path/compose.yaml" -f "$path/compose.dev.yaml" \
+    --profile tools "$@"
 }
 
 cmd_new() {
@@ -88,7 +90,8 @@ cmd_new() {
     TRAVEL_BULK_DIR=./var/bulk TRAVEL_LAN_BIND=127.0.0.1 TRAVEL_DEV_HOST=localhost \
     TRAVEL_WEB_PORT="$web" TRAVEL_OIDC_PORT="$oidc" TRAVEL_MAIL_PORT="$mail" \
     TRAVEL_VITE_PORT="$vite" TRAVEL_CDP_PORT="$cdp" \
-    TRAVEL_DEV_IMAGE_TAG="lane-$item" TRAVEL_DB_SHARED_BUFFERS=256MB \
+    TRAVEL_DEV_IMAGE_TAG="lane-$item" TRAVEL_IMAGE_TAG="lane-$item" \
+    TRAVEL_DB_SHARED_BUFFERS=256MB \
     OIDC_ISSUER="http://localhost:$oidc/default" \
     DJANGO_CSRF_TRUSTED_ORIGINS="http://localhost:$web,http://localhost:$vite" \
     TRAVEL_PUBLIC_BASE_URL="http://localhost:$web" \
@@ -156,7 +159,10 @@ cmd_rm() {
 
   lane_compose "$path" "$project" down -v --remove-orphans
   docker rm -f "travel-e2e-chrome-$item" >/dev/null 2>&1 || true
-  docker image rm "travel-history-backend-dev:lane-$item" >/dev/null 2>&1 || true
+  local img
+  while IFS= read -r img; do
+    docker image rm "$img" >/dev/null 2>&1 || true
+  done < <(lane_image_tags "$item")
   # Files the containers wrote under var/ belong to this user (APP_UID), so git can remove them.
   if [ "$force" = 1 ]; then
     git -C "$MAIN_ROOT" worktree remove --force "$path"

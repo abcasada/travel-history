@@ -135,7 +135,9 @@ services:
   # Nightly encrypted backups into the outbox the NAS pulls (PLAN.md §22). Connects as the owner
   # role so the dump is complete (the owner is not subject to row-level security).
   backup:
-    image: travel-history-backup:latest
+    # Same tag variable as the backend: unset (latest) in the main checkout's dev stack, the
+    # lane's own tag in a worktree lane (scripts/stack.sh, D-121), the release commit in production.
+    image: travel-history-backup:${TRAVEL_IMAGE_TAG:-latest}
     build: ./backup
     user: "${APP_UID:-1000}:${APP_GID:-1000}"
     environment:

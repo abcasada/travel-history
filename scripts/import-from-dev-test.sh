@@ -19,8 +19,8 @@ cd "$REPO_ROOT"
 net=travel-import-test
 devc=travel-import-test-dev
 prodc=travel-import-test-prod
-img=travel-history-backend-dev:latest
-backup_img=travel-history-backup:latest
+img="travel-history-backend-dev:${LANE_IMAGE_TAG:-latest}"
+backup_img="travel-history-backup:${LANE_IMAGE_TAG:-latest}"
 tmp="$REPO_ROOT/var/import-test"
 pw="$(random_secret)"
 secret="$(random_secret 64)"
