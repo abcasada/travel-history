@@ -2,6 +2,7 @@
 
 Handoff note for the next session or subagent. Keep it short; overwrite, don't append history.
 
+- **P1 in progress (2026-11-23):** done and committed: the worktree hook fix, `./dev lane new|rm|list` (scripts/lane.sh, stack.sh), worktree refusals, per-lane e2e ports, `./dev load-reference`, docs/development.md and the CLAUDE.md section. Proof runs underway: lanes `p1-proof-a` and `p1-proof-b` (tear them down with `./dev lane rm <item>` if a session ends mid-proof).
 - **2026-11-23: Adam approved parallel lanes (D-98, ORCHESTRATION.md "Parallel lanes").** Next: dispatch the planner to add footprints and lane pairings to ROADMAP.md, then P1 [H] parallel readiness (alone, main checkout). Lanes start only after P1 is verified. Lane builders write `NEXT-<item>.md` on their branch; fold it in here at merge.
 - **Then:** 40c dispatch 1 [X] (Authentik sign-in build + rebind_identity) runs alone in the main checkout (it touches real data at the handover); it needs Adam's Authentik app/provider and OIDC values in `~/apps/travel-history-prod/.env.prod` to finish. Open gate: AGE_RECIPIENT for the G-2 backup.
 - **For 40c:** the final copy is `./dev prod import-from-dev` (deploy the commit dev runs first: migrations must match); it copies var/bulk/reference too. The dev DB has `history_rawfile` rows 1–2 (synthetic, dev-member's) whose files were lost with the HDD, so dev `./dev restore-test` fails at step 4; the copy prunes them. Batch 33's raw file is `var/bulk/raw/6/24/…`.
