@@ -21,6 +21,8 @@ CHECKED_AT = "oidc_checked_at"
 # Not re-checked: the callback renews the stamp itself (and needs the session's sign-in state),
 # and signing out needs the stored ID token for the provider's end-session redirect.
 EXEMPT_PATHS = frozenset({"/auth/callback", "/auth/logout"})
+# The SPA matches this sentence exactly to sign in again at once (frontend/src/auth/recheck.ts,
+# D-120): change both together.
 DUE_DETAIL = "sign in again: the session needs a fresh check with the sign-in provider"
 
 

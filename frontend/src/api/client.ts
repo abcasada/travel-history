@@ -2,6 +2,7 @@
  * The only way the frontend talks to the backend: same-origin requests with the session cookie,
  * the CSRF token on unsafe methods, and a typed error. Generated API hooks call `apiFetch`.
  */
+import { isRecheckResponse, redirectForRecheck } from "../auth/recheck";
 
 export class ApiError extends Error {
   constructor(
@@ -33,7 +34,12 @@ export async function apiFetch<T>(url: string, options: RequestInit = {}): Promi
   const response = await fetch(url, { ...options, method, headers, credentials: "same-origin" });
   const text = await response.text();
   const body: unknown = text ? JSON.parse(text) : undefined;
-  if (!response.ok) throw new ApiError(response.status, body);
+  if (!response.ok) {
+    // The hourly provider re-check (D-108): sign in again at once, silently while the provider's
+    // own session lasts, instead of waiting for the user to find the Sign in screen (D-120).
+    if (isRecheckResponse(response.status, body)) redirectForRecheck();
+    throw new ApiError(response.status, body);
+  }
   return body as T;
 }
 

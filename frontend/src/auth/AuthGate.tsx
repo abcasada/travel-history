@@ -3,6 +3,7 @@ import { createContext, useContext } from "react";
 import { ApiError, signInUrl } from "../api/client";
 import { type MeOut, useGetMe } from "../api/generated";
 import { PrivacyNotice } from "./PrivacyNotice";
+import { recheckRedirecting } from "./recheck";
 
 const MeContext = createContext<MeOut | null>(null);
 
@@ -19,7 +20,11 @@ export function AuthGate({ children }: { children: ReactNode }) {
     return <Centered>Loading…</Centered>;
   }
   if (me.isError) {
-    if (me.error instanceof ApiError && me.error.status === 401) return <SignIn />;
+    if (me.error instanceof ApiError && me.error.status === 401) {
+      // The hourly re-check already sent this page to sign-in (recheck.ts); don't offer a button.
+      if (recheckRedirecting()) return <Centered>Signing in again…</Centered>;
+      return <SignIn />;
+    }
     return <Centered>Couldn't reach the server. Try again shortly.</Centered>;
   }
   if (!me.data.privacy_notice_ack_at) return <PrivacyNotice />;

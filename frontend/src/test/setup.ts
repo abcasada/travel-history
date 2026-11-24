@@ -1,6 +1,7 @@
 import "@testing-library/jest-dom/vitest";
 import { createElement, type ReactNode } from "react";
 import { afterEach, beforeEach, vi } from "vitest";
+import { resetRecheckForTests } from "../auth/recheck";
 import { installMatchMedia, setDesktopMedia } from "./media";
 
 // MapLibre needs WebGL, which jsdom lacks; tests check everything around the map.
@@ -51,6 +52,9 @@ globalThis.ResizeObserver ??= ResizeObserverStub as unknown as typeof ResizeObse
 
 beforeEach(() => {
   window.localStorage.clear();
+  window.sessionStorage.clear();
+  // jsdom can't navigate; tests that care pass their own spy.
+  resetRecheckForTests(() => {});
   setDesktopMedia(true);
 });
 
