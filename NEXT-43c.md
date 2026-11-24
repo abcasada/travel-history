@@ -9,4 +9,4 @@ re-check (D-108, D-120).
   D-122. Tests in tests/test_authentik.py; e2e/recheck.mjs gains a save within the grace;
   golive-smoke F-3 checks a write in the grace and a write past it; docs (auth.md §7.2/§7.7,
   go-live.md, development.md, PLAN index).
-- **Status:** in progress.
+- **Status:** backend, tests, smoke and e2e script committed; running `./dev e2e --recheck` (lane .env has `OIDC_SESSION_RECHECK_SECONDS=15` temporarily: remove it if found), then the local go-live smoke, then docs (D-122).
