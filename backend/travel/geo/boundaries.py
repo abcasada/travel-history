@@ -1,5 +1,5 @@
 """Natural Earth admin-0/admin-1 and US Census county boundaries (milestone 6.1, item 14a-1;
-D-107): the polygons offline reverse geocoding (travel/geo/reverse.py) and the territory
+D-112): the polygons offline reverse geocoding (travel/geo/reverse.py) and the territory
 statistics (statistics.md §15.2) look points up in.
 
 Natural Earth comes from its official GitHub repository, pinned to the v5.1.2 release commit

@@ -200,7 +200,7 @@ samples):
 
 ### 21.6 Measured: boundaries and reverse geocoding (2026-11-24, work-order item 14a-1)
 
-`./dev manage load_boundaries` (D-107) in lane 1 on the Xeon W3565, lane stack up, gazetteer
+`./dev manage load_boundaries` (D-112) in lane 1 on the Xeon W3565, lane stack up, gazetteer
 already loaded; the main checkout's stack and lane 2 running beside it.
 
 | What | Measured |

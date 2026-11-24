@@ -1,5 +1,5 @@
 """Load Natural Earth admin-0/admin-1 and US Census county boundaries (milestone 6.1, item
-14a-1, D-107). Runs as the owner role.
+14a-1, D-112). Runs as the owner role.
 
 ./dev manage load_boundaries                   # pinned files (cached copy or verified download)
 ./dev manage load_boundaries --latest          # newest upstream files, checksums recorded

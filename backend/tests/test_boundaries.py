@@ -1,4 +1,4 @@
-"""Boundary loaders and offline reverse geocoding (item 14a-1, D-107): Natural Earth and Census
+"""Boundary loaders and offline reverse geocoding (item 14a-1, D-112): Natural Earth and Census
 loaders on SYNTHETIC boxes, pinned downloads with a generic User-Agent, and the "near <town>"
 labels from the boundaries plus the gazetteer, read as the app role."""
 

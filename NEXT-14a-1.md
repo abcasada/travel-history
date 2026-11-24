@@ -8,7 +8,7 @@ Handoff for item 14a-1 (lane 1, branch `item/14a-1`). Fold into NEXT.md at merge
   (adds `ne_id`, `adm0_a3`), `travel/geo/reverse.py` `reverse_geocode(lon, lat)` with labels
   "near <town>, <state>, <country>". `./dev load-reference` now also runs `load_boundaries`.
   Tests: `backend/tests/test_boundaries.py` (SYNTHETIC boxes in `tests/fixtures/boundaries/`).
-  Decision D-107 (42a had not taken it; if 42a lands a D-107 first, renumber this one).
+  Decision D-112 (42a had not taken it; if 42a lands a D-112 first, renumber this one).
   Docs: statistics.md §15.1, data-model.md §5.8, licenses.md, facts register (two rows),
   resource-budget.md §21.6, phases.md 6.1, PLAN.md decision line.
 - **Real loads in the lane:** 258 / 4,596 / 3,235 rows, ~25 s from cache, 94 MB of DB, 66 MB

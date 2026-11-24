@@ -174,7 +174,7 @@ Frontend conventions: [docs/design/frontend-patterns.md](docs/design/frontend-pa
 - D-104 Go-live commands `rebind_identity` (G-3) and `link_person`: owner role, ids only (never email), dry run unless `--execute`, one transaction, audit log; refuse every other case
 - D-105 Go-live: travel.* and trips.* routes to production `web` (8784), tracker path rule retired, `ingest` stays stopped; scope flip last; `./dev golive-smoke local` (throwaway, scope `all`) and through Cloudflare
 - D-106 Drag editor polish: expired proposals re-proposed (verified only if the same line comes back), anchor popup, touch (hold the line to grab), `Route.sources` in the version list
-- D-107 Boundaries + offline reverse geocoding: Natural Earth v5.1.2 (commit + SHA-256) and Census 2025 counties (URL + SHA-256), upsert by `ne_id`/GEOID, polygons repaired; "near <town>, <its state>, <its country>" within 25 km by distance / log population
+- D-112 Boundaries + offline reverse geocoding: Natural Earth v5.1.2 (commit + SHA-256) and Census 2025 counties (URL + SHA-256), upsert by `ne_id`/GEOID, polygons repaired; "near <town>, <its state>, <its country>" within 25 km by distance / log population
 
 ## 25. Open questions (for Adam, answer whenever — nothing is blocked on these)
 

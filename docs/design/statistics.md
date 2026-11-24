@@ -21,7 +21,7 @@ All computed locally in PostGIS; no external geocoder (no Nominatim/Photon).
   label is "<region>, <country>" from the boundaries, at sea empty. Lodging and destination
   stops get `name` from the user or the nearest place (item 14a-2).
 - **Code:** loaders `travel/geo/boundaries.py` (`./dev manage load_boundaries`, also in
-  `./dev load-reference`; pins and keys in D-107); service
+  `./dev load-reference`; pins and keys in D-112); service
   `travel.geo.reverse.reverse_geocode(lon, lat)` → country (ISO alpha-2), region (ISO 3166-2
   and its GeoNames id), county (GEOID), nearby place with distance, label. Runs as the app role
   (the `geo_` tables are read-only to it). Measured sizes and timings: resource-budget.md §21.6.

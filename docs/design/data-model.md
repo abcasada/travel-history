@@ -136,7 +136,7 @@ and by a trigger.
 | `airline_code_history` | bundled (`geo/data/airline_code_overrides.csv`) | `code`, `airline`, `valid_from`, `valid_to`: reused IATA airline codes by date (D-88) |
 | `airline` | OpenFlights `airlines.dat` | keeps defunct (`active = N`) airlines |
 | `aircraft_type` | OpenFlights `planes.dat` | name, IATA, ICAO |
-| `country`, `region` | Natural Earth admin-0 / admin-1 (10m, v5.1.2) | upsert key `ne_id`; country `iso_a2` (ISO_A2_EH, empty for -99), `iso_a3`, `adm0_a3`; region `iso_3166_2`, `country_iso_a2`, `adm1_code`, `geonames_id` (gn_id); MultiPolygon, GiST (item 14a-1, D-107) |
+| `country`, `region` | Natural Earth admin-0 / admin-1 (10m, v5.1.2) | upsert key `ne_id`; country `iso_a2` (ISO_A2_EH, empty for -99), `iso_a3`, `adm0_a3`; region `iso_3166_2`, `country_iso_a2`, `adm1_code`, `geonames_id` (gn_id); MultiPolygon, GiST (item 14a-1, D-112) |
 | `us_county` | Census cartographic boundary file (2025, 500k) | GEOID (upsert key), name, NAMELSAD, state FIPS + USPS code, MultiPolygon, GiST |
 | `geonames_place` | GeoNames `cities500` + US populated places below 500 (+ admin codes, copied admin-1 and country names, folded name) | city search for stops (item 14); names for stops via nearest-place lookup (14a) |
 | `geonames_country`, `geonames_admin1` | GeoNames `countryInfo.txt`, `admin1CodesASCII.txt` | names shown with places |

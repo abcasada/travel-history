@@ -1,4 +1,4 @@
-"""Offline reverse geocoding (statistics.md §15.1, milestone 6.1, D-20, D-107): which country,
+"""Offline reverse geocoding (statistics.md §15.1, milestone 6.1, D-20, D-112): which country,
 state/region and US county a point is in, and the town it is near, from the boundary tables
 and the GeoNames gazetteer in PostGIS. Nothing leaves the server (rule 13).
 
@@ -79,7 +79,7 @@ def _envelopes(lon: float, lat: float, metres: float) -> list[tuple[float, float
 def nearest_place(lon: float, lat: float, radius_m: float = PLACE_RADIUS_M) -> NearbyPlace | None:
     """The town a point is near: among GeoNames places within `radius_m`, the lowest
     distance / (1 + log10(1 + population)), so a city a little farther away beats a hamlet
-    next door, but a village beats a city twice the radius off (D-107)."""
+    next door, but a village beats a city twice the radius off (D-112)."""
     boxes = _envelopes(lon, lat, radius_m)
     in_boxes = " OR ".join(["p.point && ST_MakeEnvelope(%s, %s, %s, %s, 4326)"] * len(boxes))
     params: list[object] = [lon, lat]
