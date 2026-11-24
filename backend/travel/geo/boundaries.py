@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 
-from django.contrib.gis.gdal import DataSource
+from django.contrib.gis.gdal import CoordTransform, DataSource, SpatialReference
 from django.contrib.gis.geos import GEOSGeometry, MultiPolygon, Polygon
 from django.db import connection, transaction
 
@@ -210,15 +210,22 @@ def _features(path: Path) -> Iterator[tuple[dict[str, object], MultiPolygon]]:
     source = DataSource(_ogr_path(path), encoding="utf-8")
     layer = source[0]
     fields = list(layer.fields)
+    wgs84 = SpatialReference(4326)
+    # One transformation for the whole layer (the Census file is NAD83): building it per
+    # feature, as GEOSGeometry.transform(4326) does, took most of the load time.
+    to_wgs84 = (
+        CoordTransform(layer.srs, wgs84)
+        if layer.srs is not None and layer.srs.srid not in (None, 4326)
+        else None
+    )
     for feature in layer:
         ogr = feature.geom
         if ogr is None:
             continue
+        if to_wgs84 is not None:
+            ogr.transform(to_wgs84)
         geom: GEOSGeometry = ogr.geos
-        if geom.srid is None:
-            geom.srid = 4326
-        if geom.srid != 4326:
-            geom.transform(4326)
+        geom.srid = 4326
         if isinstance(geom, Polygon):
             geom = MultiPolygon(geom, srid=4326)
         if not isinstance(geom, MultiPolygon):

@@ -77,7 +77,7 @@ Status markers: ✅ done · 🔄 in progress · ⏳ not started · ⛔ blocked o
 
 | Milestone | Acceptance criteria |
 |---|---|
-| 6.1 Boundaries + geocoding 🔄 | Natural Earth, Census counties, GeoNames loaded; stops named offline. GeoNames part ✅ 2026-11-18 (item 14, D-94): `load_gazetteer` (cities500 + US populated places, country and admin-1 names; pinned snapshot + SHA-256), `GET /reference/places` (prefix, accents folded, by population, ", state" qualifier), "find a city" in the stop editor of both shells. Natural Earth, Census and reverse geocoding: item 14a |
+| 6.1 Boundaries + geocoding 🔄 | Natural Earth, Census counties, GeoNames loaded; stops named offline. GeoNames part ✅ 2026-11-18 (item 14, D-94): `load_gazetteer` (cities500 + US populated places, country and admin-1 names; pinned snapshot + SHA-256), `GET /reference/places` (prefix, accents folded, by population, ", state" qualifier), "find a city" in the stop editor of both shells. Boundaries and reverse geocoding ✅ 2026-11-24 (item 14a-1, D-107): `load_boundaries` (Natural Earth 1:10m admin-0/1 v5.1.2 pinned to the release commit + SHA-256, Census 2025 counties pinned by SHA-256; upsert by `ne_id`/GEOID, polygons repaired; also in `./dev load-reference`), `travel.geo.reverse.reverse_geocode` ("near <town>, <state>, <country>" within 25 km; country/region/county by containment, 2 km coastal slack; ~9 ms median). Stops named offline in `trips` and the stop editor: item 14a-2 |
 | 6.2 Territories | Countries/regions/counties visited, "through" vs "stopped in"; flights count airports only |
 | 6.3 Distances + flight stats | Miles by vehicle, mode, year from saved geometry (great-circle for flights); airports, airlines, aircraft |
 

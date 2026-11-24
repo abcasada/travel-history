@@ -197,3 +197,22 @@ samples):
 - **Loading the reference data into a lane** (`./dev load-reference`, 385,097 places from the
   copied cache) takes about 4 min.
 
+
+### 21.6 Measured: boundaries and reverse geocoding (2026-11-24, work-order item 14a-1)
+
+`./dev manage load_boundaries` (D-107) in lane 1 on the Xeon W3565, lane stack up, gazetteer
+already loaded; the main checkout's stack and lane 2 running beside it.
+
+| What | Measured |
+|---|---|
+| Downloads cached in `/bulk/reference` | 66 MB: Natural Earth admin-0 GeoJSON 13.3 MB, admin-1 40.7 MB; Census `cb_2025_us_county_500k.zip` 11.8 MB (shapefile read straight from the zip) |
+| Rows | 258 countries, 4,596 states and provinces, 3,235 US counties (and equivalents, incl. Puerto Rico and the island areas) |
+| DB | `geo_country` 15 MB, `geo_region` 42 MB, `geo_uscounty` 37 MB (94 MB incl. GiST and TOAST). Lane DB 260 MB → 355 MB |
+| Load time | about 25 s for all three from the cache (admin-0 3 s, admin-1 17 s, counties 4 s), plus ~10 s container start; re-runs upsert in the same time. First run with downloads ~95 s (counties then took 60 s, fixed by one coordinate transformation per layer) |
+| Peak memory (cgroup `memory.peak`) | loader container 247 MiB; DB container 1,181 MiB incl. page cache; host never below 5.7 GiB available |
+| Reverse geocoding | 300 random points (US and Europe): median 9 ms, p95 25 ms, max 130 ms |
+
+Spot checks: downtown Wichita → "near Wichita, Kansas, United States" (Sedgwick County);
+Santa Monica pier (just off the 1:10m coast) → US-CA, Los Angeles County; Midtown Manhattan →
+"near New York City, New York, United States"; central Tokyo → "near Chūō, Tokyo, Japan" (a
+ward GeoNames lists as a populated place); mid-Atlantic → empty label.
