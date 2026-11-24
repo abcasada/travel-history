@@ -28,6 +28,14 @@ export const PAGE_SIZE = 200;
 /** The matching trips so far: the total count and every loaded page's items, newest first. */
 type Loaded = { count: number; items: TripOut[] };
 
+// Module-level, so React Query keeps the flattened result (and the row ids) stable between renders.
+function flatten(data: { pages: TripPageOut[] }): Loaded {
+  return {
+    count: data.pages.at(-1)?.count ?? 0,
+    items: data.pages.flatMap((page) => page.items),
+  };
+}
+
 /**
  * The list's pages. The key starts with the generated `listTrips` key, so `trips/cache.ts`
  * refreshes these pages with every other trip list after a change.
@@ -43,10 +51,7 @@ function useTripPages(params: ReturnType<typeof apiParams>) {
       const loaded = pages.reduce((n, page) => n + page.items.length, 0);
       return last.items.length && loaded < last.count ? loaded : undefined;
     },
-    select: (data): Loaded => ({
-      count: data.pages.at(-1)?.count ?? 0,
-      items: data.pages.flatMap((page) => page.items),
-    }),
+    select: flatten,
     placeholderData: keepPreviousData,
   });
 }
