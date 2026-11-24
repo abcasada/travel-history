@@ -2,9 +2,11 @@
 # server and a `tools` container, and binds dev ports to TRAVEL_LAN_BIND (the server's LAN
 # address) so the stack is reachable over LAN/WireGuard only — never from the internet. The
 # production stack is a separate project (compose.prod.yaml, ./dev prod …) with its own database.
+# Worktree lanes (./dev lane new, D-98) set their own image tag and host ports in their .env;
+# the defaults below are the main checkout's.
 
 x-dev-backend: &dev-backend
-  image: travel-history-backend-dev:latest
+  image: travel-history-backend-dev:${TRAVEL_DEV_IMAGE_TAG:-latest}
   build:
     context: .
     dockerfile: backend/Dockerfile
@@ -21,8 +23,8 @@ services:
     <<: *dev-backend
     command: ["python", "manage.py", "runserver", "0.0.0.0:8000"]
     ports:
-      - "127.0.0.1:8780:8000"
-      - "${TRAVEL_LAN_BIND:-127.0.0.1}:8780:8000"
+      - "127.0.0.1:${TRAVEL_WEB_PORT:-8780}:8000"
+      - "${TRAVEL_LAN_BIND:-127.0.0.1}:${TRAVEL_WEB_PORT:-8780}:8000"
     environment:
       DJANGO_DEBUG: "true"
       DJANGO_SECURE_COOKIES: "false"   # plain HTTP on the LAN; production is HTTPS-only
@@ -82,7 +84,7 @@ services:
     volumes:
       - ./devstack/oidc/config.json:/config/config.json:ro
     ports:
-      - "${TRAVEL_LAN_BIND:-127.0.0.1}:8781:8080"
+      - "${TRAVEL_LAN_BIND:-127.0.0.1}:${TRAVEL_OIDC_PORT:-8781}:8080"
     networks: [egress]
     user: "${APP_UID:-1000}:${APP_GID:-1000}"
     cap_drop: [ALL]
@@ -93,7 +95,7 @@ services:
     image: axllent/mailpit:v1.29
     user: "${APP_UID:-1000}:${APP_GID:-1000}"
     ports:
-      - "${TRAVEL_LAN_BIND:-127.0.0.1}:8782:8025"
+      - "${TRAVEL_LAN_BIND:-127.0.0.1}:${TRAVEL_MAIL_PORT:-8782}:8025"
     networks: [internal, egress]
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
@@ -111,7 +113,7 @@ services:
     volumes:
       - ./frontend:/src
     ports:
-      - "${TRAVEL_LAN_BIND:-127.0.0.1}:5173:5173"
+      - "${TRAVEL_LAN_BIND:-127.0.0.1}:${TRAVEL_VITE_PORT:-5173}:5173"
     networks: [internal, egress]
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]

@@ -2,7 +2,10 @@
 // Run with ./dev e2e [base-url]; screenshots land in e2e/out/.
 import { chromium } from "playwright-core";
 const base = process.argv[2];
-const browser = await chromium.connectOverCDP("http://127.0.0.1:9222");
+// Ports come from ./dev e2e (a worktree lane has its own block, D-98).
+const cdpPort = process.env.CDP_PORT || "9222";
+const oidcPort = process.env.OIDC_PORT || "8781";
+const browser = await chromium.connectOverCDP(`http://127.0.0.1:${cdpPort}`);
 const context = await browser.newContext({ viewport: { width: 1400, height: 850 } });
 const page = await context.newPage();
 const log = [];
@@ -13,8 +16,8 @@ try {
 await page.goto(`${base}/app/`);
 // Production redirects straight to the provider (login wall); the dev server shows the SPA's link.
 await page.waitForLoadState("networkidle");
-if (!page.url().includes(":8781")) await page.getByRole("link", { name: "Sign in" }).click();
-await page.waitForURL(/8781/);
+if (!page.url().includes(`:${oidcPort}`)) await page.getByRole("link", { name: "Sign in" }).click();
+await page.waitForURL((u) => u.port === oidcPort);
 await page.locator("input[name=username]").fill("dev-member");
 await page.locator("input[type=submit]").click();
 await page.waitForURL(/\/app\//);

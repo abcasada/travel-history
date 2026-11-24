@@ -4,6 +4,8 @@
 set -euo pipefail
 # shellcheck source=scripts/stack.sh
 source "$(dirname "$0")/stack.sh"
+# Production (deploy, import-from-dev, restore-test, …) is driven from the main checkout only.
+refuse_in_worktree "./dev prod"
 cd "$REPO_ROOT"
 
 usage() {

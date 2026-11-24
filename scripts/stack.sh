@@ -28,9 +28,102 @@ random_secret() {  # [length], default 48
   head -c $((n * 2)) /dev/urandom | base64 | tr -d '/+=\n' | head -c "$n"
 }
 
+# ---- Parallel lanes (D-98, item P1) ----
+# A lane is a git worktree at ../travel-history-lanes/<item> on branch item/<item>, made by
+# `./dev lane new`. Its .env (from .env.example, never the real .env) names the lane (TH_LANE,
+# TH_LANE_ITEM) and its port block, so its dev stack is its own compose project with its own
+# DB volume, networks, image tag and var/bulk. Only the main checkout's stack holds real data.
+LANE_PROJECT_PREFIX=travel-history-lane-
+
+_git_dir_abs() { git -C "$REPO_ROOT" rev-parse --path-format=absolute "$1" 2>/dev/null || true; }
+GIT_COMMON_DIR="$(_git_dir_abs --git-common-dir)"
+# The main checkout's root (the repository root itself outside git, e.g. a production release).
+MAIN_ROOT="$REPO_ROOT"
+[ -n "$GIT_COMMON_DIR" ] && MAIN_ROOT="$(dirname "$GIT_COMMON_DIR")"
+LANES_DIR="$(dirname "$MAIN_ROOT")/travel-history-lanes"
+
+in_worktree() { [ -n "$GIT_COMMON_DIR" ] && [ "$(_git_dir_abs --git-dir)" != "$GIT_COMMON_DIR" ]; }
+
+refuse_in_worktree() {  # what
+  if in_worktree; then
+    die "$1 runs only in the main checkout ($MAIN_ROOT), never in a worktree lane"
+  fi
+}
+
+# A value from an env file (KEY=value lines).
+env_file_value() { grep -E "^$2=" "$1" 2>/dev/null | head -1 | cut -d= -f2- || true; }
+
+LANE_ITEM=""
+LANE_NUMBER=""
+if in_worktree; then
+  LANE_ITEM="$(env_file_value "$REPO_ROOT/.env" TH_LANE_ITEM)"
+  LANE_NUMBER="$(env_file_value "$REPO_ROOT/.env" TH_LANE)"
+  DEV_PROJECT="$LANE_PROJECT_PREFIX${LANE_ITEM:-unset}"
+fi
+
+# Port block of lane n: web 8800+10(n-1), mock OIDC +1, Mailpit +2, Vite 5180+10(n-1), the
+# e2e browser's debugging port 9222+n. (8790 belongs to another app on this host.)
+lane_ports() {  # n -> "web oidc mail vite cdp"
+  local n="$1" web=$((8800 + 10 * ($1 - 1)))
+  echo "$web $((web + 1)) $((web + 2)) $((5180 + 10 * (n - 1))) $((9222 + n))"
+}
+
+# Absolute path of an env file's TRAVEL_BULK_DIR (relative paths are relative to its checkout).
+bulk_dir_of() {  # checkout-root
+  local d
+  d="$(env_file_value "$1/.env" TRAVEL_BULK_DIR)"
+  [ -n "$d" ] || return 0
+  [[ "$d" = /* ]] || d="$1/${d#./}"
+  echo "$d"
+}
+
+# A lane's stack must never reach the main project, its DB volume or its bulk storage.
+lane_check() {
+  [ -n "$LANE_ITEM" ] && [ -n "$LANE_NUMBER" ] ||
+    die "this worktree's .env has no TH_LANE/TH_LANE_ITEM: create lanes with ./dev lane new <item>"
+  [ "$DEV_PROJECT" != travel-history ] || die "a worktree may not use the main dev project"
+  local bulk
+  bulk="$(bulk_dir_of "$REPO_ROOT")"
+  case "$(realpath -m "$bulk")/" in
+    "$REPO_ROOT"/*) ;;
+    *) die "TRAVEL_BULK_DIR ($bulk) must be inside this worktree, never the main bulk storage" ;;
+  esac
+}
+
+# Write an env file from .env.example: every "generate" value gets a fresh secret, KEY=value
+# overrides replace their line (or are appended). Mode 0600.
+env_from_example() {  # example dest [KEY=value ...]
+  local example="$1" dest="$2" line key kv
+  shift 2
+  local -A over=()
+  local order=()
+  for kv in "$@"; do over["${kv%%=*}"]="${kv#*=}"; order+=("${kv%%=*}"); done
+  (
+    umask 077
+    while IFS= read -r line; do
+      key=""
+      [[ "$line" =~ ^([A-Z0-9_]+)= ]] && key="${BASH_REMATCH[1]}"
+      if [ -n "$key" ] && [ -n "${over[$key]+x}" ]; then
+        echo "$key=${over[$key]}"
+        unset "over[$key]"
+      elif [[ "$line" =~ ^([A-Z0-9_]+)=generate$ ]]; then
+        echo "$key=$(random_secret)"
+      else
+        echo "$line"
+      fi
+    done < "$example"
+    for key in "${order[@]}"; do
+      [ -n "${over[$key]+x}" ] && echo "$key=${over[$key]}"
+    done
+    true
+  ) > "$dest"
+  chmod 600 "$dest"
+}
+
 # The project name is explicit, so a stray COMPOSE_PROJECT_NAME can't point dev commands
-# at production.
+# at production (or a lane at the main dev stack).
 dev_compose() {
+  if in_worktree; then lane_check; fi
   docker compose -p "$DEV_PROJECT" --project-directory "$REPO_ROOT" \
     -f "$REPO_ROOT/compose.yaml" -f "$REPO_ROOT/compose.dev.yaml" "$@"
 }

@@ -10,6 +10,7 @@
 set -euo pipefail
 # shellcheck source=scripts/stack.sh
 source "$(dirname "$0")/stack.sh"
+refuse_in_worktree "restore-test"
 cd "$REPO_ROOT"
 
 stack="${1:-dev}"

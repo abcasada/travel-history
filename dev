@@ -11,22 +11,15 @@ node_run() {
   docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -e npm_config_update_notifier=false \
     -v "$PWD/frontend:/src" -w /src node:24.22.0-trixie-slim@sha256:7f486cabe892bff8fef04c0f7da8dba84a560be3e4e2740b7a86afc57ebec315 "$@"
 }
-env_value() { grep -E "^$1=" .env | head -1 | cut -d= -f2-; }
+env_value() { env_file_value .env "$1"; }
 
 cmd="${1:-help}"; shift || true
 case "$cmd" in
   setup)
     git config core.hooksPath .githooks
     if [ ! -f .env ]; then
-      umask 077
-      while IFS= read -r line; do
-        if [[ "$line" =~ ^([A-Z0-9_]+)=generate$ ]]; then
-          echo "${BASH_REMATCH[1]}=$(random_secret)"
-        else
-          echo "$line"
-        fi
-      done < .env.example > .env
-      chmod 600 .env
+      in_worktree && die "a worktree gets its .env from ./dev lane new <item> (main checkout)"
+      env_from_example .env.example .env
       echo "created .env with generated secrets (edit TRAVEL_LAN_BIND / TRAVEL_DEV_HOST for LAN access)"
     fi
     bulk="$(env_value TRAVEL_BULK_DIR)"
@@ -74,14 +67,17 @@ case "$cmd" in
     ;;
   restore-test)
     # Backup -> restore -> verify, end to end, with a throwaway key (never the real one).
+    refuse_in_worktree "./dev restore-test"
     scripts/restore-test.sh dev
     ;;
   prod)
     # The production stack: its own compose project, database and .env.prod (D-96).
+    refuse_in_worktree "./dev prod"
     exec scripts/prod.sh "$@"
     ;;
   tracker)
     # The internet-facing tracker endpoint moved to the production stack (D-96).
+    refuse_in_worktree "./dev tracker"
     exec scripts/prod.sh tracker "$@"
     ;;
   valhalla)
@@ -89,6 +85,8 @@ case "$cmd" in
     # reaches it as http://valhalla:8002 over the shared `valhalla` network.
     vc() { docker compose -f valhalla/compose.yaml "$@"; }
     sub="${1:-help}"; shift || true
+    # The service is shared by every stack: only the main checkout builds, starts or stops it.
+    case "$sub" in build|up|down) refuse_in_worktree "./dev valhalla $sub" ;; esac
     case "$sub" in
       build)
         docker network inspect valhalla >/dev/null 2>&1 || docker network create valhalla >/dev/null
@@ -123,23 +121,39 @@ case "$cmd" in
   npm)      node_run npm "$@" ;;
   e2e)
     # Headless Chrome (host network: containers can't reach the host's LAN address otherwise).
-    base="${1:-http://$(env_value TRAVEL_DEV_HOST):5173}"
+    vite="$(env_value TRAVEL_VITE_PORT)"
+    base="${1:-http://$(env_value TRAVEL_DEV_HOST):${vite:-5173}}"
+    # Per-stack browser container and debugging port, so lanes can run e2e beside each other.
+    chrome="travel-e2e-chrome${LANE_ITEM:+-$LANE_ITEM}"
+    cdp="$(env_value TRAVEL_CDP_PORT)"; cdp="${cdp:-9222}"
+    oidc_port="$(env_value TRAVEL_OIDC_PORT)"; oidc_port="${oidc_port:-8781}"
     mkdir -p e2e/out
     [ -d e2e/node_modules ] || docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp \
       -v "$PWD/e2e:/w" -w /w node:24.22.0-trixie-slim@sha256:7f486cabe892bff8fef04c0f7da8dba84a560be3e4e2740b7a86afc57ebec315 npm ci --no-audit --no-fund
-    docker rm -f travel-e2e-chrome >/dev/null 2>&1 || true  # a previous run's container may still be going away
-    docker run -d --rm --name travel-e2e-chrome --network host --shm-size=1g zenika/alpine-chrome:124 \
-      --no-sandbox --remote-debugging-address=127.0.0.1 --remote-debugging-port=9222 \
+    docker rm -f "$chrome" >/dev/null 2>&1 || true  # a previous run's container may still be going away
+    docker run -d --rm --name "$chrome" --network host --shm-size=1g zenika/alpine-chrome:124 \
+      --no-sandbox --remote-debugging-address=127.0.0.1 --remote-debugging-port="$cdp" \
       --use-gl=swiftshader --enable-unsafe-swiftshader about:blank >/dev/null
-    trap 'docker rm -f travel-e2e-chrome >/dev/null' EXIT  # rm -f returns only once the name is free
+    trap 'docker rm -f "$chrome" >/dev/null' EXIT  # rm -f returns only once the name is free
     sleep 3
     docker run --rm --network host --user "$(id -u):$(id -g)" -e HOME=/tmp \
+      -e CDP_PORT="$cdp" -e OIDC_PORT="$oidc_port" \
       -v "$PWD/e2e:/w" -w /w node:24.22.0-trixie-slim@sha256:7f486cabe892bff8fef04c0f7da8dba84a560be3e4e2740b7a86afc57ebec315 node smoke.mjs "$base" && status=0 || status=$?
     # Each run re-uploads the same synthetic fixture; drop the duplicate batches it leaves.
     "$0" manage e2e_cleanup "$(sha256sum e2e/fixtures/timeline-synthetic.json | cut -d' ' -f1)"
     exit "$status"
     ;;
   import-scale-test) scripts/import-scale-test.sh "$@" ;;
+  load-reference)
+    # The public reference data (GeoNames gazetteer, airports, airlines) from the cached copies
+    # in var/bulk/reference; a lane gets those copied by ./dev lane new (GeoNames pins can't be
+    # downloaded again, D-94). Upserts only; never deletes.
+    "$0" manage load_flight_reference
+    "$0" manage load_gazetteer
+    ;;
+  lane)
+    exec scripts/lane.sh "$@"
+    ;;
   help|*)
     cat <<'HELP'
 ./dev setup               first-time setup: git hooks, .env with generated secrets, bulk dirs, networks
@@ -156,6 +170,11 @@ case "$cmd" in
 ./dev restore-test        backup -> restore into a scratch DB -> verify (throwaway key)
 ./dev import-scale-test [size_mb|cleanup]  realistic-size Timeline import on the dev stack (default 1024 MB; deletes its data after)
 ./dev e2e [base-url]      browser smoke test (sign-in, notice, map, both shells; screenshots in e2e/out/)
+./dev load-reference      load the gazetteer and flight reference data from var/bulk/reference
+./dev lane new <item>     parallel lane: worktree ../travel-history-lanes/<item>, branch item/<item>,
+                          own .env, compose project, ports, DB volume and var/bulk (D-98)
+./dev lane rm <item> [--force]   remove a lane's stack, volumes and worktree (refuses unmerged)
+./dev lane list           lanes with their port blocks
 ./dev prod <command>      the production stack (127.0.0.1:8784; ./dev prod help): init, deploy,
                           status, ps, logs, migrate, manage, shell, psql, backup-now,
                           restore-test, smoke, down, tracker start|stop|logs|ps|smoke

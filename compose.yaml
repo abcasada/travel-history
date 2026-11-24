@@ -79,7 +79,7 @@ services:
       TRAVEL_APP_PASSWORD: ${TRAVEL_APP_PASSWORD:?set in .env}
       TRAVEL_PUBLIC_PASSWORD: ${TRAVEL_PUBLIC_PASSWORD:?set in .env}
     command: >-
-      postgres -c shared_buffers=512MB -c work_mem=16MB -c maintenance_work_mem=256MB
+      postgres -c shared_buffers=${TRAVEL_DB_SHARED_BUFFERS:-512MB} -c work_mem=16MB -c maintenance_work_mem=256MB
       -c max_connections=60 -c log_min_duration_statement=2000
     volumes:
       - db-data:/var/lib/postgresql
