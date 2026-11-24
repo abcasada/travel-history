@@ -21,7 +21,7 @@ sources*, `/app/about`; the loaded reference datasets come from `dataset_version
 | react-map-gl | MIT | notice |
 | OurAirports | public domain | courtesy credit |
 | OpenFlights airlines/aircraft | ODbL 1.0 / DbCL 1.0 | "Airline and aircraft data: OpenFlights.org (ODbL)" with link; derived public datasets under a free license |
-| Natural Earth | public domain | courtesy credit |
-| US Census cartographic boundaries | public domain (US federal work) | courtesy credit |
+| Natural Earth (admin-0, admin-1 1:10m, v5.1.2) | public domain | courtesy credit "Boundaries: Natural Earth (public domain)" on the About page from `DatasetVersion` (item 14a-1); invalid polygons repaired, otherwise unchanged |
+| US Census cartographic boundaries (2025 counties, 1:500k) | public domain (US federal work) | courtesy credit "US counties: US Census Bureau cartographic boundary files (public domain)" on the About page from `DatasetVersion` |
 | GeoNames | CC BY 4.0 | "Place names: GeoNames (geonames.org), CC BY 4.0" with license link, on the About page from `DatasetVersion` (item 14). Loaded as a subset (cities500, US populated places, country and admin-1 names), names copied onto places, accents folded for search; no other changes |
 | Python/JS dependencies | various permissive (BSD/MIT/Apache) | generated notices file at build time |

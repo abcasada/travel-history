@@ -10,10 +10,21 @@ All computed locally in PostGIS; no external geocoder (no Nominatim/Photon).
 ### 15.1 Reverse geocoding
 
 - **Admin areas:** point-in-polygon against `country` (Natural Earth admin-0), `region`
-  (admin-1) and `us_county` (Census cartographic boundaries), all GiST-indexed.
-- **Place names:** nearest `geonames_place` (cities500) within 25 km, preferring higher
-  population when distances are similar → "near Salina, Kansas, US". Lodging and destination
-  stops get `name` from the user or the nearest place.
+  (admin-1) and `us_county` (Census cartographic boundaries), all GiST-indexed. The smallest
+  polygon holding the point wins (enclaves); a point just off the 1:10m coastline (a beach, a
+  pier) gets the nearest polygon within 2 km.
+- **Place names:** among `geonames_place` rows within 25 km (cities500 plus the US populated
+  places; not neighbourhoods PPLX or abandoned/historical places), the lowest
+  distance / (1 + log10(1 + population)), so a city a few km farther beats the hamlet next door
+  but a village beats a city more than about twice as far → "near Salina, Kansas, United
+  States". The town's own admin-1 and country name it (from the gazetteer); without a town the
+  label is "<region>, <country>" from the boundaries, at sea empty. Lodging and destination
+  stops get `name` from the user or the nearest place (item 14a-2).
+- **Code:** loaders `travel/geo/boundaries.py` (`./dev manage load_boundaries`, also in
+  `./dev load-reference`; pins and keys in D-107); service
+  `travel.geo.reverse.reverse_geocode(lon, lat)` → country (ISO alpha-2), region (ISO 3166-2
+  and its GeoNames id), county (GEOID), nearby place with distance, label. Runs as the app role
+  (the `geo_` tables are read-only to it). Measured sizes and timings: resource-budget.md §21.6.
 - Google place IDs from Timeline visits are stored on `place.google_place_id` (allowed to be kept
   indefinitely under Google's terms, see §26), but names come from local data.
 

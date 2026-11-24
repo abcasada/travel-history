@@ -151,11 +151,12 @@ case "$cmd" in
     exec scripts/golive-smoke.sh "$@"
     ;;
   load-reference)
-    # The public reference data (GeoNames gazetteer, airports, airlines) from the cached copies
-    # in var/bulk/reference; a lane gets those copied by ./dev lane new (GeoNames pins can't be
-    # downloaded again, D-94). Upserts only; never deletes.
+    # The public reference data (GeoNames gazetteer, airports, airlines, boundaries) from the
+    # cached copies in var/bulk/reference; a lane gets those copied by ./dev lane new (GeoNames
+    # pins can't be downloaded again, D-94). Upserts only; never deletes.
     "$0" manage load_flight_reference
     "$0" manage load_gazetteer
+    "$0" manage load_boundaries
     ;;
   lane)
     exec scripts/lane.sh "$@"
@@ -179,7 +180,7 @@ case "$cmd" in
 ./dev golive-smoke local [--keep]   production image of HEAD, scope all, throwaway DB, 127.0.0.1
                           only; every go-live check, then removed (local-check, local-down)
 ./dev golive-smoke https://<host> [--scope all|tracker]   the same checks through Cloudflare
-./dev load-reference      load the gazetteer and flight reference data from var/bulk/reference
+./dev load-reference      load the gazetteer, flight reference data and boundaries from var/bulk/reference
 ./dev lane new <item>     parallel lane: worktree ../travel-history-lanes/<item>, branch item/<item>,
                           own .env, compose project, ports, DB volume and var/bulk (D-98)
 ./dev lane rm <item> [--force]   remove a lane's stack, volumes and worktree (refuses unmerged)
