@@ -94,7 +94,8 @@ export function TripListPage({ title = "Trips" }: { title?: string }) {
     const purpose = purposeKeys(purposes.data)[n - 1];
     if (!canEdit || !purpose) return;
     const ids = selectCursorIfNone();
-    if (ids.length) change.runFor(ids, { purpose_id: purpose.id }, `Purpose set to ${purpose.name}`);
+    if (ids.length)
+      change.runFor(ids, { purpose_id: purpose.id }, `Purpose set to ${purpose.name}`);
   };
   const open = (to: (id: number) => string) =>
     selection.cursor !== null && navigate(to(selection.cursor));

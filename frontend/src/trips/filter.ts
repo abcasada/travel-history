@@ -62,10 +62,22 @@ export function readTripFilter(params: URLSearchParams): TripFilter {
   };
 }
 
+const FILTER_KEYS = [
+  "q",
+  "from",
+  "to",
+  "purpose",
+  "tag",
+  "mode",
+  "person",
+  "visibility",
+  "in_view",
+];
+
 /** New search params with the filter applied (other params are kept). */
 export function writeTripFilter(params: URLSearchParams, filter: TripFilter): URLSearchParams {
   const next = new URLSearchParams(params);
-  for (const key of ["q", "from", "to", "purpose", "tag", "mode", "person", "visibility", "in_view"]) next.delete(key);
+  for (const key of FILTER_KEYS) next.delete(key);
   if (filter.q.trim()) next.set("q", filter.q);
   if (filter.from) next.set("from", filter.from);
   if (filter.to) next.set("to", filter.to);

@@ -22,7 +22,9 @@ test("the filter round-trips through the URL and keeps other parameters", () => 
 });
 
 test("junk in the URL is ignored", () => {
-  const filter = readTripFilter(new URLSearchParams("from=yesterday&tag=x&tag=-1&mode=teleport&person=me&visibility=everyone"));
+  const filter = readTripFilter(
+    new URLSearchParams("from=yesterday&tag=x&tag=-1&mode=teleport&person=me&visibility=everyone"),
+  );
   expect(filter).toEqual(EMPTY_FILTER);
 });
 

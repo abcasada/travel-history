@@ -32,7 +32,6 @@ export function HeaderSearch({ ref }: { ref?: Ref<HTMLInputElement> }) {
     <input
       ref={ref}
       type="search"
-      role="searchbox"
       aria-label="Search trips"
       placeholder="Search trips…  /"
       className="w-64 rounded-md border px-2 py-1 text-sm"

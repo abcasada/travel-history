@@ -1,11 +1,20 @@
 const ROWS: [string, string][] = [
   ["?", "Show or hide this help"],
+  ["/", "Search trips"],
   ["g then m / t / r / s / v / h", "Go to Map, Trips, Review, Stats, Vehicles, History"],
   ["[ and ]", "Narrow or widen the list"],
   ["\\", "Hide or show the list"],
-  ["e", "Edit the open trip"],
+  ["j / k", "Trip list: next or previous trip"],
+  ["Enter or o", "Open the trip under the cursor"],
+  ["e", "Edit the trip under the cursor, or the open trip"],
+  ["x", "Select or deselect the trip under the cursor"],
+  ["Shift+J / Shift+K", "Extend the selection down or up"],
+  ["* then a / n", "Select all listed trips, or none"],
+  ["f", "Fit the map to the selected trips"],
+  ["t / u / p", "Tag, purpose or people for the selected trips"],
+  ["1 to 7", "Set that purpose on the selected trips"],
   ["u / Shift+U", "Undo or redo in the route editor"],
-  ["Esc", "Close dialogs, cancel"],
+  ["Esc", "Close dialogs, cancel, clear the selection"],
 ];
 
 export function ShortcutHelp({ onClose }: { onClose: () => void }) {
@@ -14,7 +23,7 @@ export function ShortcutHelp({ onClose }: { onClose: () => void }) {
       <div
         role="dialog"
         aria-label="Keyboard shortcuts"
-        className="w-[28rem] rounded-lg bg-white p-5 shadow-xl"
+        className="max-h-[90vh] w-[32rem] overflow-auto rounded-lg bg-white p-5 shadow-xl"
       >
         <h2 className="mb-3 text-lg font-semibold">Keyboard shortcuts</h2>
         <table className="w-full text-sm">

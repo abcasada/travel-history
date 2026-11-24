@@ -39,11 +39,11 @@ export function useBulkChange(tripIds: number[]) {
     mutation.mutate(
       { data: { trip_ids: ids, ...change } },
       {
-        onSuccess: async (page) => {
+        onSuccess: async () => {
           await invalidateTrips(client, ids);
           if (change.add_tag_ids || change.remove_tag_ids)
             await client.invalidateQueries({ queryKey: getListTagsQueryKey() });
-          setDone(`${what}: ${trips(page.items.length)} updated.`);
+          setDone(`${what}: ${trips(ids.length)} updated.`);
         },
       },
     );
@@ -131,6 +131,12 @@ export function BulkBar({
   );
 }
 
+/** A panel opened with t/u/p puts the keyboard in its first field (a stable callback ref, so it
+ * runs once when the panel mounts; the autoFocus attribute is linted out). */
+function focusOnMount(element: HTMLSelectElement | null) {
+  element?.focus();
+}
+
 type PanelProps = { change: ReturnType<typeof useBulkChange>; disabled: boolean };
 
 function TagPanel({ change, disabled }: PanelProps) {
@@ -156,7 +162,7 @@ function TagPanel({ change, disabled }: PanelProps) {
       <label className="flex flex-col text-xs">
         Your tag
         <select
-          autoFocus
+          ref={focusOnMount}
           className={select}
           value={tagId}
           onChange={(e) => setTagId(e.target.value)}
@@ -216,7 +222,7 @@ function PurposePanel({ change, disabled }: PanelProps) {
       <label className="flex flex-col text-xs">
         Purpose
         <select
-          autoFocus
+          ref={focusOnMount}
           className={select}
           value={value}
           onChange={(e) => setValue(e.target.value)}
@@ -257,7 +263,7 @@ function PeoplePanel({ change, disabled }: PanelProps) {
       <label className="flex flex-col text-xs">
         Person
         <select
-          autoFocus
+          ref={focusOnMount}
           className={select}
           value={value}
           onChange={(e) => setValue(e.target.value)}
@@ -297,7 +303,7 @@ function VisibilityPanel({ change, disabled }: PanelProps) {
       <label className="flex flex-col text-xs">
         Visibility
         <select
-          autoFocus
+          ref={focusOnMount}
           className={select}
           value={value}
           onChange={(e) => setValue(e.target.value as Visibility | "")}
