@@ -142,7 +142,7 @@ Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhi
     - **14c. [H] Trip spreadsheet importer** (D-95, docs/design/trip-sheet.md §28; Q-18 to Q-21 answered). Two dispatches (split 2026-11-23). Runs in Lane B beside the go-live chain; it never delays a Lane A item (Adam, 2026-11-18: notes first, then go-live).
       - **14c-1 [H] backend:** parser (add defusedxml), resolvers (gazetteer, airports, coordinates), the `trip_sheet` upload kind and worker step, new tables with RLS, matrix rows, preview/commit API and CLI, with API and RLS tests. Stay out of `accounts` and `config` so it can run beside 40c-1.
         - Footprint: `trips`, `history` (upload kind, worker), `geo` (gazetteer exact match) (?), `core.policy`, backend requirements. Flags: migrations, api.
-        - Status: todo
+        - Status: done (2026-11-24)
       - **14c-2 [H] preview UI:** upload, per-tab outcome and diff, problems by tab/row/column, the unticked "create these people" option (Q-20), commit and 409 handling, both shells; e2e upload of a SYNTHETIC sheet.
         - Footprint: fe:tripsheet (new), fe:upload, fe:trips (query invalidation only) (?). Flags: none.
         - Status: todo
@@ -578,3 +578,4 @@ Nature: mech = mechanical, mod = moderate, hard. Size is S/M/L/XL with approxima
 - 2026-11-23 (planner): batched L-1 to L-5 for Adam, all PROPOSED. Reason: they interpret or amend D-98 and ORCHESTRATION.md, or set a production deploy cadence.
 - 2026-11-23: Adam answered L-1 to L-5: defaults (yes to all). ORCHESTRATION.md and D-98 updated.
 - 2026-11-23: item P1 done and verified (pushed, tree clean, `./dev test-quick` 2321 + 105 passed in the main checkout; two lanes ran test-quick at once, e2e green in a lane; lowest available RAM 3.7 GiB; lane ports from 8800, D-99). Dispatching 40c-1 [X] ∥ 14c-1 [H] in lanes.
+- 2026-11-24: item 14c-1 done and verified in lane 2, merged (rebased on main, `./dev test-quick` 2472 + 105 passed in the main checkout; images rebuilt for defusedxml; dev migrated to history 0014 / trips 0008; batch 33 intact). D-100–D-102. Lane 2 takes 14c-2 next.
