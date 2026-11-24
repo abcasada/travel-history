@@ -24,7 +24,7 @@ await page.waitForURL(/\/app\//);
 const notice = page.getByRole("button", { name: "I understand" });
 await notice.waitFor({ timeout: 10000 }).then(() => notice.click(), () => {});
 // Headless Chrome has no precise pointer, so the automatic choice is mobile; use the manual switch.
-await page.getByText("Dev Member").click();
+await page.locator("summary", { hasText: "Dev Member" }).click();
 await page.getByLabel("Layout").selectOption("desktop");
 await page.getByRole("link", { name: "Review" }).waitFor();
 try {
@@ -219,7 +219,7 @@ await m.screenshot({ path: "out/mobile-history.png" });
 // Tracker ingestion (milestone 2.4): create a token on the trackers page, send one synthetic
 // OwnTracks point with it, revoke it, and check the endpoint then refuses it. Each run leaves one
 // revoked token and one point (Wichita city centre) in dev-member's history.
-await page.getByText("Dev Member").click();
+await page.locator("summary", { hasText: "Dev Member" }).click();
 await page.getByRole("link", { name: "Location trackers" }).click();
 await page.getByLabel("Name").fill("E2E phone");
 await page.getByRole("button", { name: "Create token" }).click();

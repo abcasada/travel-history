@@ -1,4 +1,4 @@
-import type { Ref } from "react";
+import { type Ref, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { readTripFilter, writeTripFilter } from "../trips/filter";
 import { paths } from "../trips/paths";
@@ -18,9 +18,22 @@ export function HeaderSearch({ ref }: { ref?: Ref<HTMLInputElement> }) {
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const listed = onTripList(pathname);
-  const value = listed ? readTripFilter(params).q : "";
+  const urlQ = listed ? readTripFilter(params).q : "";
+  // The text is local state: the URL updates a moment after each keystroke, and a box bound
+  // to it directly drops letters typed faster than that. It follows the URL only when the URL
+  // changes from elsewhere (Clear filters, leaving the list).
+  const [text, setText] = useState(urlQ);
+  const sent = useRef(urlQ);
+  useEffect(() => {
+    if (urlQ !== sent.current) {
+      sent.current = urlQ;
+      setText(urlQ);
+    }
+  }, [urlQ]);
 
   const onChange = (q: string) => {
+    setText(q);
+    sent.current = q;
     if (listed) {
       setParams(writeTripFilter(params, { ...readTripFilter(params), q }), { replace: true });
     } else if (q.trim()) {
@@ -35,7 +48,7 @@ export function HeaderSearch({ ref }: { ref?: Ref<HTMLInputElement> }) {
       aria-label="Search trips"
       placeholder="Search trips…  /"
       className="w-64 rounded-md border px-2 py-1 text-sm"
-      value={value}
+      value={text}
       onChange={(e) => onChange(e.target.value)}
       onKeyDown={(e) => {
         if (e.key === "Escape") e.currentTarget.blur();

@@ -1,11 +1,19 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, useLocation } from "react-router";
+import { MemoryRouter, useLocation, useNavigate } from "react-router";
 import { HeaderSearch } from "./HeaderSearch";
 
 function Probe() {
   const location = useLocation();
-  return <output data-testid="location">{location.pathname + location.search}</output>;
+  const navigate = useNavigate();
+  return (
+    <>
+      <output data-testid="location">{location.pathname + location.search}</output>
+      <button type="button" onClick={() => navigate("/trips")}>
+        Clear
+      </button>
+    </>
+  );
 }
 
 function renderAt(url: string) {
@@ -54,4 +62,15 @@ test("Enter and Esc leave the box so list keys work again", async () => {
   await user.click(box);
   await user.keyboard("{Escape}");
   expect(box).not.toHaveFocus();
+});
+
+test("fast typing keeps every letter, and a filter cleared elsewhere empties the box", async () => {
+  const user = userEvent.setup({ delay: null });
+  renderAt("/trips");
+  const box = screen.getByRole("searchbox", { name: "Search trips" });
+  await user.type(box, "Synthetic weekend");
+  expect(box).toHaveValue("Synthetic weekend");
+  expect(screen.getByTestId("location")).toHaveTextContent("/trips?q=Synthetic+weekend");
+  await user.click(screen.getByRole("button", { name: "Clear" }));
+  expect(box).toHaveValue("");
 });
