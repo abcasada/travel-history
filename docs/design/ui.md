@@ -73,6 +73,9 @@ working feature; the final mobile tabs are decided in T29 (mobile features).
 No Ctrl/Cmd combinations are used (they collide with browser and OS shortcuts such as Ctrl+T/W/N/L/R/S/P/F, Ctrl+Tab, Alt+←).
 Shortcuts are ignored while typing in a text field, except `Esc`. Implemented behind the
 `shortcuts` adapter so a desktop wrapper can add global shortcuts later.
+The list keys are built (item 21a, 2026-11-24): with nothing selected, `t`/`p`/`u`/`1`-`7`
+act on the cursor's trip; `Esc` first closes the bulk panel, then clears the selection; `/`
+focuses the header search, which searches trip titles (details in frontend-patterns.md §8).
 
 | Scope | Keys | Action |
 |---|---|---|

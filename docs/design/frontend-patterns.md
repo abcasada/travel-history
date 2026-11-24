@@ -88,7 +88,8 @@ A new feature gets its own folder like `trips/` (pages, editors, `paths.ts`, `la
 ### Client state
 
 - **zustand only for UI state shared across the two panels that doesn't belong in the URL**:
-  `map/store.ts` holds the map's current `bbox` (for "Only in map view") and a pending map pick.
+  `map/store.ts` holds the map's current `bbox` (for "Only in map view") and a pending map pick;
+  `trips/selection.ts` holds the trip list's cursor and selection (the map highlights them).
   Don't put server data in zustand.
 - Per-device preferences that should follow the user (divider position): `usePreference`.
 - Everything else is component state.
@@ -156,7 +157,8 @@ No form library. Every editor follows the same shape (see `TripFieldsForm`, `Sto
   every trip is drawn, the open one highlighted, labelled and fitted (`fitBounds` once per trip).
   Colours by mode come from `trips/labels.ts` (`MODE_COLORS`), shared with legends.
 - **Clicks**: one map-level listener per layer group (`map.on("click")` with
-  `queryRenderedFeatures` on its own layer ids), as in `HistoryLayers`. A pending map pick takes
+  `queryRenderedFeatures` on its own layer ids), as in `HistoryLayers`. The test mock of
+  `Layer` exposes `data-paint` (JSON), so highlight expressions are testable. A pending map pick takes
   precedence: check `useMapStore.getState().pick` first.
 - **Picking a point for a form**: `useMapStore().startPick(label, onPick)`; `MapPickHandler`
   shows the banner, a crosshair, takes the next click, and Esc cancels.
@@ -234,19 +236,34 @@ No form library. Every editor follows the same shape (see `TripFieldsForm`, `Sto
 Each dispatch: follow sections 2-7, add tests for every new page and mutation, keep `./dev test`,
 `./dev lint` and `./dev e2e` green, update this doc where a pattern grows.
 
-**21a: the list as a working tool.**
-- [ ] Keyboard list navigation (§18.4): `j`/`k` move a cursor, `Enter`/`o` open, `x` toggle
+**21a: the list as a working tool.** Done 2026-11-24.
+- [x] Keyboard list navigation (§18.4): `j`/`k` move a cursor, `Enter`/`o` open, `x` toggle
       select, `Shift+j/k` extend, `*` then `a`/`n` select all/none, `f` fit the map to the
-      selection, `e` edit the cursor's trip. Selection lives in a small zustand store in
-      `trips/` (it spans panels; not in the URL). Map highlights selected trips.
-- [ ] Bulk bar for a selection (`POST /trips/bulk`, operation `bulkEditTrips`): tag (`t`),
-      purpose (`u`, `1`-`7` direct), participants (`p`), visibility. Show the 403 body's
-      `refused` list per trip (all or nothing, D-89).
-- [ ] Paging past 200 (`offset`, "Load more" or `useInfiniteQuery` with the generated
-      `listTrips` function); keep the count line.
-- [ ] More filters: person (`person=`, picker from `useListPersons`), status, visibility. The
-      header search box and its `/` shortcut (desktop shell) drive the list's `q`.
-- [ ] Shortcut help rows; e2e: select two trips and tag them in bulk.
+      selection, `e` edit the cursor's trip, `Esc` closes the bulk panel, then clears the
+      selection. Selection lives in `trips/selection.ts` (zustand; pure rules `moveCursor`,
+      `toggle`, `extend`, `prune`, `targets`, `highlighted`). A new filter prunes selected trips
+      it no longer lists. The map highlights the selection plus the cursor's trip.
+- [x] Bulk bar (`trips/BulkBar.tsx`, `POST /trips/bulk`): tag (`t`; pick one of your tags or
+      type a new name, which `createTag` makes first), purpose (`u`, `1`-`7` direct, archived
+      purposes take no digit), people (`p`, add or remove), visibility (the editable three).
+      With nothing selected, `t`/`u`/`p`/digits select the cursor's trip first. A 403 lists
+      each refused trip with its reason ("Nothing was changed", D-89). Viewers get no
+      checkboxes and no bar. At most 500 trips per change (the API's limit).
+- [x] Paging: `useInfiniteQuery` over the generated `listTrips` (key = `getListTripsQueryKey`
+      + `"pages"`, so `trips/cache.ts` refreshes it), 200 per page, "Show N more"; the count
+      line stays.
+- [x] More filters: person and visibility. **Status is left out**: the OpenAPI schema names
+      both `Trip.Status` and `FlightRecord.Status` "Status", so the generated `status` type is
+      `resolved | unmatched` instead of `candidate | confirmed` (fix: give the trip enum a
+      distinct name, e.g. `TripStatus`, and regenerate; that is an API change). Candidates only
+      appear with item 19 anyway. The header search box (`shells/HeaderSearch.tsx`, desktop;
+      `/` focuses it, Enter/Esc leave it) edits the list's `q`; from another page it opens
+      `/trips?q=…`. The list's own search box shows only in the mobile shell.
+- [x] Shortcut help rows; e2e: two trips found with `/`, selected with `j x Shift+J`, tagged
+      with a new tag in bulk, then deleted with the tag.
+- Shortcut adapter changes: a focused checkbox/radio/button is not a text field (keys keep
+      working after clicking a row's checkbox); Enter on a focused link or button keeps its
+      native meaning; a bare Shift keydown doesn't cancel a pending `*` sequence.
 
 **21b: the trip page complete.**
 - [ ] Tags on a trip: `listTripTags`/`addTripTag` (`{tag_id}` or `{name}` creates an own tag)/
