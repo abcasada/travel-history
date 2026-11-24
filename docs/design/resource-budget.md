@@ -175,3 +175,25 @@ development held Adam's real data (batch 33, 385,097 gazetteer places). `free -m
 - **Easy headroom when it gets tight:** once Adam enters data only in production (item 40c),
   the dev `frontend`, `oidc` and `mail` (about 620 MiB) can stay stopped between builder
   sessions. The Ryzen host (32 GB) removes the constraint.
+
+### 21.5 Measured: two parallel lanes beside both stacks (2026-11-23, work-order item P1)
+
+Two worktree lanes (D-98) ran beside the main dev stack (real data), the production stack,
+Authentik, Valhalla and the other apps. `free -m` was sampled every 3 s for the whole proof (367
+samples):
+
+| Phase | Host `used` | Host `available` |
+|---|---|---|
+| Baseline (no lanes) | 5,994 MiB | 5,433 MiB |
+| Both lanes running `./dev test-quick` at once (each lane: its DB + tools) | — | min 4,048 MiB |
+| Peak: lane 1's full stack (gazetteer load, then e2e) with lane 2's DB still up | **7,700 MiB** | **min 3,727 MiB** |
+
+- **Swap** rose from 1,244 to about 1,500 MiB. Both quick suites passed side by side in about
+  3 min 53 s each, against 4 min 41 s for one lane alone (the first run also built its image).
+- **A lane costs about 0.7 GiB for its tests, and about 1.5 GiB with a full stack and the
+  gazetteer loaded.** Lane DBs use `shared_buffers=256MB`. Two full lanes at once would leave
+  about 2–2.5 GiB available on this host, close to ORCHESTRATION.md's 2 GiB floor, so one full
+  stack plus one test-only lane is the comfortable pair until the Ryzen move.
+- **Loading the reference data into a lane** (`./dev load-reference`, 385,097 places from the
+  copied cache) takes about 4 min.
+
