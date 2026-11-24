@@ -169,7 +169,7 @@ Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhi
       - Status: done (2026-11-24; the status filter waits on the enum-name fix)
     - **21b [M] the trip page complete** (§8), plus 14b's leftover: participants edit the notes on their own contributed legs in the UI (the API already allows it). Also (added 2026-11-24): rename the trip status enum in the OpenAPI schema (`TripStatus`; it clashes with `FlightRecord.Status`, so the generated type is wrong), regenerate the client, and add 21a's left-out trip status filter. Builds now; merges after 40e (backend freeze).
       - Footprint: fe:trips (trip page, leg form, tags page), `trips` (`PATCH /persons`, purposes), `geo` (`GET /reference/airlines`), `core.policy` (API tests per actor). Flags: api.
-      - Status: todo
+      - Status: built 2026-11-24 on item/21b (D-113; accounts migration 0005 tightens person_update RLS; TripStatus enum + client regenerated); merge after 40e
     - **→ Review pause B:** the desktop catalog UI, once 21, 27 and 40e are done (Adam reviews in production).
 22. **[M] T20 polish,** plus the T10 trip comparison.
     - Footprint: `history` and `trips` (detection tuning), fe:review, fe:history (trip comparison on the bake-off page). Flags: api (?).
@@ -418,6 +418,10 @@ P1. **[H] Parallel readiness (Adam, 2026-11-23; D-98).** Runs alone, in the main
    - Footprint: `accounts` (sessions), fe:auth only if needed, scripts/golive-smoke.sh, docs. Flags: none.
    - Status: todo
 
+43d. **[M] Flaky TitleSearch "fast typing" test** (added 2026-11-24 from 21b's report: fails about 1 run in 3). Make it deterministic (fake timers or awaiting the debounced URL write), and check the hook (`trips/useFollowedText.ts`) has no real race behind it.
+   - Footprint: fe:trips (TitleSearch test, useFollowedText). Flags: none.
+   - Status: todo
+
 42a. **[X] Go-live hardening from 41a** (re-scoped 2026-11-24: 41a found no blockers, but these are cheap and should land before 40c-2 deploys; docs/review/2026-11-24-go-live.md).
    - F-1 CSP for the installed PWA (WhiteNoise serves before the CSP middleware); F-2 no 40 MB anonymous bodies (per-endpoint limits); F-3 removing travel-users ends sessions at next request or refresh, plus an owner-role deactivate command; F-6 refresh pinned base digests and re-run the CPU smoke test (no AVX); F-7 Ninja docs/schema off in production, `requests` errors in `OidcBearer` → no user; F-8 tunnel requests with a non-public Host → 404; F-9 scope `all` requires an https issuer and client credentials; F-10 `public` visibility refused (422) until T37; F-11 dev-copy pruning and `e2e_cleanup` cover e2e persons, the `e2e` tag and trip-sheet batches. Smoke checks for each where possible.
    - F-4 is checked in 40c-2 against the real token; F-5 is recorded in docs (40e); F-12 onward go to item 43.
@@ -609,3 +613,4 @@ Nature: mech = mechanical, mod = moderate, hard. Size is S/M/L/XL with approxima
 - 2026-11-24: item 43a done and verified in lane 1, merged (`./dev test-quick` 2580 + 184 passed in the main checkout). Split 14a into 14a-1 (geo loaders + reverse-geocoding service) and 14a-2 (stop names in trips/UI), and pulled 14a-1 forward into lane 1. Reason: 21b overlaps 42a's `trips` footprint and 11/12 wait for Review pause B; 14a-1 is geo-only, nothing a pause reviews, and its merge waits for 40e.
 - 2026-11-24: item 42a done and verified in lane 2, merged (`./dev test-quick` 2696 + 184 passed in the main checkout; images rebuilt on refreshed digests; local go-live smoke passed in the lane). D-107–D-111. 14a-1 built in lane 1 (its D-107 renumbered D-112; merge after 40e). Added 43b [M] (hourly re-check UX, lane image tags) and folded the trip status enum fix into 21b; both build now, 21b merges after 40e.
 - 2026-11-24: item 43b done and verified in lane 3, merged (`./dev test-quick` 2696 + 192 passed in the main checkout; `./dev e2e --recheck` green in the lane). D-120, D-121. Added 43c [X]: a save that meets the hourly re-check loses its form input; let writes through for a grace window. Reason: family members editing trips would lose work hourly.
+- 2026-11-24: 21b built in lane 2 (backend quick 2811 passed, e2e green; merge after 40e). Added 43d [M] for the flaky TitleSearch test it found.
