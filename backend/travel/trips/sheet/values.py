@@ -162,6 +162,16 @@ def _date_part(raw: str) -> n.FlightDate:
     return parsed
 
 
+def _clock(raw: str) -> dt.time:
+    """24-hour HH:MM:SS keeps its seconds (the flight normaliser keeps minutes only)."""
+    if m := re.fullmatch(r"(\d{1,2}):(\d{2}):(\d{2})", raw.strip()):
+        hour, minute, second = int(m[1]), int(m[2]), int(m[3])
+        if hour > 23 or minute > 59 or second > 59:
+            raise n.ValueProblem(f"unrecognised time {raw!r}")
+        return dt.time(hour, minute, second)
+    return n.parse_time(raw)
+
+
 def local_time(value, number_format: str = "") -> LocalTime | None:
     """None for an empty cell. A date-time cell is wall-clock time; a date cell (a date or a
     midnight date-time whose format shows no hours) is a date only."""
@@ -192,7 +202,7 @@ def local_time(value, number_format: str = "") -> LocalTime | None:
         date_text = raw[: m.start(1)].strip().rstrip("T").strip()
         if date_text:
             try:
-                time_part = n.parse_time(m[1])
+                time_part = _clock(m[1])
             except n.ValueProblem as exc:
                 raise CellProblem("bad_time", str(exc), hint="write HH:MM (24-hour)") from None
             raw = date_text

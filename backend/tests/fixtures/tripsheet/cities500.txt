@@ -1,0 +1,7 @@
+# SYNTHETIC test subset in GeoNames dump format (fake places and coordinates) for the trip spreadsheet tests
+9100101	Synthport	Synthport		39.25	-94.7	P	PPL	US		MO				30000		0	America/Chicago	2026-11-01
+9100102	Synthden	Synthden		39.8	-104.7	P	PPL	US		CO				50000		0	America/Denver	2026-11-01
+9100103	Mesa Synth	Mesa Synth		35.1	-106.6	P	PPL	US		NM				8000		0	America/Denver	2026-11-01
+9100104	Twin Synth	Twin Synth		38.9	-97.0	P	PPL	US		KS				1200		0	America/Chicago	2026-11-01
+9100105	Twin Synth	Twin Synth		40.5	-98.0	P	PPL	US		NE				900		0	America/Chicago	2026-11-01
+9100106	Fernhill Synth	Fernhill Synth		39.1	-104.85	P	PPL	US		CO				2000		0	America/Denver	2026-11-01
