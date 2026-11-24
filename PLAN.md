@@ -173,6 +173,7 @@ Frontend conventions: [docs/design/frontend-patterns.md](docs/design/frontend-pa
 - D-103 Authentik sign-in: issuer, `travel-users` list and `amr` second factor (G-5; `mfa` or passkey) checked before any account; confidential client required; HTTPS redirect in own middleware so plain HTTP on localhost (G-4's SSH port-forward) is served
 - D-104 Go-live commands `rebind_identity` (G-3) and `link_person`: owner role, ids only (never email), dry run unless `--execute`, one transaction, audit log; refuse every other case
 - D-105 Go-live: travel.* and trips.* routes to production `web` (8784), tracker path rule retired, `ingest` stays stopped; scope flip last; `./dev golive-smoke local` (throwaway, scope `all`) and through Cloudflare
+- D-106 Drag editor polish: expired proposals re-proposed (verified only if the same line comes back), anchor popup, touch (hold the line to grab), `Route.sources` in the version list
 
 ## 25. Open questions (for Adam, answer whenever — nothing is blocked on these)
 

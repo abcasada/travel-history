@@ -105,8 +105,8 @@ into `frontend/src/routing/editor/`:
   no track point there); clicking the line marks a point within 1 m or inserts one.
 - `controller.ts` (the map half of `routing-controls.ts`): one GeoJSON source of anchors
   filtered by `minZoom`, a wide invisible hit line, the temporary anchor that follows the
-  pointer along the line, drag with pan disabled; shift-click or right-click deletes (no popup),
-  a click elsewhere appends. Mouse only: the editor is desktop-only.
+  pointer along the line, drag with pan disabled; shift-click or right-click deletes (item 27 added the popup and
+  touch), a click elsewhere appends.
 - `editorStore.ts` (zustand): undo/redo of whole states (100 steps; `u` / `Shift+U`), one
   routing request in flight (edits while routing are ignored; requests go out on release, not
   while dragging, so no debounce is needed), errors snap the line back.
@@ -122,6 +122,27 @@ is `hand_edited` (or `routed` for exactly one whole proposal) with `Route.source
 engine, points, verified), engine = the one engine or `mixed`, the oldest road-data date and
 every provider's credit. Expired proposals: 409 with their piece positions; the editor resends
 them once as drawn points with an `engine` claim (credit only).
+
+**Polish (item 27, D-106).** Frontend only; no API change.
+
+- **Anchor popup** (gpx.studio's anchor popup): clicking an anchor opens a MapLibre popup
+  saying whether it is a fixed point (saved with the version) or a shape point, with
+  "Remove this point" and, for shape points, "Keep as a fixed point". A click elsewhere or
+  Escape closes it; shift-click and right-click still remove at once.
+- **Touch:** a finger on an anchor drags it (pan off while dragging; a second finger cancels);
+  a tap opens its popup; holding the line still for 400 ms grabs it (a plain swipe pans the
+  map), and releasing without moving keeps a fixed point there. Browser follow-ups of a touch
+  (emulated mouse events, the long-press context menu) are ignored for 800 ms, so a long press
+  never deletes. The editor still renders only in the desktop shell (tablets, touch laptops).
+- **Version list:** each version shows `Route.sources` ("Made from: Valhalla (self-hosted)
+  route, 1,204 points, checked; 2 points drawn by hand, not checked").
+- **Expired proposals are re-proposed:** on the save's 409, the editor asks
+  `/api/v1/routing/route` again for each expired proposal's exact waypoints (about one request
+  a second to stay under the per-user limit; one retry after a 429; at most 20). If the answer
+  has exactly the points the line uses, the server has it cached again and the piece saves as
+  verified; otherwise (roads or provider changed, routing failed, over the cap) only that piece
+  goes as drawn points with its engine claim. The user's line is never replaced by the new
+  answer, and nothing re-routes a saved version (rule 5).
 
 ### 13.5 Valhalla service and tile-build strategy
 
