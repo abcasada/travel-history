@@ -69,6 +69,13 @@ def _lock(user_id: int) -> None:
         )
 
 
+def same_instant(seen: dt.datetime | None, current: dt.datetime | None) -> bool:
+    """The API's JSON carries milliseconds (Django's encoder), the database microseconds."""
+    if seen is None or current is None:
+        return seen is None and current is None
+    return abs(seen - current) < dt.timedelta(milliseconds=1)
+
+
 def commit_batch(user, batch: ImportBatch, options: Options) -> list[TabResult]:
     """Apply the chosen tabs. Raises CommitError (409) before writing anything if a target trip
     changed since the preview, (422) for a blocked or unknown tab, (409) for a batch that is no
@@ -104,7 +111,7 @@ def commit_batch(user, batch: ImportBatch, options: Options) -> list[TabResult]:
             plan.record.pk
             for plan in plans
             if plan.record.pk in options.seen
-            and options.seen[plan.record.pk] != plan.trip_updated_at
+            and not same_instant(options.seen[plan.record.pk], plan.trip_updated_at)
         ]
         if stale:
             raise CommitError(

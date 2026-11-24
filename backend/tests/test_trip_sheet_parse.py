@@ -10,7 +10,7 @@ import pytest
 
 from tests.factories import PersonFactory, UserFactory, user_with_person
 from tests.helpers import as_owner
-from tests.tripsheet_data import FIELDS, LEGS, STOPS, example, leg, load_places, trip_tab, workbook
+from tests.tripsheet_data import LEGS, STOPS, example, leg, load_places, trip_tab, workbook
 from travel.core.rls import rls_context
 from travel.trips.models import Purpose, Trip
 from travel.trips.sheet import reader

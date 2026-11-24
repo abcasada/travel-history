@@ -63,8 +63,9 @@ FLIGHT_COLUMNS = (
     "cabin",
 )
 CLOSE_FLIGHT_KM = 50
-# Row numbers move when rows are inserted; they are not part of what a tab says.
-HASH_IGNORES = {"row", "origin_row", "destination_row"}
+# Not part of what a tab says: row numbers move when rows are inserted, and which tags or people
+# are new depends on the app's data at parse time.
+HASH_IGNORES = {"row", "origin_row", "destination_row", "new_tags", "unknown_people"}
 
 
 @dataclass

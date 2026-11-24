@@ -9,7 +9,6 @@ from __future__ import annotations
 import datetime as dt
 from pathlib import Path
 
-from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from ninja import Router, Schema, Status
 from ninja.errors import HttpError
@@ -25,6 +24,9 @@ router = Router(tags=["imports"])
 
 TEMPLATE = Path(__file__).resolve().parent / "trip-template.xlsx"
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+TEMPLATE_DOC = {
+    "responses": {200: {"description": "The trip spreadsheet template", "content": {XLSX: {}}}}
+}
 
 Scalar = str | int | float | bool | None
 
@@ -300,20 +302,3 @@ def discard_trip_sheet(request, batch_id: int):
     except CommitError as error:
         raise HttpError(error.status, error.message) from None
     return Status(204, None)
-
-
-@router.get(
-    "/trips/sheet-template.xlsx",
-    operation_id="getTripSheetTemplate",
-    openapi_extra={
-        "responses": {200: {"description": "The trip spreadsheet template", "content": {XLSX: {}}}}
-    },
-)
-def trip_sheet_template(request):
-    """The committed template (docs/trips/trip-template.xlsx, SYNTHETIC example tab)."""
-    return FileResponse(
-        TEMPLATE.open("rb"),
-        as_attachment=True,
-        filename="trip-template.xlsx",
-        content_type=XLSX,
-    )

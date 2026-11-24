@@ -14,7 +14,7 @@ import json
 from enum import StrEnum
 from typing import Annotated, Any, Literal
 
-from django.http import HttpRequest
+from django.http import FileResponse, HttpRequest
 from django.utils import timezone
 from geojson_pydantic import MultiLineString
 from ninja import Field, Query, Router, Schema, Status
@@ -43,6 +43,7 @@ from .models import (
     TripTag,
 )
 from .services import BulkRefused, TripError
+from .sheet import api as sheet_api
 
 router = Router(tags=["trips"])
 
@@ -888,6 +889,23 @@ def _filtered_trips(request, params: TripFilterIn):
         )
     except TripError as error:
         _fail(error)
+
+
+# Before /trips/{trip_id}, which would otherwise take the file name for an id.
+@router.get(
+    "/trips/sheet-template.xlsx",
+    operation_id="getTripSheetTemplate",
+    openapi_extra=sheet_api.TEMPLATE_DOC,
+)
+def trip_sheet_template(request):
+    """The trip spreadsheet template (docs/trips/trip-template.xlsx, SYNTHETIC example tab;
+    docs/design/trip-sheet.md §28)."""
+    return FileResponse(
+        sheet_api.TEMPLATE.open("rb"),
+        as_attachment=True,
+        filename="trip-template.xlsx",
+        content_type=sheet_api.XLSX,
+    )
 
 
 @router.get("/trips", response=TripPageOut, operation_id="listTrips")
@@ -1748,8 +1766,6 @@ def delete_media(request, media_id: int):
     return Status(204, None)
 
 
-# Trip spreadsheet preview, commit and the template (§28.8): their own module, mounted here so
-# the trips app keeps one router.
-from .sheet.api import router as sheet_router  # noqa: E402
-
-router.add_router("", sheet_router)
+# Trip spreadsheet preview, commit and discard (§28.8): their own module, mounted here so the
+# trips app keeps one router.
+router.add_router("", sheet_api.router)
