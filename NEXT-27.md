@@ -13,3 +13,5 @@ Item 27 (T25 editor polish), frontend only, no backend/API/migration change.
 - **Not done / notes:** the editor still renders only in the desktop shell (`mode === "desktop"` in
   LegRoutePage); touch helps tablets and touch laptops, phones never load it (§18.1). Real-device
   touch testing hasn't happened (only unit tests with a fake map); Adam can try it at Review pause B.
+- **Verified in the lane (2026-11-24):** `./dev test-quick` 2580 backend + 152 frontend passed;
+  `./dev lint` clean; `./dev e2e` ok (only the pre-existing basemap glyph 404); lane stack is down.
