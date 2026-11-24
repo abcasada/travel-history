@@ -24,7 +24,7 @@ Versions are the latest stable on 2026-10-19 (sources: `docs/research/stack-libr
 | Compression | zstandard 0.25 | Raw-file archive. |
 | Push | pywebpush 2.5 (VAPID) | §7.5. |
 | Misc | qrcode, polyline, gpxpy, puremagic, whitenoise, gunicorn (gthread) | |
-| Spreadsheets | openpyxl 3.1.5, PyYAML 6.0.3 | Flight spreadsheet conversion (XLSX input, mapping file; D-88). |
+| Spreadsheets | openpyxl 3.1.5, defusedxml 0.7.1, PyYAML 6.0.3 | Flight spreadsheet conversion (XLSX input, mapping file; D-88); the trip spreadsheet import (§28), whose uploads openpyxl parses through defusedxml (it uses it when installed). |
 | Rate limits | small PostgreSQL-backed fixed-window counter (`travel.core.ratelimit`): atomic upsert on its own autocommit connection, HMAC-hashed keys, hourly cleanup | django-ratelimit is stale (last release 2023); no Redis. D-10, D-77. |
 | Tests / quality | pytest + pytest-django, hypothesis, factory_boy; ruff (lint + format) | |
 

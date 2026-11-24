@@ -59,6 +59,7 @@ object under §6.2. "Participant" means a Member whose person participates in th
 | Who was on a leg (anyone's overrides) | vis (people they can see) | ✅ (people they can see) | ❌ | ❌ | ❌ | ❌ |
 | Public consent for my name/notes/photos/legs | own | own | own | ❌ | own | ❌ |
 | Raw history (points and their map roll-up, segments, imports and imported flight records, coverage; also the history map's tiles and coverage strip) | own only | own only | own only | own only | ❌ (no imports) | ❌ |
+| Trip spreadsheet imports: parsed tabs, key links, preview / commit / discard (§28.10); a key stands only for the importer's own trip | own only | own only | own only | own only | ❌ (no imports) | ❌ |
 | Home periods | own; family-shared ones read-only | own; shared read-only | — | shared read-only | shared read-only | ❌ |
 | Tags (definitions; `GET /tags` lists own; purposes likewise own) | own | own | own | own | ❌ | ❌ |
 | Person: create | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
@@ -200,6 +201,27 @@ Notes:
     own-proposal rule, versions never changed) and the matrix rows `propose_route`,
     `view_alice_route_cache`, `delete_alice_route_cache`, `save_route_version_on_bobs_leg`
     (now 102 actions × 7 actors).
+- Trip spreadsheet import (work-order item 14c-1, [trip-sheet.md](trip-sheet.md) §28.10,
+  D-100 to D-102):
+  - Uploads of kind `trip_sheet` need `policy.can_import` like every import (Viewers 403).
+    Preview, commit and discard need `policy.can_commit_trip_sheet` (the batch's owner, never
+    the Admin); RLS hides other users' batches, so they answer 404.
+  - `trip_sheet_record` (one parsed tab) and `trip_sheet_link` (key → trip) are raw history:
+    policy `own_all` for every command (`owner = app.user_id()` and the family check; writes
+    need `app.can_create()`). Their WITH CHECK also requires the record's batch, a record's or
+    link's trip and a link's last record to be the owner's own, so a key can never stand for
+    someone else's trip, even one the Admin could edit (`policy.can_reimport_trip`). A trigger
+    keeps a record's parsed columns immutable; only the commit's outcome (`outcome`, `trip`,
+    `committed_at`) is filled in later. A deleted trip leaves its link with `trip` empty, so a
+    later import skips it (rule 7).
+  - Writes go through `travel.trips.services` as the caller with the API's checks
+    (`can_create`, `can_add_participant`, `can_tag_trip`, `can_use_place`, `can_use_vehicle`,
+    `can_set_leg_participation`), marked `in_app=False` so they don't count as in-app edits.
+  - Tests: `tests/permissions/test_trip_sheet_api.py` (preview, commit, discard, upload kind and
+    template × every actor; the batch, trip and immutability rules and the link outliving its
+    trip as `travel_app`) and the matrix rows `view_alice_trip_sheet`, `import_trip_sheet`,
+    `commit_own_trip_sheet`, `commit_other_users_batch` (never), `reimport_other_users_trip`
+    (never), `edit_alice_sheet_content` (never) (now 108 actions × 7 actors).
 
 ### 6.4 Row-level security policies
 
@@ -208,7 +230,7 @@ schema and fails if any user-owned table lacks RLS or a policy for each command.
 
 | Table group | SELECT | INSERT | UPDATE | DELETE |
 |---|---|---|---|---|
-| `location_point`, `point_rollup`, `timeline_segment`, `raw_file`, `import_batch`, `flight_record`, `coverage_report`, `detection_run`, `rejected_candidate`, `device_token`, `push_subscription`, `integration_setting`, `user_preference`, `tag` | `owner = app.user_id()`; `device_token` also by hash in the `ingest` context | same; points: Admin/Member only, and a named device must be the owner's unrevoked token | same (points/raw files: never, trigger; tokens: name and counters only, revocation final) | owner (points: purge only) |
+| `location_point`, `point_rollup`, `timeline_segment`, `raw_file`, `import_batch`, `flight_record`, `trip_sheet_record`, `trip_sheet_link`, `coverage_report`, `detection_run`, `rejected_candidate`, `device_token`, `push_subscription`, `integration_setting`, `user_preference`, `tag` | `owner = app.user_id()`; `device_token` also by hash in the `ingest` context | same; points: Admin/Member only, and a named device must be the owner's unrevoked token | same (points/raw files: never, trigger; tokens: name and counters only, revocation final) | owner (points: purge only) |
 | `trip` | `app.can_view_trip(id)` | `owner = me AND app.can_create()` | `app.can_edit_trip_core(id)` | `owner = me` |
 | `leg`, `route` | `app.can_view_trip(trip)` | core editor, or contributor with `author = me` | core editor on core legs, author on own (while they may contribute) | same as update; legs also the trip owner once a contributor left the trip (Q-16) |
 | `routing_routerequestcache` | `owner = me AND app.is_family()` | `owner = me AND app.can_create()` | same | same as select |

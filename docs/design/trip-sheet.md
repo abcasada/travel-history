@@ -1,8 +1,10 @@
 # Trip spreadsheet import
 
-New section (2026-11-18), design only: no importer code exists yet. Decision D-95 (pending Adam);
-open questions Q-18 to Q-21 in PLAN.md §25. Template: [docs/trips/trip-template.xlsx](../trips/trip-template.xlsx),
-rebuilt by `scripts/make_trip_template.py` (SYNTHETIC example).
+New section (2026-11-18). Decision D-95 (approved 2026-11-18); Q-18 to Q-21 answered (PLAN.md
+§25). Backend built in work-order item 14c-1 (2026-11-24, `backend/travel/trips/sheet/`, D-100 to
+D-102, §28.12); the preview UI is item 14c-2. Template: [docs/trips/trip-template.xlsx](../trips/trip-template.xlsx),
+rebuilt by `scripts/make_trip_template.py` (SYNTHETIC example), which also writes the copy the app
+serves (`backend/travel/trips/sheet/trip-template.xlsx`).
 
 ## 28. Trip spreadsheet import
 
@@ -280,3 +282,33 @@ instead of creating a second leg; the sheet preview shows the match as info.
 `trip.source` + `sheet_import`; `stop.time_precision`, `stop.sheet_key`, `stop.import_batch`;
 `leg.sheet_key`; tables `trip_sheet_record`, `trip_sheet_link` (RLS in the same migration).
 data-model.md §5.3 and §5.5 get the rows when the item lands.
+
+### 28.12 As built (item 14c-1)
+
+- **Code:** `travel/trips/sheet/` — `reader` (limits, defusedxml check, read-only openpyxl),
+  `layout` (blocks), `values` (cells, times, zones, references), `resolve` (places, zones, the
+  caller's people, purposes, tags, vehicles), `parse`, `plan` (outcome + diff), `commit`,
+  `importer` (worker step, CSV report), `api`. CLI `trips_sheet_import` (`--commit`,
+  `--create-people`, `--recreate`).
+- **Outcomes in the API:** `new`, `update`, `identical`, `review`, `deleted` and `transferred`
+  (both skipped), `blocked`. A record's stored outcome after the commit is `created`,
+  `updated`, `identical`, `review` or `skipped`.
+- **Commit body** (D-101): `records` (default every importable tab), `seen` (each tab's
+  `trip_updated_at` from the preview; a mismatch is 409 with the stale record ids, nothing
+  written), and the per-tab choices as record-id lists: `create_people` (Q-20), `recreate`
+  (a trip deleted in the app), `remove_missing` (Q-19).
+- **Identical bytes** (D-100): shown again as `duplicate` while a preview of them is open;
+  otherwise parsed again, since the outcome depends on the trips as they are now.
+- **Writes** (D-102): through `travel.trips.services` with `in_app=False` (no
+  `edited_in_app_at`; only `updated_at` moves), so rule 7's "edited in the app" means a person
+  edited it. A stop's Name is its place's name: a place is reused only with the same GeoNames
+  id (or coordinates) *and* name, so a renamed stop gets another place and a shared place is
+  never renamed. On update, dates the sheet doesn't give only widen the trip; people, tags and
+  a leg's people are only added; times are written with the zone they were computed in.
+- **Content hash** leaves out row numbers and which tags or people are new at parse time, so
+  inserting rows or adding a person in the app doesn't make an unchanged tab look changed.
+- **Not yet:** unknown-airline and aircraft resolution use the flight reference data as is;
+  GeoNames alternate names aren't loaded (exact matching uses `name` and `asciiname`); a
+  review flag's "apply the sheet version" action comes with the review queue (item 19); new
+  flight legs get no great-circle route until item 11.
+

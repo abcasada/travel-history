@@ -166,6 +166,9 @@ Frontend conventions: [docs/design/frontend-patterns.md](docs/design/frontend-pa
 - D-96 Production stack: own compose project, DB and `.env.prod` beside the repo; deployed only from pushed `main` via a release directory, images tagged by commit; §7.7 enforced at startup; trips.* redirects to travel.*; dev never answers a public name (pending Adam)
 - D-98 Parallel lanes: up to two builders at once (three after Ryzen) in git worktrees with own compose projects, disjoint footprints, at most one migration/API item at a time; real-data and prod items run alone; the orchestrator merges serially
 - D-99 Lane isolation (P1): `./dev lane new|rm`, `.env` from `.env.example`, project `travel-history-lane-<item>`, ports 8800+/5180+ (8790 taken), only `var/bulk/reference` copied, prod/restore-test/valhalla control refused in worktrees, hook scans worktrees
+- D-100 Identical trip-sheet bytes: shown again only while their preview is open, else parsed again
+- D-101 Trip-sheet commit: `seen` (trip_updated_at from the preview, 409 if stale) and per-tab record-id lists create_people / recreate / remove_missing
+- D-102 Trip-sheet writes: services with `in_app=False` (no edited_in_app_at), places reused by id/coords + name, blank dates only widen, people/tags only added, hash without row numbers
 
 ## 25. Open questions (for Adam, answer whenever — nothing is blocked on these)
 
