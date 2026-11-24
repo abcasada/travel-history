@@ -302,7 +302,7 @@ P1. **[H] Parallel readiness (Adam, 2026-11-23; D-98).** Runs alone, in the main
    - Prove it: two lanes running `./dev test-quick` at once, both green, and `./dev e2e` green in one lane, with the main dev stack and batch 33 untouched; record the host's peak RAM in the report.
    - Docs: a short "Parallel lanes" section in CLAUDE.md commands and docs/development (or the nearest existing dev doc).
    - Footprint: `dev`, `scripts` (stack.sh), `.githooks`, `compose.dev.yaml`, `.env.example`, docs (CLAUDE.md commands, dev doc). Flags: main-checkout.
-   - Status: not started
+   - Status: done (2026-11-23)
 
 40c. **[X] Authentik sign-in and the account handover (PROPOSED: G-3, G-4, G-5).** Three dispatches (split 2026-11-23: the build runs in a lane; only the production steps need the main checkout).
    - **40c-1 [X]: build, in a lane.** Needs neither real data nor Adam's Authentik values.
@@ -577,3 +577,4 @@ Nature: mech = mechanical, mod = moderate, hard. Size is S/M/L/XL with approxima
 - 2026-11-23 (planner): split 46 into 46a–46d (T16, T41, T42, T45, same order). Reason: as one item it spans flights, a new desktop app, the basemap and backend-wide typing, so it couldn't pair with anything.
 - 2026-11-23 (planner): batched L-1 to L-5 for Adam, all PROPOSED. Reason: they interpret or amend D-98 and ORCHESTRATION.md, or set a production deploy cadence.
 - 2026-11-23: Adam answered L-1 to L-5: defaults (yes to all). ORCHESTRATION.md and D-98 updated.
+- 2026-11-23: item P1 done and verified (pushed, tree clean, `./dev test-quick` 2321 + 105 passed in the main checkout; two lanes ran test-quick at once, e2e green in a lane; lowest available RAM 3.7 GiB; lane ports from 8800, D-99). Dispatching 40c-1 [X] ∥ 14c-1 [H] in lanes.
