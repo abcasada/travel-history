@@ -9,7 +9,8 @@
 #   source mounts; non-root; DB unpublished on an internal network only production joins;
 #   web published on 127.0.0.1:8784 only; .env.prod 0600; bulk storage outside the repository;
 # - the landing page and /healthz answer with production headers; the landing page offers only
-#   "Sign in"; plain HTTP is redirected; unknown hosts are refused without DEBUG's error page;
+#   "Sign in"; plain HTTP through the tunnel is redirected, plain HTTP on localhost (the SSH
+#   port-forward, G-4) is served; unknown hosts are refused without DEBUG's error page;
 # - every API operation in the release's OpenAPI schema and the private pages refuse anonymous
 #   requests;
 # - the public names: before go-live only the tracker paths answer on the canonical one; the
@@ -59,6 +60,7 @@ request() {
     --write-out '%{http_code}' --config - || true
 }
 https='header = "X-Forwarded-Proto: https"'
+tunnel_http=('header = "X-Forwarded-Proto: http"' 'header = "CF-Connecting-IP: 203.0.113.1"')
 header() { grep -i "^$1:" "$work/headers" | tail -1 | cut -d: -f2- | tr -d '\r' | sed 's/^ *//'; }
 
 production_headers() {  # description
@@ -137,8 +139,14 @@ links="$(grep -o 'href="[^"]*"' "$work/body" | sort -u | tr '\n' ' ' | sed 's/ $
 expect "  offers only Sign in" 'href="/auth/login"' "$links"
 grep -q '<form' "$work/body" && fail "  the landing page has a form" || pass "  no forms"
 grep -q 'name="robots" content="noindex, nofollow"' "$work/body" && pass "  noindex" || fail "  noindex missing"
-expect "GET / over plain HTTP is redirected" 301 "$(request GET / "localhost:$PROD_WEB_PORT")"
-expect "  to HTTPS" "https://localhost:$PROD_WEB_PORT/" "$(header location)"
+expect "GET / over plain HTTP through the tunnel is redirected" 301 \
+  "$(request GET / "$canonical" "${tunnel_http[@]}")"
+expect "  to HTTPS" "https://$canonical/" "$(header location)"
+expect "  also with a loopback Host header" 301 \
+  "$(request GET / "localhost:$PROD_WEB_PORT" "${tunnel_http[@]}")"
+expect "GET / over plain HTTP on localhost (the SSH port-forward, G-4) is served" 200 \
+  "$(request GET / "localhost:$PROD_WEB_PORT")"
+[ -z "$(header strict-transport-security)" ] && pass "  without HSTS" || fail "  sent HSTS over plain HTTP"
 expect "unknown Host refused" 400 "$(request GET / evil.example "$https")"
 grep -qiE 'traceback|DisallowedHost|settings' "$work/body" && fail "  DEBUG's error page" || pass "  without DEBUG's error page"
 expect "the SPA build is served (manifest)" 200 \
