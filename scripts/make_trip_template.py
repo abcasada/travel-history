@@ -11,6 +11,7 @@ installed on the host):
 """
 
 import datetime as dt
+import shutil
 from pathlib import Path
 
 from openpyxl import Workbook
@@ -128,8 +129,9 @@ INSTRUCTIONS = [
         None,
     ),
     (
-        "Upload the file in the app (Import, Trip spreadsheet). Nothing is saved until you have "
-        "seen the preview and pressed Import. Problems are listed by tab, row and column.",
+        "Upload the file in the app: open the menu under your name, choose Import trips from a "
+        "spreadsheet, then Upload a trip spreadsheet. Nothing is saved until you have checked the "
+        "preview and chosen Import. Problems are listed by tab, row and column.",
         None,
     ),
     ("", None),
@@ -254,10 +256,13 @@ def main() -> None:
     wb.properties.lastModifiedBy = "travel-history"
     wb.properties.created = FIXED_TIME
     wb.properties.modified = FIXED_TIME
-    for path in (OUT, SERVED):
-        path.parent.mkdir(parents=True, exist_ok=True)
-        wb.save(path)
-        print(f"wrote {path}")
+    OUT.parent.mkdir(parents=True, exist_ok=True)
+    wb.save(OUT)
+    print(f"wrote {OUT}")
+    # A byte copy, not a second save: zip entry times come from the clock, so two saves can differ.
+    SERVED.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(OUT, SERVED)
+    print(f"wrote {SERVED}")
 
 
 if __name__ == "__main__":
