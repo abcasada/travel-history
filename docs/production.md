@@ -105,12 +105,21 @@ auth.md §7.7 holds:
 - `RATELIMIT_CLIENT_IP_HEADER=CF-Connecting-IP` (per-address limits use the visitor's address,
   not the tunnel's);
 - CSP with `default-src` and `frame-ancestors 'none'`, nosniff, `Referrer-Policy: same-origin`,
-  `X-Frame-Options: DENY`, and the middleware that sends them;
-- upload size limits set;
+  `X-Frame-Options: DENY`, and the middleware that sends them, placed before WhiteNoise so the
+  installed PWA's own files carry them too (D-107);
+- upload size limits set, and per-endpoint body limits (`BodySizeLimitMiddleware`; the default
+  `DATA_UPLOAD_MAX_MEMORY_SIZE` at most 5 MiB, Django's 2.5 MiB by default, D-107);
 - no OIDC back channel (D-57 is development only) and an `https://` issuer (no mock provider);
 - a confidential client: `OIDC_CLIENT_ID` and `OIDC_CLIENT_SECRET` once `OIDC_ISSUER` is set
   (not on `ingest`, which signs nobody in), the `travel-users` group check and the second-factor
-  rule (G-5) switched on, and no loopback name among the public host names (D-103).
+  rule (G-5) switched on, and no loopback name among the public host names (D-103);
+- with `TRAVEL_PUBLIC_SCOPE=all`, the provider configured (`OIDC_ISSUER`, client id and secret,
+  D-107), and browser sessions re-checked with the provider every 60 s to 24 h
+  (`OIDC_SESSION_RECHECK_SECONDS`; `compose.prod.yaml` forces 3600, D-108).
+
+Production serves no API docs and no `openapi.json` (D-107). A request through the tunnel
+(`CF-Connecting-IP`) whose Host isn't a public name answers 404, so a tunnel "HTTP Host Header"
+override can't get around the scope.
 
 Per-address rate limits cover `/` (60 a minute), `/auth/login` and `/auth/callback` (30 each per
 10 minutes), alongside the tracker endpoints' own limits. Containers run as the host user (the
@@ -289,6 +298,12 @@ Family members (after go-live, [go-live runbook](go-live.md#adding-a-family-memb
 `./dev prod manage link_person` lists accounts and the persons without one, and
 `link_person ACCOUNT PERSON --execute` links the account to the person already on their trips,
 so the trips shared with `participants` visibility appear.
+
+Ending someone's access (D-108, [go-live runbook](go-live.md#removing-someones-access)):
+`./dev prod manage deactivate_account` lists the accounts with their session counts;
+`deactivate_account ACCOUNT --execute` deactivates it and deletes its sessions at once (dry run
+without `--execute`; it refuses the only active Admin), `--reactivate` lets it in again, and
+`--sign-out` only deletes its sessions (a lost phone). Each writes an audit log row.
 
 ## Memory
 

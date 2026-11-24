@@ -26,7 +26,7 @@ like "PLAN.md §N" still resolve; the section map in PLAN.md says which file hol
 | private | the owner only |
 | participants | the owner + users whose person is an effective participant (trip-level or any leg) |
 | family | every active account |
-| public | every active account + anonymous visitors, but anonymous visitors only through the public renderer and only allowlisted fields (§6.5) |
+| public | every active account + anonymous visitors, but anonymous visitors only through the public renderer and only allowlisted fields (§6.5). **Not settable until T37** (422 everywhere, D-109); trips stored as public earlier keep it |
 
 Default visibility comes from the purpose (Work → private, everything else → participants) and
 is configurable per user. Contributions always follow the trip's visibility.
@@ -73,6 +73,7 @@ object under §6.2. "Participant" means a Member whose person participates in th
 | Vehicle plate / VIN: read | ❌ unless managing | managing user | managing user | managing user | ❌ | ❌ |
 | Account: email, OIDC issuer/subject, role (the `user` row) | ✅ | own | own | own | own | ❌ |
 | Account: display name, linked person, active flag (directory, D-76) | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| Account: deactivate / reactivate (no API yet; the server's `deactivate_account`, D-108) | ✅ (others only) | ❌ | ❌ | ❌ | ❌ | ❌ |
 | Device tokens: list own | own | own | own | own | own (inert, see notes) | ❌ |
 | Device tokens: create / revoke own | own | own | own | own | ❌ | ❌ |
 | Push subscriptions, integrations, preferences | own | own | own | own | own (prefs, push) | ❌ |
@@ -130,6 +131,24 @@ Notes:
   no DELETE policy. Tests: `tests/permissions/test_account_commands.py` (as `travel_app` after
   each command: the kept account's rows, the moved identity, the sessions, the trips a linked
   person is on; every refusal leaves the database unchanged) and `tests/test_authentik.py`.
+- Ending access (work-order item 42a, D-108; auth.md §7.7, §7.8). Removing someone from
+  `travel-users` ends their access by itself within the hour: production sends every browser
+  session back through Authentik once it is an hour old (`OIDC_SESSION_RECHECK_SECONDS`), the
+  callback checks the group again, and a refused sign-in ends the browser's session; bearer
+  tokens are checked for the group on every request. `deactivate_account` (owner role, like
+  `set_role`) ends it at once: the account is deactivated (it reads nothing, D-53; its tracker
+  tokens are refused) and its sessions deleted; it refuses the only active Admin. In the app
+  only the Admin may change another account's active flag (the guard trigger; matrix row
+  `deactivate_alice`, `policy.can_deactivate_account`; no endpoint yet). Tests:
+  `tests/permissions/test_account_commands.py` (the command and its statements as `travel_app`,
+  what a deactivated account and its old sessions see), `tests/test_authentik.py` (the hourly
+  check, a refused sign-in, bearer tokens outside the group), and the matrix (now 109 actions ×
+  7 actors).
+- No public trips before T37 (work-order item 42a, D-109): `visibility: public` answers 422 on
+  create, edit and bulk edit for every signed-in caller (before any permission check, so it
+  reveals nothing), and the trips services refuse it on every other path. Tests: the
+  `make_trip_public` and `bulk_make_public` rows of `test_trips_api.py` and
+  `test_trips_api_rest.py`, plus the stored-public and purpose-default cases.
 - Trips API (work-order item 6, D-81; endpoints in [api.md](api.md) §17):
   - Every endpoint asks `travel.core.policy` and runs under RLS. A trip the caller can't see
     answers **404** (its existence isn't revealed), a visible trip they may not change **403**,

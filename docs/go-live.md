@@ -50,6 +50,11 @@ In the Authentik admin interface, check the "Travel History" application and its
    **Authenticator Validation** stage with device classes WebAuthn and TOTP and
    *Not configured action* = **Force the user to configure an authenticator**. The app also
    refuses a sign-in whose ID token says a password alone was used (`amr: ["pwd"]`, G-5).
+   In the same flow, the **User Login** stage's **Session duration**: `weeks=2` (the default
+   `seconds=0` ends Authentik's session when the browser closes). The app sends every session
+   back through Authentik once an hour to check the account is still in `travel-users`
+   (D-108); with a live Authentik session nobody notices, without one everybody signs in again
+   with their second factor every hour.
 5. **A refusal test** (2 minutes): sign in at `https://travel.adamcasada.com` after step 4 with
    an Authentik user who is *not* in `travel-users` (a throwaway one). Authentik should refuse
    it; if it lets it through, the app answers "not in the group". Delete that user afterwards.
@@ -142,12 +147,14 @@ The app is now public, behind the login wall: anonymous visitors see the landing
 1. **The go-live smoke, through Cloudflare:** `./dev golive-smoke https://travel.adamcasada.com`
    on the server (or anywhere with the repository). Paste a throwaway tracker token at the
    prompt, or press Enter to skip the token checks. Expect `PASS`. It checks: the landing page
-   and every response's headers (HSTS, CSP, nosniff, X-Frame-Options, Referrer-Policy, COOP);
-   plain HTTP redirected; `/auth/login` sending you to Authentik with state, nonce, PKCE and the
-   canonical callback, and a Secure, HttpOnly session cookie; every API operation and private
-   page refusing anonymous requests; the app's own 404s without a debug page and Cloudflare's
-   managed robots.txt; the trips.* redirect, which is not an open one; the tracker endpoints
-   unchanged on both names; no token in production's logs.
+   and every response's headers (HSTS, CSP, nosniff, X-Frame-Options, Referrer-Policy, COOP),
+   the installed app's own `index.html` and `sw.js` included; plain HTTP redirected;
+   `/auth/login` sending you to Authentik with state, nonce, PKCE and the canonical callback,
+   and a Secure, HttpOnly session cookie; every API operation and private page refusing
+   anonymous requests, no API docs or schema even with a Bearer header, and a large anonymous
+   form post refused (413); the app's own 404s without a debug page and Cloudflare's managed
+   robots.txt; the trips.* redirect, which is not an open one; the tracker endpoints unchanged
+   on both names; no token in production's logs.
 2. **Sign in from outside:** on your phone with Wi-Fi off, open `https://trips.adamcasada.com`.
    It lands on `https://travel.adamcasada.com`; sign in with your second factor and check your
    trips and history.
@@ -176,9 +183,25 @@ Do this once per person, after go-live:
 4. They reload the app and see the trips they were on.
 
 The command refuses a person that already has an account and an account that already has a
-person ([auth.md §7.8](design/auth.md)). To remove someone's access, remove them from
-`travel-users` in Authentik (or deactivate the Authentik user): every new sign-in is then
-refused.
+person ([auth.md §7.8](design/auth.md)).
+
+## Removing someone's access
+
+1. **Authentik:** remove them from `travel-users` (or deactivate the Authentik user). Every new
+   sign-in is refused, and their open sessions end by themselves within the hour: the app sends
+   each session back through Authentik once it is an hour old (D-108).
+2. **Server, to end it now:** `./dev prod manage deactivate_account` lists the accounts with
+   their sessions; `./dev prod manage deactivate_account ACCOUNT` shows what changes (dry run);
+   the same with `--execute` deactivates the account and deletes its sessions. Their trips and
+   history stay; they read nothing, their tracker tokens stop working, and anything shared with
+   them stays shared with their person. `--reactivate --execute` lets them in again.
+
+**A lost or stolen phone** (someone who keeps their access): in Authentik, end their sessions
+(the user's **Sessions** tab), then `./dev prod manage deactivate_account ACCOUNT --sign-out
+--execute` ends the app's sessions on every device at once. They sign in again on their other
+devices. If the phone ran a tracker, revoke its token on **Location trackers**. For your own
+phone, the same works: `deactivate_account` refuses to deactivate the only Admin, `--sign-out`
+doesn't.
 
 ## Rollback
 
@@ -193,8 +216,10 @@ Any one of these is enough; fastest first.
    route or put it back to the tracker-only values (the "Before" column above). Delete the
    `trips` CNAME if it remains.
 
-After a rollback, sessions made while public stay valid until they expire or the user signs out;
-that is harmless while the app isn't reachable. Nothing else needs undoing.
+After a rollback, sessions made while public stay valid until their hourly check with Authentik
+or until the user signs out; that is harmless while the app isn't reachable
+(`deactivate_account ACCOUNT --sign-out --execute` ends one account's sessions at once). Nothing
+else needs undoing.
 
 ## What Cloudflare can see
 
@@ -237,6 +262,8 @@ G-4's temporary redirect URI back in Authentik for the duration.
 | Sign-in refused after a password | The flow let a password through without a second factor; fix the Authenticator Validation stage (step 1.4). |
 | 403 with a Cloudflare page | A zone security feature (Bot Fight Mode, a WAF rule) challenges the requests; changing it is a zone change, your call. |
 | "site can't be found" | The home router remembers a failed lookup for up to 30 minutes (`~/infra/TUNNELS.md`); test on mobile data. |
+| Everyone has to sign in again (with the second factor) every hour | Authentik's own session doesn't last: set the User Login stage's Session duration (step 1.4). |
+| Every request answers 404, the tracker endpoints too | The route has an HTTP Host Header override: clear it (the app serves only its public names through the tunnel). |
 
 ## The go-live smoke test
 
@@ -253,6 +280,9 @@ The local stack is its own compose project (`travel-history-golive`, or
 `travel-history-golive-<item>` in a lane) with image tag `golive-local[-<item>]`: never
 production's project, database, volumes, `.env.prod` or commit-tagged images. Locally it also
 makes a synthetic account and tracker token in the throwaway database, so the accepted-token
-checks run too, and it checks the container itself (gunicorn, non-root, ports, Django's deploy
-checks). `./dev prod smoke` stays the check of the running production stack;
+checks run too, and a synthetic Member's sessions, to check that a trip can't be made public,
+that a session past its hourly Authentik check is signed out and that `deactivate_account`
+ends access at once; it checks the container itself (gunicorn, non-root, ports, Django's deploy
+checks, the hourly check's setting, and that scope `all` refuses to start without the provider)
+and that a loopback Host through the tunnel answers 404. `./dev prod smoke` stays the check of the running production stack;
 `./dev prod tracker smoke` the check of the tracker-only `ingest` service.

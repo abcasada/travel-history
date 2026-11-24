@@ -61,7 +61,10 @@ budget ~2–2.5 GB RAM (§21, §26).
 3. **Native application + provider** "Travel Companion (Android)": client type **public**, PKCE
    S256 (the app always sends it), redirect URI (strict) `com.adamcasada.travel:/oauth2redirect`,
    scopes `openid profile email offline_access`, same signing key, same group binding. The API
-   accepts tokens from both providers' `iss`/`aud` pairs.
+   accepts tokens from both providers' `iss`/`aud` pairs, and only those that list
+   `travel-users` in `groups` (and, when they carry `amr`, a second factor), checked on every
+   request (D-108): phase 9 confirms Authentik's access tokens carry the profile scope's
+   `groups` claim.
 4. **Enrollment by invitation:** the `Invitation-based Enrollment` blueprint, with the Invitation
    stage set to *not* continue without an invitation, single-use invitations, `fixed_data`
    prefilled with name and email, and the User Write stage adding new users to `travel-users`.
@@ -72,6 +75,12 @@ budget ~2–2.5 GB RAM (§21, §26).
    (G-5, D-103): Authentik's ID token reports `amr: ["pwd", "mfa"]` after a password and an
    authenticator and `["user"]` after a passkey, both accepted; a password alone (`["pwd"]`)
    is refused.
+   **Session duration** on the flow's User Login stage: about the app's own 14 days (e.g.
+   `weeks=2`) rather than the default `seconds=0` (until the browser closes). The app sends a
+   browser session back through Authentik every hour (D-108) to see whether the account is still
+   in `travel-users`; while Authentik's session lives that trip asks nothing, otherwise it is a
+   full sign-in with the second factor each time (an installed phone app loses a browser-session
+   cookie whenever it is closed). To check in 40c-2 against the deployed version.
 6. **API token** for this app (user `travel-provisioner`, intent `api`) with permission to
    create users and invitations and add users to `travel-users`, used by the approval flow:
    `POST /api/v3/stages/invitation/invitations/` (+ `.../send_email/`) or
@@ -149,7 +158,9 @@ Only these work without a session: `/` (landing), `/auth/login`, `/auth/callback
 `/static/…`, the SPA's static files (`/app/assets/…`, `/app/icons/…`,
 `/app/manifest.webmanifest`, `/app/sw.js` — code and icons only, no data), `/healthz`. The SPA
 itself lives under `/app/` and is behind the wall. A test walks the URL resolver
-and asserts every other route rejects anonymous requests.
+and asserts every other route rejects anonymous requests. The API's docs and schema
+(`/api/v1/docs`, `/api/v1/openapi.json`) don't exist in production and need a signed-in
+session in development (D-107).
 
 ### 7.7 Hardening checklist
 
@@ -170,12 +181,23 @@ and `/auth/callback` are limited per address (60 a minute; 30 per 10 minutes eac
 `./dev prod smoke` checks the rest (ports, networks, non-root, `.env.prod` mode, headers,
 anonymous refusals).
 
+Since item 42a (D-107 to D-109, the 41a review's fixes): the CSP and X-Frame-Options middleware
+wrap WhiteNoise, so the installed PWA's `index.html` (which the service worker answers every
+navigation with), `sw.js` and the assets carry them; request bodies are limited per endpoint
+before anything reads them (32 MiB upload chunks, 5 MiB tracker posts, 2.5 MiB everything else);
+production has no API docs or schema URL; bearer tokens the provider can't vouch for (or that it
+is too slow to check) are no user, with a 30-second back-off; a request through the tunnel whose
+Host isn't a public name answers 404; scope `all` needs the provider configured; browser
+sessions go back through the provider hourly (`OIDC_SESSION_RECHECK_SECONDS`), so an account
+removed from `travel-users` loses access within the hour, and a refused sign-in ends the
+browser's session; no trip can be made public until T37.
+
 ### 7.8 Account handover and linking (server commands)
 
-Two owner-role commands (D-104, `travel/accounts/handover.py`), run with `./dev prod manage`
-and never reachable from the app. Both take ids only (without arguments they list what to
-choose from), change nothing without `--execute`, run in one transaction, and write an
-`accounts_auditlog` row and a log line.
+Three owner-role commands (D-104, D-108, `travel/accounts/handover.py`), run with
+`./dev prod manage` and never reachable from the app. All take ids only (without arguments they
+list what to choose from), change nothing without `--execute`, run in one transaction, and write
+an `accounts_auditlog` row and a log line.
 
 - **`rebind_identity NEW OLD` (G-3, item 40c-3):** Adam's first Authentik sign-in creates an empty
   account NEW, because accounts are never matched by email. The command moves NEW's identity
@@ -184,6 +206,11 @@ choose from), change nothing without `--execute`, run in one transaction, and wr
   and both accounts' sessions. It refuses unless NEW is a brand-new active Member with an
   identity from `OIDC_ISSUER`, no person and no other rows (checked over every foreign key to
   `accounts_user`), newer than OLD, and OLD is active without a real identity yet.
+- **`deactivate_account ACCOUNT` (item 42a, D-108):** ends someone's access at once instead of
+  at the next hourly provider check: `is_active = false` (the account then reads nothing, D-53,
+  its tracker tokens stop working, its data stays) and every session it has deleted. It refuses
+  the only active Admin. `--reactivate` lets the account in again; `--sign-out` only deletes its
+  sessions (a lost phone of someone who keeps their access).
 - **`link_person ACCOUNT PERSON`:** links a family member's account to the person Adam already
   put on trips (the linking step of the onboarding in §7.3, pulled forward from T33). Trips
   default to `participants` visibility (permissions.md §6.2), so until then the account can't
@@ -191,5 +218,6 @@ choose from), change nothing without `--execute`, run in one transaction, and wr
   already has a person.
 
 Tests: `tests/permissions/test_account_commands.py` (as `travel_app`: the commands and their
-statements are refused; after them, row-level security shows the kept rows, the moved identity
-and the linked person's trips; every refusal leaves the database unchanged).
+statements are refused; after them, row-level security shows the kept rows, the moved identity,
+the linked person's trips and nothing for a deactivated account, whose sessions answer 401;
+every refusal leaves the database unchanged).

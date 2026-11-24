@@ -15,7 +15,8 @@ orchestrated work order in [docs/ROADMAP.md](docs/ROADMAP.md) (process:
 runs separately from dev (item 40a, 2026-11-19: `./dev prod …`, web on `127.0.0.1:8784`, not
 exposed; [docs/production.md](docs/production.md), D-96); the copy of the real data from dev
 into production is built and rehearsed (item 40b, `./dev prod import-from-dev`, D-97); the
-Authentik sign-in and the handover commands are built (item 40c-1, D-103, D-104; deployed in 40c-2).
+Authentik sign-in and the handover commands are built (item 40c-1, D-103, D-104; deployed in 40c-2);
+41a's go-live review fixes are in (item 42a, D-107 to D-111).
 
 | Phase | Status | Detail |
 |---|---|---|
@@ -174,6 +175,11 @@ Frontend conventions: [docs/design/frontend-patterns.md](docs/design/frontend-pa
 - D-104 Go-live commands `rebind_identity` (G-3) and `link_person`: owner role, ids only (never email), dry run unless `--execute`, one transaction, audit log; refuse every other case
 - D-105 Go-live: travel.* and trips.* routes to production `web` (8784), tracker path rule retired, `ingest` stays stopped; scope flip last; `./dev golive-smoke local` (throwaway, scope `all`) and through Cloudflare
 - D-106 Drag editor polish: expired proposals re-proposed (verified only if the same line comes back), anchor popup, touch (hold the line to grab), `Route.sources` in the version list
+- D-107 Go-live edge hardening: CSP/X-Frame-Options wrap WhiteNoise, per-endpoint body limits (2.5 MiB default), no docs/schema in production, provider errors = no user, tunnel Host must be public, scope `all` needs the provider
+- D-108 Access ends with the provider: sessions re-checked through Authentik hourly in production, refused sign-ins end the session, bearer tokens checked for the group each request, `deactivate_account` (owner role, dry run, audited)
+- D-109 No trip becomes public before T37: 422 on create, edit, bulk; services refuse it everywhere else
+- D-110 e2e leftovers: dev copy and `e2e_cleanup` remove E2E persons, e2e tags and SYNTHETIC trip-sheet batches (by workbook title); raw files kept
+- D-111 Base digests refreshed; builds run `apt-get upgrade` (Debian security updates); CPU smoke passed (amends D-78)
 
 ## 25. Open questions (for Adam, answer whenever — nothing is blocked on these)
 
