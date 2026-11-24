@@ -14,5 +14,12 @@ Lane 2 handoff for item 21a (the trip list as a working tool). Fold into NEXT.md
   `FlightRecord.Status` both "Status", so the generated type is `resolved | unmatched` (the
   backend actually validates `candidate | confirmed`). Fix item: rename the trip enum in the
   schema (e.g. `TripStatus`), regenerate, then add the filter. Candidates only exist from item 19.
-- **Tests:** see the final report / commit log (Vitest: TripListBulk, HeaderSearch, selection,
-  filter, geo, shortcuts; e2e step "list as a working tool").
+- **Tests (lane, 2026-11-24):** `./dev test-quick` 2580 backend passed (31 slow deselected),
+  Vitest 163 passed in 27 files; lint and type-check clean; `./dev e2e` green (only the known
+  basemap glyph 404). Lane stack is down.
+- **Merge notes:** the e2e now opens the account menu with `locator("summary", { hasText: "Dev
+  Member" })`, because the new Person filter also lists "Dev Member". The e2e list step creates
+  its two trips and tag through the API and deletes them in a `finally`.
+- **Fix items:** the trip status enum name clash (above). The mobile list's own search box is
+  still bound straight to the URL; the header search had dropped letters typed fast that way
+  and now keeps its text locally. The mobile box may need the same fix.
