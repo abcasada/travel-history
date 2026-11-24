@@ -131,7 +131,8 @@ async function initialState(
 }
 
 function Toolbar({ leg }: { leg: LegOut }) {
-  const { state, past, future, busy, error, undo, redo, save, stop } = useEditorStore();
+  const { state, past, future, busy, error, saveStatus, undo, redo, save, stop } =
+    useEditorStore();
   const setEditing = useRoutingStore((s) => s.setEditing);
   const clearProposal = useRoutingStore((s) => s.clear);
   const [note, setNote] = useState("");
@@ -217,6 +218,11 @@ function Toolbar({ leg }: { leg: LegOut }) {
       >
         {saving ? "Saving…" : "Save the edited route"}
       </Button>
+      {saving && saveStatus && (
+        <p className="mt-1 text-sm text-slate-600" role="status">
+          {saveStatus}
+        </p>
+      )}
       {saveError && (
         <p className="mt-1 text-sm text-red-700" role="alert">
           {saveError}

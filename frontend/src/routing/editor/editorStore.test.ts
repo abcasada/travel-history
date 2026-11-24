@@ -112,19 +112,82 @@ test("appending to an empty editor starts a line without routing", async () => {
   ]);
 });
 
-test("saving sends pieces and the fixed anchors; expired proposals are resent as drawn", async () => {
+function saveMock(mock: ReturnType<typeof stubFetch>, reproposed: Response | (() => Response)) {
+  const saved = { id: 99 };
+  let saves = 0;
+  mock.mockImplementation(async (input: RequestInfo | URL) => {
+    const path = new URL(String(input), "http://localhost").pathname;
+    if (path === "/api/v1/routing/route") {
+      return typeof reproposed === "function" ? reproposed() : reproposed.clone();
+    }
+    saves += 1;
+    return saves === 1
+      ? new Response(JSON.stringify({ detail: "expired", expired: [0] }), { status: 409 })
+      : new Response(JSON.stringify(saved), { status: 201 });
+  });
+  return saved;
+}
+
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+
+test("an expired proposal is routed again and saved as the same verified piece", async () => {
+  const mock = stubFetch([PROPOSE]);
+  await useEditorStore.getState().dragLine([-97.47, 38.26], [-97.4, 38.0], 10);
+  mock.mockClear();
+  const saved = saveMock(mock, json({ ...answer(), cached: false }));
+  await expect(useEditorStore.getState().save("by hand")).resolves.toEqual(saved);
+  // the same waypoints go back to the proxy, which caches the answer again
+  expect(bodies(mock, "/api/v1/routing/route")).toEqual([
+    { waypoints: [START, [-97.4, 38], END], profile: "auto" },
+  ]);
+  const [first, second] = bodies(mock, "/api/v1/legs/200/routes/edited");
+  expect(first).toEqual({
+    pieces: [{ source: "proposal", waypoints: [START, [-97.4, 38], END], start: 0, end: 3 }],
+    waypoints: [ROUTED[0], ROUTED[1], ROUTED[3]],
+    note: "by hand",
+  });
+  expect(second.pieces).toEqual(first.pieces);
+  expect(useEditorStore.getState().saveStatus).toBeNull();
+});
+
+test("when the new answer differs, the line is kept and that part is sent as drawn", async () => {
+  const mock = stubFetch([PROPOSE]);
+  await useEditorStore.getState().dragLine([-97.47, 38.26], [-97.4, 38.0], 10);
+  mock.mockClear();
+  const other = [ROUTED[0], [-97.45, 38.1], ROUTED[3]] as Coord[];
+  saveMock(mock, json(answer(other)));
+  await useEditorStore.getState().save("by hand");
+  const [, second] = bodies(mock, "/api/v1/legs/200/routes/edited");
+  expect(second.pieces).toEqual([{ source: "drawn", coordinates: ROUTED, engine: "valhalla" }]);
+  expect(coords(useEditorStore.getState().state)).toEqual(ROUTED);
+});
+
+test("when routing again fails, that part is sent as drawn", async () => {
+  const mock = stubFetch([PROPOSE]);
+  await useEditorStore.getState().dragLine([-97.47, 38.26], [-97.4, 38.0], 10);
+  mock.mockClear();
+  saveMock(mock, () => json({ detail: "no routing service is available right now" }, 503));
+  await useEditorStore.getState().save("");
+  const [, second] = bodies(mock, "/api/v1/legs/200/routes/edited");
+  expect(second.pieces).toEqual([{ source: "drawn", coordinates: ROUTED, engine: "valhalla" }]);
+});
+
+test("saving sends pieces and the fixed anchors; a second expiry is resent as drawn", async () => {
   const saved = { id: 99 };
   const mock = stubFetch([PROPOSE]);
   await useEditorStore.getState().dragLine([-97.47, 38.26], [-97.4, 38.0], 10);
   let calls = 0;
-  mock.mockImplementation(async () => {
+  mock.mockImplementation(async (input: RequestInfo | URL) => {
+    const path = new URL(String(input), "http://localhost").pathname;
+    if (path === "/api/v1/routing/route") return json(answer());
     calls += 1;
-    return calls === 1
+    return calls <= 2
       ? new Response(JSON.stringify({ detail: "expired", expired: [0] }), { status: 409 })
       : new Response(JSON.stringify(saved), { status: 201 });
   });
   await expect(useEditorStore.getState().save("by hand")).resolves.toEqual(saved);
-  const [first, second] = bodies(mock, "/api/v1/legs/200/routes/edited");
+  const [first, second, third] = bodies(mock, "/api/v1/legs/200/routes/edited");
   expect(first).toEqual({
     pieces: [
       {
@@ -137,5 +200,6 @@ test("saving sends pieces and the fixed anchors; expired proposals are resent as
     waypoints: [ROUTED[0], ROUTED[1], ROUTED[3]],
     note: "by hand",
   });
-  expect(second.pieces).toEqual([{ source: "drawn", coordinates: ROUTED, engine: "valhalla" }]);
+  expect(second.pieces).toEqual(first.pieces);
+  expect(third.pieces).toEqual([{ source: "drawn", coordinates: ROUTED, engine: "valhalla" }]);
 });

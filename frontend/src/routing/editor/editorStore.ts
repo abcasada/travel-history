@@ -32,6 +32,7 @@ import {
   type RoutePlan,
   toPieces,
 } from "./model";
+import { reproposeExpired, sleep } from "./repropose";
 
 /** Enough steps for a long session; each state shares its unchanged points with the others. */
 const MAX_UNDO = 100;
@@ -43,6 +44,8 @@ type Store = {
   future: EditorState[];
   busy: boolean;
   error: string | null;
+  /** What a long save is doing (re-checking expired routed parts), else null. */
+  saveStatus: string | null;
   /** Bumped when the map must redraw from the state (e.g. a failed drag snaps back). */
   revision: number;
   start: (legId: number, state: EditorState) => void;
@@ -113,6 +116,7 @@ export const useEditorStore = create<Store>((set, get) => {
     future: [],
     busy: false,
     error: null,
+    saveStatus: null,
     revision: 0,
     start: (legId, state) =>
       set({ legId, state, past: [], future: [], busy: false, error: null, revision: 0 }),
@@ -155,19 +159,37 @@ export const useEditorStore = create<Store>((set, get) => {
       const { legId, state } = get();
       if (legId === null || state.points.length < 2) return null;
       const waypoints = controlPoints(state).map((c) => [c[0], c[1]]);
-      let expired = new Set<number>();
+      let asDrawn = new Set<number>();
+      let reproposed = false;
       // A session can outlast the 10-minute proposal cache: the server lists the expired
-      // pieces (409) and they are sent once more as drawn points that keep their credit.
-      for (let attempt = 0; attempt < 2; attempt++) {
-        const { pieces, pieceSources } = toPieces(state, expired);
-        try {
-          return await saveEditedRoute(legId, { pieces, waypoints, note });
-        } catch (error) {
-          const conflict = error instanceof ApiError && error.status === 409;
-          const body = conflict ? (error.body as { expired?: number[] } | undefined) : undefined;
-          if (attempt > 0 || !body?.expired) throw error;
-          expired = new Set(body.expired.map((position) => pt(pieceSources, position)));
+      // pieces (409). They are routed again once through the proxy (verified if the line
+      // comes back the same); what still can't be verified is sent as drawn points that keep
+      // their credit (D-93).
+      try {
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const { pieces, pieceSources } = toPieces(state, asDrawn);
+          try {
+            return await saveEditedRoute(legId, { pieces, waypoints, note });
+          } catch (error) {
+            const conflict = error instanceof ApiError && error.status === 409;
+            const body = conflict ? (error.body as { expired?: number[] } | undefined) : undefined;
+            if (attempt === 2 || !body?.expired) throw error;
+            const expired = body.expired.map((position) => pt(pieceSources, position));
+            let still: Iterable<number> = expired;
+            if (!reproposed) {
+              reproposed = true;
+              still = await reproposeExpired(state, expired, {
+                propose: (request) => proposeRoute(request),
+                wait: sleep,
+                progress: (done, total) =>
+                  set({ saveStatus: `Re-checking routed parts (${done + 1} of ${total})…` }),
+              });
+            }
+            asDrawn = new Set([...asDrawn, ...still]);
+          }
         }
+      } finally {
+        set({ saveStatus: null });
       }
       return null;
     },
