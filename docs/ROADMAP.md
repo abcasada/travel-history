@@ -127,12 +127,13 @@ Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhi
     - **Tests:** the loader on a SYNTHETIC fixture, ranking and limits, API auth, the picker. The e2e adds a stop by city name.
     - **Out:** Natural Earth, Census counties and reverse geocoding (item 14a).
     - Status: done (2026-11-18)
-    - **14a. [M] T26 part 2: Natural Earth and Census boundaries + offline reverse geocoding.**
-      - Natural Earth admin-0/1 and Census county loaders, same pattern as item 14.
-      - Stops named offline ("near <town>, <state>", phases.md 6.1, D-20).
-      - Runs before item 28 (territories), which needs the boundaries.
-      - Footprint: `geo` (loaders into the existing boundary tables, reverse geocoding), `trips` (offline stop names) (?), fe:trips (stop editor) (?). Flags: migrations (?), api (?).
-      - Status: todo
+    - **14a. [M] T26 part 2: Natural Earth and Census boundaries + offline reverse geocoding.** Two dispatches (split 2026-11-24 so part 1 can run beside 42a).
+      - **14a-1 [M] geo only:** Natural Earth admin-0/1 and Census county loaders, same pattern as item 14 (pinned snapshot + SHA-256, D-94), plus a reverse-geocoding service ("near <town>, <state>", phases.md 6.1, D-20) with tests. No `trips` or frontend change. Its merge waits until 40e's smoke passes (backend freeze).
+        - Footprint: `geo`. Flags: migrations (?).
+        - Status: todo
+      - **14a-2 [M] stop names:** use the service for offline stop names in `trips` and the stop editor. Runs before item 28 (territories), which needs the boundaries.
+        - Footprint: `trips` (offline stop names), fe:trips (stop editor). Flags: api (?).
+        - Status: todo
     - **14b. [M] Stop and leg notes.** Adam's request, 2026-11-18; runs right after item 14.
       - A free-text `notes` field on each stop and each leg (new migration), edited by whoever can edit that stop or leg (travel.core.policy), readable by whoever can see it, like `Trip.notes`. Private: never in public snapshots (permissions.md §6.5).
       - API schemas, OpenAPI + client regenerated; the stop and leg editors and the trip page show and edit them in both shells.
@@ -403,7 +404,7 @@ P1. **[H] Parallel readiness (Adam, 2026-11-23; D-98).** Runs alone, in the main
    - The template's Instructions tab matches the UI's wording ("Import" / "Import trips from a spreadsheet"): rebuild docs/trips/trip-template.xlsx with its generator.
    - The basemap glyph 404 in the e2e: find the cause and fix it, or make the e2e ignore only that exact URL if it's an upstream gap (say which).
    - Footprint: `dev` (lane subcommand), `scripts/lane.sh`, fe:trips (mobile search only), docs/trips template, fe:map style/glyphs, e2e. Flags: none.
-   - Status: todo
+   - Status: done (2026-11-24; glyph 404 is an upstream OpenFreeMap gap, ignored for that exact URL)
 
 42a. **[X] Go-live hardening from 41a** (re-scoped 2026-11-24: 41a found no blockers, but these are cheap and should land before 40c-2 deploys; docs/review/2026-11-24-go-live.md).
    - F-1 CSP for the installed PWA (WhiteNoise serves before the CSP middleware); F-2 no 40 MB anonymous bodies (per-endpoint limits); F-3 removing travel-users ends sessions at next request or refresh, plus an owner-role deactivate command; F-6 refresh pinned base digests and re-run the CPU smoke test (no AVX); F-7 Ninja docs/schema off in production, `requests` errors in `OidcBearer` → no user; F-8 tunnel requests with a non-public Host → 404; F-9 scope `all` requires an https issuer and client credentials; F-10 `public` visibility refused (422) until T37; F-11 dev-copy pruning and `e2e_cleanup` cover e2e persons, the `e2e` tag and trip-sheet batches. Smoke checks for each where possible.
@@ -593,3 +594,4 @@ Nature: mech = mechanical, mod = moderate, hard. Size is S/M/L/XL with approxima
 - 2026-11-24: item 41a done (reviewer, in a worktree; merged docs only): 0 blockers, 6 fix soon, 11 minor. Re-scoped 42a [H → X] to the cheap fix-soon and minor findings that touch auth and exposure (F-1–F-3, F-6–F-11), to run before 40c-2. Reason: they'd otherwise ship to the internet and wait for item 43; the delta review covers 42a's diff.
 - 2026-11-24: item 21a done and verified in lane 2, merged (`./dev test-quick` 2580 + 163 passed in the main checkout; e2e green in the lane). Left out: the trip status filter (OpenAPI enum name clash; fix item queued).
 - 2026-11-24: item 27 done and verified in lane 1, merged (`./dev test-quick` 2580 + 182 passed in the main checkout; e2e green in the lane; D-106). Added 43a [M] small fixes beside 42a. Reason: 21b overlaps 42a's `trips` footprint, and 11/12 wait for Review pause B, so lane 1 takes queued fixes.
+- 2026-11-24: item 43a done and verified in lane 1, merged (`./dev test-quick` 2580 + 184 passed in the main checkout). Split 14a into 14a-1 (geo loaders + reverse-geocoding service) and 14a-2 (stop names in trips/UI), and pulled 14a-1 forward into lane 1. Reason: 21b overlaps 42a's `trips` footprint and 11/12 wait for Review pause B; 14a-1 is geo-only, nothing a pause reviews, and its merge waits for 40e.
