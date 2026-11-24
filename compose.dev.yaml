@@ -34,6 +34,9 @@ services:
       # Containers can't reach the host's LAN address (host firewall), so server-to-server
       # OIDC calls go to the mock provider directly (travel/accounts/oidc.py).
       OIDC_BACKCHANNEL_URL: http://oidc:8080
+      # The hourly provider re-check (D-108) is off in development; a lane's .env may set a few
+      # seconds for `./dev e2e --recheck` (D-120).
+      OIDC_SESSION_RECHECK_SECONDS: ${OIDC_SESSION_RECHECK_SECONDS:-0}
       SMTP_HOST: mail
       SMTP_PORT: "1025"
       SMTP_USE_TLS: "false"

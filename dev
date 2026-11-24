@@ -121,6 +121,9 @@ case "$cmd" in
   npm)      node_run npm "$@" ;;
   e2e)
     # Headless Chrome (host network: containers can't reach the host's LAN address otherwise).
+    # --recheck: the hourly re-check redirect instead of the smoke test (e2e/recheck.mjs, D-120).
+    script=smoke.mjs
+    if [ "${1:-}" = --recheck ]; then script=recheck.mjs; shift; fi
     vite="$(env_value TRAVEL_VITE_PORT)"
     base="${1:-http://$(env_value TRAVEL_DEV_HOST):${vite:-5173}}"
     # Per-stack browser container and debugging port, so lanes can run e2e beside each other.
@@ -138,7 +141,8 @@ case "$cmd" in
     sleep 3
     docker run --rm --network host --user "$(id -u):$(id -g)" -e HOME=/tmp \
       -e CDP_PORT="$cdp" -e OIDC_PORT="$oidc_port" \
-      -v "$PWD/e2e:/w" -w /w node:24.22.0-trixie-slim@sha256:a6155384446670e9719bdc4fd0ebe4d4b29fb32a8d6aa523da3547a6cfbcf22c node smoke.mjs "$base" && status=0 || status=$?
+      -e RECHECK_SECONDS="$(env_value OIDC_SESSION_RECHECK_SECONDS)" \
+      -v "$PWD/e2e:/w" -w /w node:24.22.0-trixie-slim@sha256:a6155384446670e9719bdc4fd0ebe4d4b29fb32a8d6aa523da3547a6cfbcf22c node "$script" "$base" && status=0 || status=$?
     # Each run re-uploads the same synthetic fixture; drop the duplicate batches it leaves.
     "$0" manage e2e_cleanup "$(sha256sum e2e/fixtures/timeline-synthetic.json | cut -d' ' -f1)"
     exit "$status"
@@ -176,6 +180,7 @@ case "$cmd" in
 ./dev restore-test        backup -> restore into a scratch DB -> verify (throwaway key)
 ./dev import-scale-test [size_mb|cleanup]  realistic-size Timeline import on the dev stack (default 1024 MB; deletes its data after)
 ./dev e2e [base-url]      browser smoke test (sign-in, notice, map, both shells; screenshots in e2e/out/)
+./dev e2e --recheck [url] the hourly re-check redirect (needs OIDC_SESSION_RECHECK_SECONDS=15 in a lane's .env)
 ./dev golive-smoke local [--keep]   production image of HEAD, scope all, throwaway DB, 127.0.0.1
                           only; every go-live check, then removed (local-check, local-down)
 ./dev golive-smoke https://<host> [--scope all|tracker]   the same checks through Cloudflare
