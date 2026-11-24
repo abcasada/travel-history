@@ -305,7 +305,7 @@ P1. **[H] Parallel readiness (Adam, 2026-11-23; D-98).** Runs alone, in the main
    - Status: done (2026-11-23)
 
 40c. **[X] Authentik sign-in and the account handover (PROPOSED: G-3, G-4, G-5).** Three dispatches (split 2026-11-23: the build runs in a lane; only the production steps need the main checkout).
-   - **40c-1 [X]: build, in a lane.** Needs neither real data nor Adam's Authentik values.
+   - **40c-1 [X]: build, in a lane.** Needs neither real data nor Adam's Authentik values. **Done (2026-11-24).**
      - **Authentik:** point production at Authentik per auth.md §7.2 (per-provider issuer, confidential client, `travel-users` group check, `auth_time`, end-session logout). D-57's back channel is dev-only.
      - **Tests:** Authentik-shaped claims (issuer with a trailing slash, `email_verified=false`, group lists, a missing group refused, `auth_time`); the `amr` second-factor check (G-5).
      - **Pre-exposure sign-in:** make it work over an SSH port-forward to `localhost:8784` (G-4), without weakening the public-host settings.
@@ -579,3 +579,4 @@ Nature: mech = mechanical, mod = moderate, hard. Size is S/M/L/XL with approxima
 - 2026-11-23: Adam answered L-1 to L-5: defaults (yes to all). ORCHESTRATION.md and D-98 updated.
 - 2026-11-23: item P1 done and verified (pushed, tree clean, `./dev test-quick` 2321 + 105 passed in the main checkout; two lanes ran test-quick at once, e2e green in a lane; lowest available RAM 3.7 GiB; lane ports from 8800, D-99). Dispatching 40c-1 [X] ∥ 14c-1 [H] in lanes.
 - 2026-11-24: item 14c-1 done and verified in lane 2, merged (rebased on main, `./dev test-quick` 2472 + 105 passed in the main checkout; images rebuilt for defusedxml; dev migrated to history 0014 / trips 0008; batch 33 intact). D-100–D-102. Lane 2 takes 14c-2 next.
+- 2026-11-24: item 40c-1 done and verified in lane 1, merged (rebased on main; its decisions renumbered D-100/D-101 → D-103/D-104 because 14c-1 took D-100–D-102; `./dev test-quick` 2580 + 105 passed in the main checkout). 40c-2 waits on Adam's Authentik values. Lane 1 takes 40d.
