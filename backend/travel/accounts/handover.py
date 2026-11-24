@@ -1,4 +1,4 @@
-"""Server-side account repairs for go-live (work-order item 40c, G-3, D-101), run as the owner
+"""Server-side account repairs for go-live (work-order item 40c, G-3, D-104), run as the owner
 role through `./dev prod manage` (or `./dev manage`). Never reachable from the app.
 
 - `rebind_identity`: Adam's first Authentik sign-in creates a new, empty account, because

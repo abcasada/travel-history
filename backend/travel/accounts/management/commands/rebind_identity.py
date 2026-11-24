@@ -1,4 +1,4 @@
-"""Move a new account's Authentik sign-in onto the existing account (G-3, item 40c, D-101;
+"""Move a new account's Authentik sign-in onto the existing account (G-3, item 40c, D-104;
 travel.accounts.handover). Owner role only:
 
   ./dev prod manage rebind_identity                     list the accounts

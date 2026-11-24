@@ -1,4 +1,4 @@
-"""Link a family member's account to the person already on their trips (item 40c, D-101,
+"""Link a family member's account to the person already on their trips (item 40c, D-104,
 auth.md §7.3; travel.accounts.handover). Owner role only, like set_role:
 
   ./dev prod manage link_person                              list accounts and unlinked persons

@@ -186,7 +186,7 @@ OIDC_BACKCHANNEL_URL = env.str("OIDC_BACKCHANNEL_URL", "")
 # Only members of this provider group may use the app ("" disables the check; production
 # refuses that).
 OIDC_REQUIRED_GROUP = env.str("OIDC_REQUIRED_GROUP", "travel-users")
-# G-5 (D-100): when an ID token lists its authentication methods (`amr`), one must be one of
+# G-5 (D-103): when an ID token lists its authentication methods (`amr`), one must be one of
 # these. Authentik: "mfa" = password plus an authenticator, "user" = a passkey; ["pwd"] alone
 # is refused. Tokens without `amr` pass ("" disables the check; production refuses that).
 OIDC_SECOND_FACTOR_AMR = env.list("OIDC_SECOND_FACTOR_AMR", ["mfa", "user"])
@@ -237,7 +237,7 @@ BEHIND_TLS_PROXY = env.bool("DJANGO_BEHIND_TLS_PROXY", False)
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https") if BEHIND_TLS_PROXY else None
 # The redirect to HTTPS is travel.core.exposure.HttpsRedirectMiddleware's (the container's own
 # /healthz excepted), so Django's own stays off: it can't exempt plain HTTP on localhost, which
-# the pre-exposure sign-in over an SSH port-forward needs (G-4, D-100). Public host names and
+# the pre-exposure sign-in over an SSH port-forward needs (G-4, D-103). Public host names and
 # every request through the tunnel are still redirected.
 TRAVEL_SSL_REDIRECT = env.bool("DJANGO_SSL_REDIRECT", BEHIND_TLS_PROXY)
 SECURE_SSL_REDIRECT = False

@@ -11,7 +11,7 @@ like "PLAN.md §N" still resolve; the section map in PLAN.md says which file hol
   against the provider's JWKS) with ~50 lines of our own login/callback/logout/re-auth views.
   Users are matched on `(issuer, sub)`, never on email alone. See D-07 for why not
   mozilla-django-oidc or django-allauth.
-- **Before any account is found or created** (D-100, `travel/accounts/provisioning.py`): the ID
+- **Before any account is found or created** (D-103, `travel/accounts/provisioning.py`): the ID
   token must come from `OIDC_ISSUER` (compared without the trailing slash Authentik's issuers
   carry), list the `travel-users` group in its `groups` array, and, when it carries `amr`, show a
   second factor (G-5: `mfa`, or `user` for a passkey; `["pwd"]` alone is refused; no `amr` at
@@ -69,7 +69,7 @@ budget ~2–2.5 GB RAM (§21, §26).
    device classes WebAuthn (passkeys) and TOTP, `not_configured_action = configure` (forces
    enrollment of a second factor at first login), WebAuthn user verification `preferred`.
    Optionally passkey autofill on the Identification stage. The app checks the result too
-   (G-5, D-100): Authentik's ID token reports `amr: ["pwd", "mfa"]` after a password and an
+   (G-5, D-103): Authentik's ID token reports `amr: ["pwd", "mfa"]` after a password and an
    authenticator and `["user"]` after a passkey, both accepted; a password alone (`["pwd"]`)
    is refused.
 6. **API token** for this app (user `travel-provisioner`, intent `api`) with permission to
@@ -163,7 +163,7 @@ Enforced since item 40a (D-96, [production guide](../production.md)): every prod
 sets `TRAVEL_PRODUCTION`, and `settings.py` refuses to start unless the settings above hold
 (`production_problems` in `travel/core/exposure.py`; HSTS required once `TRAVEL_PUBLIC_SCOPE=all`,
 and `RATELIMIT_CLIENT_IP_HEADER=CF-Connecting-IP`; since item 40c-1 also a confidential client,
-the group and the second-factor rule, D-100). The redirect to HTTPS is
+the group and the second-factor rule, D-103). The redirect to HTTPS is
 `HttpsRedirectMiddleware`'s: it serves plain HTTP only to `/healthz` and to the server's own
 loopback names without the tunnel's headers (the SSH port-forward, G-4). `/`, `/auth/login`
 and `/auth/callback` are limited per address (60 a minute; 30 per 10 minutes each).
@@ -172,7 +172,7 @@ anonymous refusals).
 
 ### 7.8 Account handover and linking (server commands)
 
-Two owner-role commands (D-101, `travel/accounts/handover.py`), run with `./dev prod manage`
+Two owner-role commands (D-104, `travel/accounts/handover.py`), run with `./dev prod manage`
 and never reachable from the app. Both take ids only (without arguments they list what to
 choose from), change nothing without `--execute`, run in one transaction, and write an
 `accounts_auditlog` row and a log line.

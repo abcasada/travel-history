@@ -64,7 +64,7 @@ object under §6.2. "Participant" means a Member whose person participates in th
 | Tags (definitions; `GET /tags` lists own; purposes likewise own) | own | own | own | own | ❌ | ❌ |
 | Person: create | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
 | Own account: link to a new person it creates ("Add me", once) | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
-| Account: link to an existing person | ✅ (or the server's `link_person`, D-101) | only a person they manage (no API) | same | same | ❌ | ❌ |
+| Account: link to an existing person | ✅ (or the server's `link_person`, D-104) | only a person they manage (no API) | same | same | ❌ | ❌ |
 | Person: edit | ✅ | managing user | managing user | managing user | ❌ | ❌ |
 | Vehicle: read | vis (not hidden, or managing) | managing or not hidden | same | same | not hidden | ❌ |
 | Vehicle: use on own legs | any visible | any visible | any visible | any visible | ❌ | ❌ |
@@ -120,7 +120,7 @@ Notes:
     writes to B, revoked, Viewer, inactive).
 - Accounts (D-72, D-76): a deactivated account reads nothing, not even its own row (D-53). Other
   users' accounts are read only through the `accounts_userdirectory` view, never the `user` table.
-- Sign-in and the server's account commands (work-order item 40c-1, D-100, D-101; auth.md §7.1,
+- Sign-in and the server's account commands (work-order item 40c-1, D-103, D-104; auth.md §7.1,
   §7.8). No account exists, and none is found, for an ID token outside the `travel-users` group or
   one whose `amr` shows no second factor (G-5). `set_role`, `link_person` and `rebind_identity`
   run only as the owner role (`./dev prod manage`), outside every app role in this matrix; as

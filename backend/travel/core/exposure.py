@@ -26,7 +26,7 @@ and before WhiteNoise, which would otherwise serve static files and the SPA bund
 `HttpsRedirectMiddleware` sits between the two: with `DJANGO_SSL_REDIRECT` (production) plain
 HTTP answers a permanent redirect to HTTPS, except the container's own `/healthz` and plain HTTP
 on the server's loopback names (`is_local_http`), which is how the production app is reached
-over an SSH port-forward before go-live (G-4, D-100). Requests through the tunnel always carry
+over an SSH port-forward before go-live (G-4, D-103). Requests through the tunnel always carry
 the public host name, `X-Forwarded-Proto` and `CF-Connecting-IP`, so none of them is local.
 
 `production_problems` lists why a production server must not start (auth.md §7.7, D-85 (3),

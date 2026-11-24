@@ -77,7 +77,7 @@ def test_the_production_stack_starts_with_production_settings():
     assert result["ALLOWED_HOSTS"] == ["localhost", "127.0.0.1", CANONICAL, OTHER]
     assert result["CSRF_TRUSTED_ORIGINS"] == [f"https://{CANONICAL}", f"https://{OTHER}"]
     assert result["SECURE_PROXY_SSL_HEADER"] == ["HTTP_X_FORWARDED_PROTO", "https"]
-    assert result["TRAVEL_SSL_REDIRECT"] is True  # HttpsRedirectMiddleware (G-4, D-100)
+    assert result["TRAVEL_SSL_REDIRECT"] is True  # HttpsRedirectMiddleware (G-4, D-103)
     assert result["SECURE_SSL_REDIRECT"] is False  # Django's own can't exempt localhost
     assert result["SECURE_HSTS_SECONDS"] == 31536000
     assert result["SESSION_COOKIE_SECURE"] is True
@@ -451,7 +451,7 @@ def test_the_landing_page_offers_only_sign_in(client):
     assert "Set-Cookie" not in response
 
 
-# --- Sign-in before exposure, over an SSH port-forward to localhost:8784 (G-4, D-100) --------
+# --- Sign-in before exposure, over an SSH port-forward to localhost:8784 (G-4, D-103) --------
 
 LOCAL = "localhost:8784"
 

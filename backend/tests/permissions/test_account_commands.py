@@ -1,4 +1,4 @@
-"""The owner-role account commands for go-live (work-order item 40c-1, D-101):
+"""The owner-role account commands for go-live (work-order item 40c-1, D-104):
 `rebind_identity` (G-3) and `link_person` (auth.md §7.3's linking step, pulled forward).
 
 The commands run as the owner role, as `./dev prod manage` runs them. Everything checked

@@ -1,4 +1,4 @@
-"""Signing in through Authentik (work-order item 40c-1, auth.md §7.2, D-100): the real Authlib
+"""Signing in through Authentik (work-order item 40c-1, auth.md §7.2, D-103): the real Authlib
 client against a synthetic Authentik provider behind a stubbed HTTP layer, so discovery, PKCE,
 the confidential client's token request and Authlib's ID-token validation all run. Claims are
 shaped like Authentik's: a per-provider issuer with a trailing slash, a hashed subject,

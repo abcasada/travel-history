@@ -110,7 +110,7 @@ auth.md §7.7 holds:
 - no OIDC back channel (D-57 is development only) and an `https://` issuer (no mock provider);
 - a confidential client: `OIDC_CLIENT_ID` and `OIDC_CLIENT_SECRET` once `OIDC_ISSUER` is set
   (not on `ingest`, which signs nobody in), the `travel-users` group check and the second-factor
-  rule (G-5) switched on, and no loopback name among the public host names (D-100).
+  rule (G-5) switched on, and no loopback name among the public host names (D-103).
 
 Per-address rate limits cover `/` (60 a minute), `/auth/login` and `/auth/callback` (30 each per
 10 minutes), alongside the tracker endpoints' own limits. Containers run as the host user (the
@@ -146,7 +146,7 @@ Until go-live, the web service is reached only over an SSH port-forward to
 
 ## Signing in before go-live (G-4)
 
-Item 40c-1, D-100. Before the tunnel route exists, Adam signs in to production through an SSH
+Item 40c-1, D-103. Before the tunnel route exists, Adam signs in to production through an SSH
 port-forward from his own computer:
 
 ```
@@ -263,7 +263,7 @@ backup with the real key) stays open until `AGE_RECIPIENT` is set.
 
 ## Handing the copied account to Adam's Authentik sign-in (G-3)
 
-Item 40c-3, with the commands built in 40c-1 (D-101, auth.md §7.8). Adam's first Authentik sign-in
+Item 40c-3, with the commands built in 40c-1 (D-104, auth.md §7.8). Adam's first Authentik sign-in
 creates a new, empty Member account, because accounts are matched by issuer and subject and never
 by email. The copied account (`dev-admin`, Admin, all the data) still carries the dev mock's
 identity, which production can't sign in with. Then:

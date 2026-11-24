@@ -3,7 +3,7 @@ RLS context: users are matched by (issuer, subject) only - never linked by email
 
 Before any account is found or created, the ID token must come from the configured provider,
 name the app's group (auth.md §7.2) and, when it lists its authentication methods, show a
-second factor (G-5, D-100)."""
+second factor (G-5, D-103)."""
 
 from __future__ import annotations
 
