@@ -335,3 +335,92 @@ def test_bearer_tokens_match_the_issuer_with_or_without_the_slash(authentik, set
     )
     with pytest.raises(oidc.InvalidToken, match="issuer"):
         oidc.validate_access_token(other, KeySet([authentik.key]))
+
+
+# --- Bearer tokens on every request (F-3, F-7; D-107, D-108) ----------------------------------
+
+
+def access_token(fake: FakeAuthentik, **overrides) -> str:
+    now = int(time.time())
+    claims = {
+        "iss": ISSUER,
+        "sub": SUBJECT,
+        "aud": CLIENT_ID,
+        "iat": now,
+        "exp": now + 300,
+        "groups": ["travel-users"],
+        "amr": ["pwd", "mfa"],
+        **overrides,
+    }
+    claims = {name: value for name, value in claims.items() if value is not DROP}
+    return jwt.encode({"alg": "RS256", "kid": "synthetic-key"}, claims, fake.key)
+
+
+@pytest.fixture
+def bearer_account(authentik):
+    with as_owner():
+        return UserFactory(oidc_issuer=ISSUER, oidc_sub=SUBJECT)
+
+
+def me_with(client, token: str):
+    return client.get("/api/v1/me", HTTP_AUTHORIZATION=f"Bearer {token}")
+
+
+def test_a_bearer_token_from_travel_users_signs_in(client, authentik, bearer_account):
+    response = me_with(client, access_token(authentik))
+    assert response.status_code == 200
+    assert response.json()["id"] == bearer_account.pk
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"groups": ["authentik Admins"]},  # removed from travel-users: the next token says so
+        {"groups": DROP},
+        {"groups": "travel-users"},
+        {"amr": ["pwd"]},  # a password alone
+    ],
+    ids=["left-the-group", "no-groups", "groups-string", "password-only"],
+)
+def test_a_bearer_token_outside_travel_users_is_refused(
+    client, authentik, bearer_account, overrides
+):
+    assert me_with(client, access_token(authentik, **overrides)).status_code == 401
+
+
+def test_a_deactivated_accounts_bearer_token_is_refused(client, authentik, bearer_account):
+    with as_owner():
+        User.objects.filter(pk=bearer_account.pk).update(is_active=False)
+    assert me_with(client, access_token(authentik)).status_code == 401
+
+
+def test_junk_bearer_tokens_never_reach_the_provider(client, authentik):
+    for junk in ("x", "a.b", "a..c", "a.b.c.d.e"):
+        assert me_with(client, junk).status_code == 401
+    assert authentik.requests == []
+
+
+def test_an_unreachable_provider_means_no_user_not_an_error(client, authentik, bearer_account):
+    """F-7: discovery failing answered 500 and was retried on every request."""
+    authentik.unreachable = True
+    token = access_token(authentik)
+    assert me_with(client, token).status_code == 401
+    # Within the back-off the provider isn't asked again, even once it is back.
+    authentik.unreachable = False
+    assert me_with(client, token).status_code == 401
+    assert authentik.requests == []
+    oidc.reset_provider_backoff()
+    assert me_with(client, token).status_code == 200
+
+
+@pytest.mark.parametrize("path", ["/api/v1/docs", "/api/v1/openapi.json"])
+def test_docs_and_schema_need_a_signed_in_session(client, authentik, bearer_account, path):
+    """F-7: a Bearer header gets past the login wall, but not to the docs or the schema. (In
+    production neither exists: test_production.py.)"""
+    assert client.get(path).status_code == 401
+    assert client.get(path, HTTP_AUTHORIZATION="Bearer x").status_code == 401
+    token = access_token(authentik)
+    assert client.get(path, HTTP_AUTHORIZATION=f"Bearer {token}").status_code == 401
+    with as_owner():
+        client.force_login(bearer_account)
+    assert client.get(path).status_code == 200

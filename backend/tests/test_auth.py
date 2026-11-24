@@ -270,6 +270,7 @@ def bearer_token(key, **overrides):
         "aud": COMPANION_ID,
         "iat": now,
         "exp": now + 300,
+        "groups": ["travel-users"],  # every request checks the group (F-3, D-108)
         **overrides,
     }
     return jwt.encode({"alg": "RS256", "kid": "test-key"}, claims, key)
@@ -295,8 +296,9 @@ def test_bearer_token_authenticates_an_existing_user(client, signing_key, compan
         {"iss": "https://evil.example/"},
         {"exp": int(time.time()) - 600},
         {"sub": "unknown-subject"},
+        {"groups": ["other-app-users"]},
     ],
-    ids=["wrong-audience", "wrong-issuer", "expired", "unknown-user"],
+    ids=["wrong-audience", "wrong-issuer", "expired", "unknown-user", "not-in-travel-users"],
 )
 def test_bad_bearer_tokens_are_rejected(client, signing_key, companion_user, overrides):
     token = bearer_token(signing_key, **overrides)

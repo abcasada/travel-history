@@ -134,11 +134,49 @@ def test_production_refuses_to_start_without_production_settings(override, probl
     assert_refused(load_production(**override), problem)
 
 
+_RESOLVE_DOCS = """
+import json, sys
+import django
+django.setup()
+from django.urls import Resolver404, resolve
+found = {}
+for path in sys.argv[1:]:
+    try:
+        found[path] = resolve(path).url_name
+    except Resolver404:
+        found[path] = None
+print(json.dumps(found))
+"""
+
+
+def test_production_serves_no_api_docs_or_schema():
+    """F-7: neither URL exists in production (the schema is in the repository and
+    `export_openapi` builds it without them); development keeps both for signed-in sessions."""
+    paths = ["/api/v1/docs", "/api/v1/openapi.json", "/api/v1/me"]
+    prod = loaded(load_settings(PROD_ENV, paths, script=_RESOLVE_DOCS))
+    assert prod == {"/api/v1/docs": None, "/api/v1/openapi.json": None, "/api/v1/me": "me"}
+    dev = loaded(load_settings({"DJANGO_DEBUG": "false"}, paths, script=_RESOLVE_DOCS))
+    assert dev["/api/v1/docs"] == "openapi-view"
+    assert dev["/api/v1/openapi.json"] == "openapi-json"
+
+
 def test_development_settings_skip_the_production_checks():
     result = loaded(
         load_settings({"DJANGO_DEBUG": "true", "DJANGO_SECURE_COOKIES": "false"}, NAMES)
     )
     assert result["TRAVEL_PRODUCTION"] is False
+
+
+def _middleware_moved(name: str) -> list[str]:
+    """MIDDLEWARE with `name` moved to the end (after WhiteNoise)."""
+    return [m for m in django_settings.MIDDLEWARE if m != name] + [name]
+
+
+def test_production_scope_tracker_needs_no_provider_yet():
+    """Before go-live (scope `tracker`) production runs without Authentik values (40a)."""
+    conf = production_conf(TRAVEL_PUBLIC_SCOPE="tracker", OIDC_ISSUER="")
+    conf.update(OIDC_CLIENT_ID="", OIDC_CLIENT_SECRET="")
+    assert exposure.production_problems(conf) == []
 
 
 def production_conf(**overrides) -> dict:
@@ -237,6 +275,24 @@ def test_production_starts_with_the_authentik_client_configured():
         ({"OIDC_CLIENT_ID": ""}, "confidential client"),
         ({"OIDC_REQUIRED_GROUP": ""}, "OIDC_REQUIRED_GROUP"),
         ({"OIDC_SECOND_FACTOR_AMR": []}, "OIDC_SECOND_FACTOR_AMR"),
+        # F-9: scope `all` needs the sign-in provider (an https issuer and the client).
+        ({"OIDC_ISSUER": ""}, "must be set once TRAVEL_PUBLIC_SCOPE=all"),
+        (
+            {"OIDC_ISSUER": "", "OIDC_CLIENT_ID": "", "OIDC_CLIENT_SECRET": ""},
+            "must be set once TRAVEL_PUBLIC_SCOPE=all",
+        ),
+        ({"OIDC_ISSUER": "http://auth.example.org/o/travel/"}, "OIDC_ISSUER must be an https"),
+        # F-1: CSP and X-Frame-Options must wrap WhiteNoise's responses.
+        *(
+            ({"MIDDLEWARE": _middleware_moved(name)}, "before WhiteNoiseMiddleware")
+            for name in exposure.WRAP_WHITENOISE
+        ),
+        # F-2: no 40 MB bodies by default.
+        ({"DATA_UPLOAD_MAX_MEMORY_SIZE": 40 * 1024 * 1024}, "DATA_UPLOAD_MAX_MEMORY_SIZE must be"),
+        (
+            {"MIDDLEWARE": [m for m in django_settings.MIDDLEWARE if "bodylimit" not in m]},
+            "BodySizeLimitMiddleware",
+        ),
     ],
 )
 def test_production_problems_catch_each_missing_header_and_limit(override, problem):
@@ -417,16 +473,19 @@ def test_public_pages_are_limited_per_address(idp, path, allowed_status):
 
 def test_behind_the_tunnel_the_limit_follows_cf_connecting_ip(idp):
     idp.RATELIMIT_CLIENT_IP_HEADER = "CF-Connecting-IP"
-    tunnel = "172.18.0.1"  # every request arrives from cloudflared
+    idp.TRAVEL_PUBLIC_HOSTS = [CANONICAL]
+    idp.TRAVEL_CANONICAL_HOST = CANONICAL
+    idp.TRAVEL_PUBLIC_SCOPE = "all"
+    idp.ALLOWED_HOSTS = ["localhost", CANONICAL]
+    tunnel = "172.18.0.1"  # every request arrives from cloudflared, naming the public host
+
+    def visitor(address: str) -> Client:
+        return Client(REMOTE_ADDR=tunnel, HTTP_HOST=CANONICAL, HTTP_CF_CONNECTING_IP=address)
+
     for _ in range(2):
-        response = Client(REMOTE_ADDR=tunnel, HTTP_CF_CONNECTING_IP="203.0.113.1").get(
-            "/auth/login"
-        )
-        assert response.status_code == 302
-    first = Client(REMOTE_ADDR=tunnel, HTTP_CF_CONNECTING_IP="203.0.113.1")
-    assert first.get("/auth/login").status_code == 429
-    second = Client(REMOTE_ADDR=tunnel, HTTP_CF_CONNECTING_IP="203.0.113.2")
-    assert second.get("/auth/login").status_code == 302
+        assert visitor("203.0.113.1").get("/auth/login", secure=True).status_code == 302
+    assert visitor("203.0.113.1").get("/auth/login", secure=True).status_code == 429
+    assert visitor("203.0.113.2").get("/auth/login", secure=True).status_code == 302
 
 
 def test_login_and_callback_have_separate_budgets(idp):

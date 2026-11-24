@@ -108,7 +108,9 @@ print(json.dumps({name: getattr(settings, name) for name in sys.argv[1:]}))
 """
 
 
-def load_settings(env: dict[str, str], names: list[str]) -> subprocess.CompletedProcess:
+def load_settings(
+    env: dict[str, str], names: list[str], script: str = _DUMP_SETTINGS
+) -> subprocess.CompletedProcess:
     """Settings as a fresh process would load them from this environment (none of this
     container's DJANGO_/TRAVEL_/OIDC_/RATELIMIT_ variables leak in). stdout holds `names` as
     JSON when the process succeeds; stderr holds ImproperlyConfigured when it refuses."""
@@ -120,7 +122,7 @@ def load_settings(env: dict[str, str], names: list[str]) -> subprocess.Completed
         **env,
     }
     return subprocess.run(  # noqa: S603 - fixed interpreter and script
-        [sys.executable, "-c", _DUMP_SETTINGS, *names],
+        [sys.executable, "-c", script, *names],
         cwd=BACKEND_DIR,
         env=full_env,
         capture_output=True,

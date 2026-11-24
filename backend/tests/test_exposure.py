@@ -171,6 +171,26 @@ def test_go_live_scope_opens_the_public_host(public):
     assert Client(HTTP_HOST=PUBLIC).get("/healthz", secure=True).status_code == 200
 
 
+@pytest.mark.parametrize("scope", ["tracker", "all"])
+@pytest.mark.parametrize("host", ["localhost", "127.0.0.1", "localhost:8784", "[::1]"])
+def test_through_the_tunnel_only_public_names_are_served(public, scope, host):
+    """F-8: a tunnel route with an "HTTP Host Header" override would send a loopback name.
+    Served as the full app, it would skip the scope rule, so scope `tracker` (the first
+    rollback step) wouldn't close the app. Every such request answers 404, tracker paths
+    included (the override breaks phones loudly instead of exposing the app)."""
+    public.TRAVEL_PUBLIC_SCOPE = scope
+    public.ALLOWED_HOSTS = ["localhost", "127.0.0.1", "[::1]", PUBLIC]
+    tunnel = Client(HTTP_HOST=host, HTTP_CF_CONNECTING_IP="192.0.2.10")
+    for path in ("/", "/healthz", "/app/", "/auth/login", "/api/v1/me", OWNTRACKS):
+        assert_not_found(tunnel.get(path, secure=True), f"{host} {path}")
+    # The same host without the tunnel's header (the server itself, the SSH port-forward).
+    assert Client(HTTP_HOST=host).get("/healthz", secure=True).status_code == 200
+    # The public name through the tunnel follows the scope as before.
+    expected = 200 if scope == "all" else 404
+    public_name = Client(HTTP_HOST=PUBLIC, HTTP_CF_CONNECTING_IP="192.0.2.10")
+    assert public_name.get("/healthz", secure=True).status_code == expected
+
+
 def test_the_guard_is_on_by_default():
     from django.conf import settings
 
@@ -217,6 +237,17 @@ def test_ingest_only_health_check_only_from_inside_the_container(ingest_only):
     assert_not_found(gateway.get("/healthz"), "/healthz from the Docker gateway")
     tunnel = Client(HTTP_HOST=PUBLIC, REMOTE_ADDR="127.0.0.1")
     assert_not_found(tunnel.get("/healthz", secure=True), "/healthz on the public host")
+
+
+def test_ingest_only_accepts_a_host_override_through_the_tunnel(ingest_only):
+    """The ingest-only service answers only the tracker paths whatever the Host says, so the
+    F-8 rule doesn't apply to it."""
+    client = Client(
+        HTTP_HOST="localhost", HTTP_CF_CONNECTING_IP="192.0.2.10", REMOTE_ADDR="172.18.0.1"
+    )
+    response = client.post(OWNTRACKS, "{}", content_type="application/json", secure=True)
+    assert response.status_code == 401  # the view answered: no token
+    assert_not_found(client.get("/healthz", secure=True), "/healthz")
 
 
 def test_ingest_only_ignores_the_go_live_scope(ingest_only):

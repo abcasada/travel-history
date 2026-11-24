@@ -11,6 +11,17 @@ from tests.routing_fakes import fake  # noqa: F401 (fixture: fake routing provid
 RATELIMIT_ALIAS = "ratelimit"
 
 
+@pytest.fixture(autouse=True)
+def _forget_provider_failures():
+    """A test that makes the identity provider unreachable mustn't make the next ones refuse
+    bearer tokens (travel.accounts.oidc backs off for PROVIDER_RETRY_SECONDS)."""
+    from travel.accounts import oidc
+
+    oidc.reset_provider_backoff()
+    yield
+    oidc.reset_provider_backoff()
+
+
 def _uses_rate_limiter(marker) -> bool:
     databases = marker.kwargs.get("databases") or ()
     return databases == "__all__" or RATELIMIT_ALIAS in databases

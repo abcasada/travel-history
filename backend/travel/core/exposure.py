@@ -16,6 +16,8 @@ This guard enforces that inside the app, so it never rests on a tunnel or dashbo
   same path on the canonical host (D-96). The target host comes from settings, never from the
   request, so it is not an open redirect. Ingest paths are served as on the canonical host, so a
   phone set up with the other name keeps working.
+- **Requests through the tunnel** (`CF-Connecting-IP`) whose Host isn't a public name answer
+  404 (a tunnel "HTTP Host Header" override would otherwise skip the scope rule; F-8).
 - **Development servers** (DEBUG): any Host header Django would refuse answers a bare 404 too.
   Otherwise Django answers it with DEBUG's technical error page (status 400), which shows
   settings and a traceback, so a tunnel pointed at the dev server by mistake would leak them.
@@ -60,6 +62,7 @@ SCOPES = ("tracker", "all")
 LOCAL_NAMES = frozenset({"localhost", "127.0.0.1", "[::1]"})
 # Cloudflare's tunnel adds both to every request it forwards (cloudflared passes them on).
 TUNNEL_HEADERS = ("HTTP_X_FORWARDED_PROTO", "HTTP_CF_CONNECTING_IP")
+TUNNEL_CLIENT_HEADER = "HTTP_CF_CONNECTING_IP"
 
 
 def request_domain(request: HttpRequest) -> str:
@@ -82,9 +85,23 @@ def _debug_allows_host(domain: str) -> bool:
     return bool(domain) and validate_host(domain, allowed)
 
 
+def through_tunnel(request: HttpRequest) -> bool:
+    """The request came through the Cloudflare Tunnel: Cloudflare adds `CF-Connecting-IP` to
+    every request it forwards (overwriting any the visitor sent), and nothing else on the
+    server's loopback-only port sends it."""
+    return TUNNEL_CLIENT_HEADER in request.META
+
+
 def is_reachable(request: HttpRequest) -> bool:
     path = request.path_info
     if settings.DEBUG and not _debug_allows_host(request_domain(request)):
+        return False
+    if through_tunnel(request) and not is_public_host(request) and not settings.TRAVEL_INGEST_ONLY:
+        # Through the tunnel the Host is always a public name, unless the route has an "HTTP
+        # Host Header" override (docs/go-live.md forbids it). A loopback or other name would
+        # skip the scope rule below, so setting the scope back to `tracker` (the first
+        # rollback step) wouldn't close the app (F-8, D-107). The ingest-only service answers
+        # only the tracker paths whatever the Host says, so it keeps accepting an override.
         return False
     if is_public_host(request):
         if settings.DEBUG:
@@ -194,9 +211,22 @@ REQUIRED_MIDDLEWARE = (
     "django.middleware.security.SecurityMiddleware",
     "travel.core.exposure.HttpsRedirectMiddleware",
     "travel.core.exposure.ExposureGuardMiddleware",
+    "travel.core.bodylimit.BodySizeLimitMiddleware",
     "django.middleware.csp.ContentSecurityPolicyMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 )
+WHITENOISE = "whitenoise.middleware.WhiteNoiseMiddleware"
+# These must wrap WhiteNoise's responses (the SPA's index.html, sw.js and assets), so they sit
+# before it in MIDDLEWARE.
+WRAP_WHITENOISE = (
+    "travel.core.bodylimit.BodySizeLimitMiddleware",
+    "django.middleware.csp.ContentSecurityPolicyMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+)
+# The largest default request body (F-2, D-107): the JSON API's biggest bodies (a drawn route
+# of 10,000 points) stay well under 1 MiB; the tracker and upload-chunk endpoints have their
+# own limits (travel.core.bodylimit).
+MAX_DEFAULT_BODY_BYTES = 5 * 1024 * 1024
 
 
 def production_problems(conf: Mapping[str, Any]) -> list[str]:
@@ -244,18 +274,39 @@ def production_problems(conf: Mapping[str, Any]) -> list[str]:
     csp = conf["SECURE_CSP"] or {}
     if not csp.get("default-src") or csp.get("frame-ancestors") != ["'none'"]:
         problems.append("SECURE_CSP must set default-src and frame-ancestors 'none'")
-    missing = [name for name in REQUIRED_MIDDLEWARE if name not in conf["MIDDLEWARE"]]
+    middleware = list(conf["MIDDLEWARE"])
+    missing = [name for name in REQUIRED_MIDDLEWARE if name not in middleware]
     if missing:
         problems.append("MIDDLEWARE must include " + ", ".join(missing))
-    if conf["DATA_UPLOAD_MAX_MEMORY_SIZE"] is None or conf["TRAVEL_UPLOAD_MAX_BYTES"] <= 0:
+    elif WHITENOISE in middleware and any(
+        middleware.index(name) > middleware.index(WHITENOISE) for name in WRAP_WHITENOISE
+    ):
+        # WhiteNoise answers without calling the middleware after it (F-1, D-107).
+        problems.append(
+            "MIDDLEWARE must put the CSP, X-Frame-Options and body-size middleware before "
+            "WhiteNoiseMiddleware"
+        )
+    body_limit = conf["DATA_UPLOAD_MAX_MEMORY_SIZE"]
+    if body_limit is None or conf["TRAVEL_UPLOAD_MAX_BYTES"] <= 0:
         problems.append("upload size limits must be set")
+    elif body_limit > MAX_DEFAULT_BODY_BYTES:
+        problems.append(
+            f"DATA_UPLOAD_MAX_MEMORY_SIZE must be at most {MAX_DEFAULT_BODY_BYTES} bytes "
+            "(larger bodies only on the endpoints with their own limits)"
+        )
     if conf["OIDC_BACKCHANNEL_URL"]:
         problems.append("OIDC_BACKCHANNEL_URL is for development only (D-57)")
     issuer = conf["OIDC_ISSUER"]
     if issuer and not issuer.startswith("https://"):
         problems.append("OIDC_ISSUER must be an https:// address (no mock provider)")
-    # The ingest-only service never signs anyone in (compose.prod.yaml blanks its secret).
-    if issuer and not conf["TRAVEL_INGEST_ONLY"]:
+    signs_in = not conf["TRAVEL_INGEST_ONLY"]  # compose.prod.yaml blanks `ingest`'s secret
+    if signs_in and not issuer and conf["TRAVEL_PUBLIC_SCOPE"] == "all":
+        # Without an issuer the claims checks skip the issuer comparison (F-9, D-107).
+        problems.append(
+            "OIDC_ISSUER, OIDC_CLIENT_ID and OIDC_CLIENT_SECRET must be set once "
+            "TRAVEL_PUBLIC_SCOPE=all (the sign-in provider)"
+        )
+    if issuer and signs_in:
         if not (conf["OIDC_CLIENT_ID"] and conf["OIDC_CLIENT_SECRET"]):
             problems.append(
                 "OIDC_CLIENT_ID and OIDC_CLIENT_SECRET must be set (a confidential client)"

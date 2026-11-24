@@ -173,7 +173,10 @@ def _check_content_type(request: HttpRequest) -> None:
 
 
 def _parse(request: HttpRequest, endpoint: str) -> payloads.Parsed:
-    body = request.body  # bounded: the declared length is within the cap
+    # Bounded twice: the declared length is within the cap, and the read stops past it. Not
+    # request.body, which DATA_UPLOAD_MAX_MEMORY_SIZE (the default limit, smaller than this
+    # endpoint's own; travel.core.bodylimit) would refuse.
+    body = request.read(settings.TRACKER_MAX_BODY_BYTES + 1)
     if len(body) > settings.TRACKER_MAX_BODY_BYTES:
         raise PayloadError(413, "the body is too large")
     document = payloads.load_json(body)

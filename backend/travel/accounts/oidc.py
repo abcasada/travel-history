@@ -80,9 +80,11 @@ def client():
 
 
 def reset_client() -> None:
-    """Forget the registered client and its cached discovery document (tests; settings change)."""
+    """Forget the registered client, its cached discovery document and the provider's keys
+    (tests; settings change)."""
     _oauth._clients.pop("idp", None)
     _oauth._registry.pop("idp", None)
+    _jwks_cached.cache_clear()
 
 
 def metadata() -> dict:
@@ -107,6 +109,11 @@ def is_accepted_issuer(issuer: str) -> bool:
 # --- Bearer access tokens ------------------------------------------------------------------
 
 _JWKS_TTL = 3600
+# After a failed discovery or key fetch, bearer tokens are refused for this long without asking
+# the provider again: otherwise every request carrying any Bearer header would wait for the
+# provider's timeout while it is down, holding one of web's few threads (F-7).
+PROVIDER_RETRY_SECONDS = 30
+_provider_down_until = 0.0
 
 
 @lru_cache(maxsize=4)
@@ -117,16 +124,41 @@ def _jwks_cached(jwks_uri: str, bucket: int) -> KeySet:  # noqa: ARG001 - bucket
         return KeySet.import_key_set(response.json())
 
 
-def jwks() -> KeySet:
-    return _jwks_cached(metadata()["jwks_uri"], int(time.time() // _JWKS_TTL))
-
-
 class InvalidToken(Exception):
     pass
 
 
+class ProviderUnavailable(InvalidToken):
+    """The provider's discovery document or keys couldn't be fetched (now or moments ago)."""
+
+
+def jwks() -> KeySet:
+    global _provider_down_until
+    if time.monotonic() < _provider_down_until:
+        raise ProviderUnavailable("the identity provider was unreachable moments ago")
+    try:
+        return _jwks_cached(metadata()["jwks_uri"], int(time.time() // _JWKS_TTL))
+    except (requests.RequestException, ValueError, KeyError) as exc:
+        _provider_down_until = time.monotonic() + PROVIDER_RETRY_SECONDS
+        raise ProviderUnavailable(f"identity provider unreachable: {type(exc).__name__}") from exc
+
+
+def reset_provider_backoff() -> None:
+    """Forget a recent provider failure (tests)."""
+    global _provider_down_until
+    _provider_down_until = 0.0
+
+
+def _looks_like_jws(token: str) -> bool:
+    parts = token.split(".")
+    return len(parts) == 3 and all(parts)
+
+
 def validate_access_token(token: str, key_set: KeySet | None = None) -> dict:
     """Validate an RS256/ES256 JWT access token from the provider and return its claims."""
+    if not _looks_like_jws(token):
+        # Refused before any key is fetched, so junk Bearer headers never reach the provider.
+        raise InvalidToken("not a signed JWT")
     try:
         decoded = jwt.decode(token, key_set or jwks(), algorithms=["RS256", "ES256"])
     except (JoseError, ValueError) as exc:

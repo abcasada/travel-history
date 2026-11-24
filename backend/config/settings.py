@@ -76,8 +76,14 @@ MIDDLEWARE = [
     "travel.core.exposure.HttpsRedirectMiddleware",
     # Before WhiteNoise: public host names reach only the tracker endpoints until go-live.
     "travel.core.exposure.ExposureGuardMiddleware",
-    "whitenoise.middleware.WhiteNoiseMiddleware",
+    # Before WhiteNoise too, so they wrap the files it serves: the installed PWA's index.html
+    # (which the service worker precaches and answers every navigation with), sw.js and the
+    # assets carry the CSP and X-Frame-Options like every page (F-1, D-107).
     "django.middleware.csp.ContentSecurityPolicyMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    # Per-endpoint body limits before anything reads a body (F-2, D-107).
+    "travel.core.bodylimit.BodySizeLimitMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -85,7 +91,6 @@ MIDDLEWARE = [
     # (replaces django.contrib.auth.middleware.AuthenticationMiddleware).
     "travel.core.middleware.RlsContextMiddleware",
     "travel.core.loginwall.LoginWallMiddleware",
-    "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -248,7 +253,10 @@ SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 # HttpsRedirectMiddleware redirects instead (production_problems requires it); `check --deploy`
 # must otherwise pass (D-96).
 SILENCED_SYSTEM_CHECKS = ["security.W021", "security.W008"]
-DATA_UPLOAD_MAX_MEMORY_SIZE = 40 * 1024 * 1024  # one upload chunk (32 MB) plus headroom
+# The default request body limit (Django's own default, 2.5 MiB). The upload-chunk and tracker
+# endpoints have their own (travel.core.bodylimit, F-2): chunks are read with request.read(),
+# which this setting doesn't cover.
+DATA_UPLOAD_MAX_MEMORY_SIZE = env.int("DATA_UPLOAD_MAX_MEMORY_SIZE", 2621440)
 
 SECURE_CSP = {
     "default-src": ["'self'"],
