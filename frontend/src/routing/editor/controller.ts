@@ -7,8 +7,10 @@
  * 2026-11-15), website/src/lib/components/toolbar/tools/routing/routing-controls.ts: one GeoJSON
  * source for all anchors filtered by zoom, dragging an anchor (pan disabled while dragging,
  * the feature moved with updateData), the temporary anchor that follows the pointer along the
- * line and can be dragged or clicked, shift-click to delete, click on the map to append. Changes:
- * no popup (right-click also deletes), no touch handling (the editor is desktop-only), no
+ * line and can be dragged or clicked, shift-click to delete, click on the map to append, the
+ * anchor popup with its delete button, and touch dragging of anchors. Changes: right-click also
+ * deletes; the popup also offers to keep a shape point as a fixed point; on touch, holding the
+ * line still for a moment grabs it (a plain swipe pans the map) and a tap opens the popup; no
  * Svelte stores or engine commands: actions go to the editor store.
  *
  * MIT License
@@ -34,12 +36,15 @@
  * SOFTWARE.
  */
 
-import type {
-  GeoJSONSource,
-  MapLayerMouseEvent,
-  Map as MapLibreMap,
-  MapMouseEvent,
-  Point,
+import {
+  type GeoJSONSource,
+  type MapLayerMouseEvent,
+  type MapLayerTouchEvent,
+  type Map as MapLibreMap,
+  type MapMouseEvent,
+  type MapTouchEvent,
+  type Point,
+  Popup,
 } from "maplibre-gl";
 import type { Coord } from "./geometry";
 import { type Anchor, anchors as anchorsOf, type EditorState } from "./model";
@@ -60,7 +65,24 @@ export type EditorActions = {
 
 type AnchorProperties = { anchorIndex: number; minZoom: number };
 
-const lngLat = (e: MapMouseEvent): Coord => [e.lngLat.lng, e.lngLat.lat];
+/** An open anchor popup; the default is a MapLibre Popup, tests pass their own. */
+export type PopupHandle = { remove: () => void };
+export type OpenPopup = (map: MapLibreMap, at: Coord, content: HTMLElement) => PopupHandle;
+
+const openMapLibrePopup: OpenPopup = (map, at, content) =>
+  new Popup({ closeOnClick: false, offset: 12, maxWidth: "16rem" })
+    .setLngLat([at[0], at[1]])
+    .setDOMContent(content)
+    .addTo(map);
+
+const lngLat = (e: MapMouseEvent | MapTouchEvent): Coord => [e.lngLat.lng, e.lngLat.lat];
+
+/** A finger moves a little even when the user means to tap. */
+const TAP_SLOP_PX = 6;
+/** Holding the line this long without moving grabs it (shorter swipes pan the map). */
+export const LONG_PRESS_MS = 400;
+/** Browsers follow a tap with emulated mouse events and, on a long press, a context menu. */
+const AFTER_TOUCH_MS = 800;
 
 export class RouteEditorController {
   private anchors: Anchor[] = [];
@@ -71,10 +93,19 @@ export class RouteEditorController {
   private dragStart: Point | null = null;
   /** Where the pointer hovers the line: an anchor that can be dragged or clicked to be added. */
   private temporaryAnchor: Coord | null = null;
+  /** The last pointer position of a touch drag (touchend may report none). */
+  private dragLast: { point: Point; at: Coord } | null = null;
+  private dragMoved = false;
+  private lastTouchTime = 0;
+  /** A finger resting on the line, waiting to become a drag. */
+  private longPress: { timer: ReturnType<typeof setTimeout>; point: Point; at: Coord } | null =
+    null;
+  private popup: PopupHandle | null = null;
 
   constructor(
     private readonly map: MapLibreMap,
     private readonly actions: EditorActions,
+    private readonly openPopup: OpenPopup = openMapLibrePopup,
   ) {
     this.map.on("style.load", this.addLayers);
     this.addLayers();
@@ -84,9 +115,17 @@ export class RouteEditorController {
     this.map.on("mouseenter", ANCHORS_ID, this.onMouseEnter);
     this.map.on("mouseleave", ANCHORS_ID, this.onMouseLeave);
     this.map.on("mousemove", LINE_HIT_ID, this.showTemporaryAnchor);
+    // anchors first: a finger on an anchor that sits on the line takes the anchor
+    this.map.on("touchstart", ANCHORS_ID, this.onAnchorTouchStart);
+    this.map.on("touchstart", LINE_HIT_ID, this.onLineTouchStart);
   }
 
   destroy() {
+    this.closePopup();
+    this.cancelLongPress();
+    this.endTouchDrag();
+    this.map.off("touchstart", ANCHORS_ID, this.onAnchorTouchStart);
+    this.map.off("touchstart", LINE_HIT_ID, this.onLineTouchStart);
     this.map.off("style.load", this.addLayers);
     this.map.off("click", this.onClick);
     this.map.off("contextmenu", ANCHORS_ID, this.onContextMenu);
@@ -112,6 +151,8 @@ export class RouteEditorController {
 
   /** Redraws the line and the anchors from the editor state. */
   render(state: EditorState) {
+    // the popup's anchor may have moved or gone
+    this.closePopup();
     this.state = state;
     this.anchors = anchorsOf(state);
     // the anchors have changed, so has what is hovered
@@ -208,6 +249,11 @@ export class RouteEditorController {
 
   private onClick = (e: MapMouseEvent) => {
     if (this.justDragged() || this.actions.blocked()) return;
+    if (this.popup) {
+      // a click elsewhere only closes the popup
+      this.closePopup();
+      return;
+    }
     const layers = [ANCHORS_ID, LINE_HIT_ID].filter((id) => this.map.getLayer(id));
     const hits = layers.length ? this.map.queryRenderedFeatures(e.point, { layers }) : [];
     const anchorHit = hits.find((f) => f.layer.id === ANCHORS_ID);
@@ -219,6 +265,8 @@ export class RouteEditorController {
         this.removeTemporaryAnchor();
       } else if (e.originalEvent.shiftKey) {
         this.actions.remove(anchor.index, this.map.getZoom());
+      } else {
+        this.showPopup(anchor);
       }
       return;
     }
@@ -231,7 +279,8 @@ export class RouteEditorController {
 
   private onContextMenu = (e: MapLayerMouseEvent) => {
     e.preventDefault();
-    if (this.actions.blocked()) return;
+    // a long press on a touch screen is a drag (or the popup), not a delete
+    if (this.actions.blocked() || this.afterTouch()) return;
     const anchor = this.anchors[Number(e.features?.[0]?.properties?.anchorIndex)];
     if (anchor) this.actions.remove(anchor.index, this.map.getZoom());
   };
@@ -247,7 +296,7 @@ export class RouteEditorController {
   };
 
   private onMouseDown = (e: MapLayerMouseEvent) => {
-    if (e.originalEvent.button !== 0 || this.actions.blocked()) return;
+    if (e.originalEvent.button !== 0 || this.actions.blocked() || this.afterTouch()) return;
     e.preventDefault();
     this.map.dragPan.disable();
     this.draggedAnchorId = Number(e.features?.[0]?.properties?.anchorIndex);
@@ -282,6 +331,165 @@ export class RouteEditorController {
       this.actions.move(this.anchors[id].index, lngLat(e), zoom);
     }
   };
+
+  private afterTouch() {
+    return Date.now() - this.lastTouchTime < AFTER_TOUCH_MS;
+  }
+
+  /** A finger on an anchor: drag it, or (without moving) open its popup. */
+  private onAnchorTouchStart = (e: MapLayerTouchEvent) => {
+    this.lastTouchTime = Date.now();
+    if (e.points.length !== 1 || this.actions.blocked() || this.draggedAnchorId !== null) return;
+    const id = Number(e.features?.[0]?.properties?.anchorIndex);
+    if (!this.anchors[id]) return;
+    e.preventDefault();
+    this.closePopup();
+    this.beginTouchDrag(id, e.point, lngLat(e));
+  };
+
+  /** A finger on the line: held still for a moment it grabs the line; moved, the map pans. */
+  private onLineTouchStart = (e: MapLayerTouchEvent) => {
+    this.lastTouchTime = Date.now();
+    if (e.points.length !== 1 || this.actions.blocked() || this.draggedAnchorId !== null) return;
+    if (this.closeToAnAnchor(e.point)) return;
+    this.cancelLongPress();
+    const at = lngLat(e);
+    this.longPress = {
+      point: e.point,
+      at,
+      timer: setTimeout(this.grabLine, LONG_PRESS_MS),
+    };
+    this.map.on("touchmove", this.onLongPressMove);
+    this.map.on("touchend", this.cancelLongPress);
+    this.map.on("touchcancel", this.cancelLongPress);
+  };
+
+  private onLongPressMove = (e: MapTouchEvent) => {
+    if (!this.longPress) return;
+    if (e.points.length !== 1 || e.point.dist(this.longPress.point) > TAP_SLOP_PX) {
+      this.cancelLongPress();
+    }
+  };
+
+  private cancelLongPress = () => {
+    if (this.longPress) clearTimeout(this.longPress.timer);
+    this.longPress = null;
+    this.map.off("touchmove", this.onLongPressMove);
+    this.map.off("touchend", this.cancelLongPress);
+    this.map.off("touchcancel", this.cancelLongPress);
+  };
+
+  private grabLine = () => {
+    const press = this.longPress;
+    this.cancelLongPress();
+    if (!press || this.actions.blocked() || this.draggedAnchorId !== null) return;
+    this.closePopup();
+    this.removeTemporaryAnchor();
+    this.temporaryAnchor = press.at;
+    this.anchorSource()?.updateData({
+      add: [
+        {
+          type: "Feature",
+          id: this.anchors.length,
+          geometry: { type: "Point", coordinates: [...press.at] },
+          properties: { anchorIndex: this.anchors.length, minZoom: 0 },
+        },
+      ],
+    });
+    this.beginTouchDrag(this.anchors.length, press.point, press.at);
+  };
+
+  private beginTouchDrag(id: number, point: Point, at: Coord) {
+    this.map.dragPan.disable();
+    this.draggedAnchorId = id;
+    this.dragStart = point;
+    this.dragLast = { point, at };
+    this.dragMoved = false;
+    this.map.on("touchmove", this.onTouchMove);
+    this.map.on("touchend", this.onTouchEnd);
+    this.map.on("touchcancel", this.onTouchCancel);
+  }
+
+  private endTouchDrag() {
+    this.map.off("touchmove", this.onTouchMove);
+    this.map.off("touchend", this.onTouchEnd);
+    this.map.off("touchcancel", this.onTouchCancel);
+    this.map.dragPan.enable();
+    this.draggedAnchorId = null;
+    this.dragLast = null;
+  }
+
+  private onTouchMove = (e: MapTouchEvent) => {
+    this.lastTouchTime = Date.now();
+    if (this.draggedAnchorId === null) return;
+    if (e.points.length !== 1) {
+      // a second finger: the user wants to zoom, not to drag
+      this.onTouchCancel();
+      return;
+    }
+    e.preventDefault();
+    if (!this.dragMoved && this.dragStart && e.point.dist(this.dragStart) <= TAP_SLOP_PX) return;
+    this.dragMoved = true;
+    this.dragLast = { point: e.point, at: lngLat(e) };
+    this.moveAnchorFeature(this.draggedAnchorId, this.dragLast.at);
+    this.lastDragTime = Date.now();
+  };
+
+  private onTouchEnd = () => {
+    this.lastTouchTime = Date.now();
+    const id = this.draggedAnchorId;
+    const last = this.dragLast;
+    const moved = this.dragMoved;
+    this.endTouchDrag();
+    // the click the browser sends after the touch must not also append or insert
+    this.lastDragTime = Date.now();
+    if (id === null || !last) return;
+    const zoom = this.map.getZoom();
+    if (id === this.anchors.length) {
+      const grabbed = this.temporaryAnchor;
+      this.removeTemporaryAnchor();
+      if (!grabbed) return;
+      // held without moving: keep a point there, as a click on the line does
+      if (moved) this.actions.dragLine(grabbed, last.at, zoom);
+      else this.actions.insert(grabbed);
+      return;
+    }
+    const anchor = this.anchors[id];
+    if (!anchor) return;
+    if (moved) this.actions.move(anchor.index, last.at, zoom);
+    else this.showPopup(anchor);
+  };
+
+  private onTouchCancel = () => {
+    const id = this.draggedAnchorId;
+    this.endTouchDrag();
+    if (id === this.anchors.length) this.removeTemporaryAnchor();
+    // put a half-dragged anchor back where it was
+    if (this.state) this.anchorSource()?.setData(this.anchorData());
+  };
+
+  /** The anchor popup: where the point is, whether it is fixed, and its actions. */
+  private showPopup(anchor: Anchor) {
+    this.closePopup();
+    const content = anchorPopupContent(anchor, {
+      remove: () => {
+        this.closePopup();
+        if (!this.actions.blocked()) this.actions.remove(anchor.index, this.map.getZoom());
+      },
+      keep: () => {
+        this.closePopup();
+        if (!this.actions.blocked()) this.actions.insert([anchor.lon, anchor.lat]);
+      },
+    });
+    this.popup = this.openPopup(this.map, [anchor.lon, anchor.lat], content);
+    content.querySelector("button")?.focus();
+  }
+
+  private closePopup() {
+    const popup = this.popup;
+    this.popup = null;
+    popup?.remove();
+  }
 
   private showTemporaryAnchor = (e: MapLayerMouseEvent) => {
     if (this.draggedAnchorId !== null || this.actions.blocked()) return;
@@ -337,4 +545,40 @@ export class RouteEditorController {
     this.map.getCanvas().style.cursor = "";
     this.temporaryAnchor = null;
   }
+}
+
+/** The popup's DOM (MapLibre popups take DOM, not React). */
+export function anchorPopupContent(
+  anchor: Anchor,
+  actions: { remove: () => void; keep: () => void },
+): HTMLElement {
+  const root = document.createElement("div");
+  root.className = "text-sm";
+  root.dataset.testid = "route-editor-popup";
+  const title = document.createElement("p");
+  title.className = "font-medium";
+  title.textContent = anchor.zoom === 0 ? "Fixed point" : "Shape point";
+  const where = document.createElement("p");
+  where.className = "text-xs text-slate-600";
+  where.textContent = `${anchor.lat.toFixed(5)}, ${anchor.lon.toFixed(5)}`;
+  const hint = document.createElement("p");
+  hint.className = "mb-1 text-xs text-slate-600";
+  hint.textContent =
+    anchor.zoom === 0
+      ? "The route is drawn through it and it is saved with the version."
+      : "A handle on the line's shape; keep it to route through it.";
+  const buttons = document.createElement("div");
+  buttons.className = "flex flex-wrap gap-2";
+  const button = (text: string, onClick: () => void) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "rounded border px-2 py-1 text-sm hover:bg-slate-100";
+    b.textContent = text;
+    b.addEventListener("click", onClick);
+    buttons.append(b);
+  };
+  button("Remove this point", actions.remove);
+  if (anchor.zoom !== 0) button("Keep as a fixed point", actions.keep);
+  root.append(title, where, hint, buttons);
+  return root;
 }

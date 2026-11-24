@@ -16,7 +16,7 @@ const LINE: Coord[] = [
   [-97.61, 38.84],
 ];
 
-const proposal = (n = 0): Source => ({
+const proposal = (n = 0): Extract<Source, { kind: "proposal" }> => ({
   kind: "proposal",
   waypoints: [
     [-97.33, 37.69 + n / 1000],

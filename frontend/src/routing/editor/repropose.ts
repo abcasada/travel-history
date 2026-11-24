@@ -35,7 +35,11 @@ export const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(r
  * uses from that source, exactly the point the editor holds, so the server's slice of the new
  * cached proposal is the line the user sees.
  */
-export function sameLine(state: EditorState, src: number, line: readonly number[][]): boolean {
+export function sameLine(
+  state: EditorState,
+  src: number,
+  line: readonly (readonly number[])[],
+): boolean {
   let used = false;
   for (const p of state.points) {
     if (p.src !== src) continue;

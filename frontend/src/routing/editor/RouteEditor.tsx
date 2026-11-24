@@ -173,7 +173,8 @@ function Toolbar({ leg }: { leg: LegOut }) {
       <ul className="mb-2 list-disc pl-5 text-xs text-slate-600">
         <li>Drag a point, or drag the line, to route through a new place.</li>
         <li>Click the line to add a point; click the map to extend the end.</li>
-        <li>Shift-click or right-click a point to remove it.</li>
+        <li>Click a point for its menu; shift-click or right-click removes it.</li>
+        <li>On a touch screen, drag a point, tap it for its menu, or hold the line to drag it.</li>
       </ul>
       <p className="mb-2 text-sm" data-testid="editor-status">
         {busy
