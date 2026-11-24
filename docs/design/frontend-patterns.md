@@ -22,6 +22,9 @@ frontend/src/
                         inputs.tsx (PlaceInput, CitySearch, AirportSearch, ZonedTimeInput)
   routing/              a leg's route view: LegRoutePage (list pane), LegRouteLayer (map) - the
                         slot for items 25-26
+  imports/              trip spreadsheets (item 14c-2): ImportsPage (/imports), TripSheetPreviewPage
+                        (/imports/:id), TabCard, SheetLayers (map), sheet.ts (pure logic), paths.ts
+  upload/               chunkedUpload: the resumable upload every importer uses
   ui/                   form.tsx (Field, Button, Section, inputClass), QueryState.tsx
   lib/time.ts           wall-clock time in an IANA zone <-> UTC, display helpers
   platform/             adapters (shortcuts, files, notifications): the only platform-specific code
@@ -142,7 +145,7 @@ No form library. Every editor follows the same shape (see `TripFieldsForm`, `Sto
 - `map/MapLayers.tsx` is the one list of everything drawn on the shared map; both shells render
   it inside `BaseMap`. Each layer reads the URL and returns `null` when it doesn't apply
   (`HistoryLayers` on `/history`, `TripLayers` on `/` and `/trips…`, `LegRouteLayer` on a leg's
-  route page). Order in the file is drawing order.
+  route page, `SheetLayers` on a spreadsheet preview `/imports/:id`, the open tab from `?tab=`). Order in the file is drawing order.
 - **Data**: GeoJSON sources for small per-user data (trips, a route), vector tiles for big data
   (raw history; trip tiles later). Build GeoJSON in pure functions (`map/geo.ts`), memoized with
   `useMemo`; they are unit-tested without WebGL.
@@ -189,6 +192,8 @@ No form library. Every editor follows the same shape (see `TripFieldsForm`, `Sto
   `useShortcuts({ e: … }, enabled)`; single keys or "g m" sequences, never Ctrl/Alt/Meta;
   ignored while typing except Esc. Add each to `ShortcutHelp`.
 - `window.confirm` is acceptable for destructive actions until a dialog component exists.
+- Files the app makes (the spreadsheet problem report) are saved with `saveFile` from
+  `platform/files.ts`, never with a hand-made link in a page.
 
 ## 7. Tests
 
@@ -213,7 +218,11 @@ No form library. Every editor follows the same shape (see `TripFieldsForm`, `Sto
   real browser; the catalog flow creates a trip, adds the user, two stops (typed coordinates and
   a map click) and a leg, checks the detail page, edits the title and deletes the trip. Use
   `getByLabel(…, { exact: true })` (labels are substring-matched otherwise) and wait for the
-  page's heading after navigating.
+  page's heading after navigating. The trip spreadsheet step uploads
+  `e2e/fixtures/trip-sheet-synthetic.xlsx` (built by `scripts/make_e2e_trip_sheet.py`), ticks
+  whichever unticked option the preview offers (create people on a fresh DB, re-create on later
+  runs, since the step deletes the trip it made), commits, opens the trip, checks the mobile
+  shell's preview and deletes the trip.
 - Any new endpoint needs backend permission tests per actor (`tests/permissions/`), a matrix
   row if it's a new action, and a regenerated client (`./dev manage export_openapi >
   frontend/src/api/openapi.json && ./dev npm run gen:api`; commit both files). Ninja names

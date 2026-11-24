@@ -2,7 +2,7 @@
 
 New section (2026-11-18). Decision D-95 (approved 2026-11-18); Q-18 to Q-21 answered (PLAN.md
 §25). Backend built in work-order item 14c-1 (2026-11-24, `backend/travel/trips/sheet/`, D-100 to
-D-102, §28.12); the preview UI is item 14c-2. Template: [docs/trips/trip-template.xlsx](../trips/trip-template.xlsx),
+D-102, §28.12); the preview UI in item 14c-2 (2026-11-24, `frontend/src/imports/`, §28.13). Template: [docs/trips/trip-template.xlsx](../trips/trip-template.xlsx),
 rebuilt by `scripts/make_trip_template.py` (SYNTHETIC example), which also writes the copy the app
 serves (`backend/travel/trips/sheet/trip-template.xlsx`).
 
@@ -312,3 +312,29 @@ data-model.md §5.3 and §5.5 get the rows when the item lands.
   review flag's "apply the sheet version" action comes with the review queue (item 19); new
   flight legs get no great-circle route until item 11.
 
+### 28.13 As built (item 14c-2, the preview UI)
+
+- **Where:** `frontend/src/imports/`. `/imports` (the trip list's Import link and the account
+  menu's "Import trips from a spreadsheet"): upload (`.xlsx` only, chunked upload kind
+  `trip_sheet`), the template link, the caller's sheet imports. An upload opens `/imports/:id`,
+  which polls `GET /imports/{id}` while the worker reads the file, then shows the preview; a
+  `duplicate` links to the open preview of the same bytes (D-100). Both shells render it.
+- **Per tab:** outcome badge, "Import this tab" (ticked for importable tabs; unticking leaves
+  it out of `records`), the issue table (row, column letter and header, severity, message, hint,
+  candidates as the exact text to type), and the diff (trip fields old → new, people and tags
+  added, stops and legs added / changed field by field / not in the sheet and kept).
+- **Unticked options** (all off until ticked, sent as record-id lists, D-101): "Create these
+  people" wherever a tab has `unknown_people` (Q-20; a tab blocked only by creatable people
+  becomes importable when ticked, mirroring the server's `plan.problems`); "Re-create this trip"
+  on `deleted`; "Also remove the N stops and legs the sheet no longer has" on `update` tabs with
+  kept rows (Q-19).
+- **Commit:** one sticky bar ("Import N trips", "Discard"). The body carries `records` and
+  `seen` for the chosen tabs. 409 or 422 with `records` names those tabs and reloads the
+  preview; anything else shows the server's message. After a commit the trip lists, the trip
+  map and each written trip are invalidated (`trips/cache.ts`), then the batch queries.
+- **Map:** `SheetLayers` draws every tab's stops and legs (straight; great-circle for flights;
+  legs with an unresolved end are left out), the tab picked with "Show on map" (`?tab=`)
+  highlighted, labelled and fitted.
+- **Report:** "Download report (CSV)" builds the CLI's CSV (`tab,row,column,severity,reason,
+  message,hint`, column as "C (Place)") in the client and saves it through
+  `platform/files.ts` `saveFile`.
