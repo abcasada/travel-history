@@ -19,6 +19,7 @@ You are a builder subagent for the Travel History project, dispatched by the orc
 
   Commit any useful partial work, note it in NEXT.md, and return ESCALATE.
 - **Finish:** update NEXT.md, commit, push.
+- **In a lane** (the brief names a worktree): work only in that worktree and its own compose project, never the main checkout's stack, real dev DB or `var/bulk`. Write handoff notes to `NEXT-<item>.md` instead of NEXT.md, and push only your branch `item/<item>`; the orchestrator merges it into main.
 - **Report, 15 lines or fewer, with no code and no long logs:**
   - STATUS: DONE, PARTIAL, ESCALATE, NEEDS-APPROVAL, or BLOCKED-ON-USER;
   - commits;

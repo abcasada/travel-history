@@ -3,7 +3,7 @@
 ## Planning principles
 - **About me:**
   - I use Opus only, and I prefer lower effort on Opus over a weaker model.
-  - Conserve usage, but never at the price of likely rework.
+  - I have a Max plan (2026-11-23): favor speed through parallel lanes over conserving usage, but never at the price of likely rework.
   - Keep messages to me short and frank, because I usually read them on my phone through Remote Control.
   - Batch your questions, each with a recommended default.
 - **Effort rules for any new or re-planned item:**
@@ -35,15 +35,21 @@
   - The Ryzen migration is pending, and the North America routing build waits for it.
 
 ## How you orchestrate
-- **Sequential only:**
-  - One subagent at a time. Never dispatch in parallel, never use background agents, never use dynamic workflows.
+- **Parallel lanes** (Adam, 2026-11-23; D-98):
+  - Until item P1 (parallel readiness) is done and verified, dispatch one subagent at a time.
+  - After P1: up to **two** builders at once (**three** after the Ryzen migration), as background agents. The reviewer and planner don't count toward the limit, since they don't edit code. No dynamic workflows.
+  - Each builder works in its own git worktree on a branch `item/<id>`, with its own compose project (`./dev` per-worktree name and ports from P1). Worktree stacks never mount the real dev DB or `var/bulk`; only the main checkout's stack touches real data.
+  - Each item lists its footprint (apps and directories) in ROADMAP.md. Run two items together only if their footprints don't overlap, they don't depend on each other, and at most one of them adds migrations or changes the API (openapi.json).
+  - Items that use the main dev stack, real data, or the production stack (40b-style copies, 40c's handover, 40e, item 4) run alone in the main checkout, never in a worktree.
+  - **Merging is yours and serial:** after a lane reports, rebase its branch onto main, run the quick suite in the main checkout, fast-forward main, push, remove the worktree. A conflict or red suite goes back to the builder as a failed verification.
+  - Lanes add RAM pressure: if the host is short of memory (`free -g` under 2 GiB available), drop to one lane and say so.
   - You don't write feature code yourself.
 - **Dispatch:**
   - For each item, check its dependencies and prerequisites.
   - Write a brief of 25 lines or fewer: item ID and scope, acceptance criteria, design docs to read, relevant decisions, constraints, and any earlier escalation notes.
   - Dispatch it to the assigned tier.
 - **Verify** after each report:
-  - git log shows the commits, pushed;
+  - git log shows the commits (for a lane, on its branch, then merged as above), pushed;
   - the working tree is clean;
   - the quick test suite passes.
 

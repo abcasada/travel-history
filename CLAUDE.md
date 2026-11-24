@@ -13,7 +13,7 @@ them current.
 ## Orchestrated workflow
 
 - **Who does what:**
-  - Opus subagents do the work (builder-medium, builder-high, builder-xhigh, reviewer-xhigh, planner-xhigh), dispatched one at a time by an orchestrator session at Opus high.
+  - Opus subagents do the work (builder-medium, builder-high, builder-xhigh, reviewer-xhigh, planner-xhigh), dispatched by an orchestrator session at Opus high, in up to two parallel lanes (three after the Ryzen move; docs/ORCHESTRATION.md "Parallel lanes").
   - The orchestrator follows docs/ORCHESTRATION.md and docs/ROADMAP.md.
   - Only the orchestrator and the planner edit ROADMAP.md.
 - **Session start:** state which model you are running as. If it isn't Opus, stop.
@@ -26,7 +26,7 @@ them current.
 - **Context hygiene:**
   - Never read generated, minified, or lockfiles.
   - Read `docs/research/` only when needed.
-  - No parallel agents.
+  - Parallel agents only as docs/ORCHESTRATION.md "Parallel lanes" allows: each builder in its own git worktree and compose project, never touching the real dev DB or `var/bulk`.
 - **Reports** are 15 lines or fewer (20 for the planner), with no code or logs.
 
 ## Project structure

@@ -164,6 +164,7 @@ Frontend conventions: [docs/design/frontend-patterns.md](docs/design/frontend-pa
 - D-94 GeoNames gazetteer: cities500 + US populated places, pinned snapshot + SHA-256 (cache is the pin, `--latest` re-pins); prefix search on folded names by population; city picker suggests stop name and zone
 - D-95 Trip spreadsheet: one trip per `.xlsx` tab; trip block, stops header, legs header found by content; legs cite stops by row number, label or `=ROW()`; places never guessed; preview before commit; re-import by trip key, never deletes by absence (pending Adam)
 - D-96 Production stack: own compose project, DB and `.env.prod` beside the repo; deployed only from pushed `main` via a release directory, images tagged by commit; §7.7 enforced at startup; trips.* redirects to travel.*; dev never answers a public name (pending Adam)
+- D-98 Parallel lanes: up to two builders at once (three after Ryzen) in git worktrees with own compose projects, disjoint footprints, at most one migration/API item at a time; real-data and prod items run alone; the orchestrator merges serially
 
 ## 25. Open questions (for Adam, answer whenever — nothing is blocked on these)
 

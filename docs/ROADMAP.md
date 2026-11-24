@@ -5,7 +5,7 @@ Only the orchestrator and the planner edit this file. Status values: todo · in 
 ## Work order
 
 > **Execution order (2026-11-18, planner, from Adam's 2026-11-18 priorities: city search, then family go-live):**
-> **14** → **14b** → **40a** → **40b** → **40c** (build and final copy, then the handover after Adam's first sign-in) → **40d** → **41a** → **42a** (only if 41a finds blockers) → **pause: 41a's findings + the exposure "go"** → **40e** → **14c** → **4** → 21 (21a list tools, 21b trip page; frontend-patterns.md §8) → 27 → **Review pause B** → 11 → 12 → **Review pause A** → 15 → 16 → 18 → 19 → 22 → 23 → 24 → 14a → 28, then 29–46 in number order (40 and 41 are now the rest of T38 and the full final review).
+> **14** → **14b** → **40a** → **40b** → **P1** (parallel readiness; then two lanes, D-98) → **40c** (build and final copy, then the handover after Adam's first sign-in) → **40d** → **41a** → **42a** (only if 41a finds blockers) → **pause: 41a's findings + the exposure "go"** → **40e** → **14c** → **4** → 21 (21a list tools, 21b trip page; frontend-patterns.md §8) → 27 → **Review pause B** → 11 → 12 → **Review pause A** → 15 → 16 → 18 → 19 → 22 → 23 → 24 → 14a → 28, then 29–46 in number order (40 and 41 are now the rest of T38 and the full final review).
 > Location tracking (item 8's last step) stays on hold; when it resumes, it deploys the production stack's `ingest` (40a), never dev's. Earlier orders are in the changelog.
 >
 > **Go-live gates:** 40a waits for G-1; 40c's handover for G-3 and G-4; 40e for G-2's backup, 41a's blockers fixed, and Adam's "go" plus his tunnel change; item 4 for G-6. Adam pastes the Authentik client secret and `AGE_RECIPIENT` into `.env.prod` himself. From 40c's final copy on, Adam enters data only in production. Family members sign in only after 40e. If answers are missing when an item needs them, run 21 and 27 meanwhile.
@@ -239,6 +239,15 @@ Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhi
    - **Tests:** the tool against scratch containers with SYNTHETIC data, including pruning and refusals.
    - **Rehearsal only:** the final copy runs in 40c, right before Adam signs in, so whatever he enters in dev until then carries over.
    - Status: done (2026-11-18) except the G-2 backup gate: `./dev prod backup-now` with the real AGE_RECIPIENT waits for Adam's key
+P1. **[H] Parallel readiness (Adam, 2026-11-23; D-98).** Runs alone, in the main checkout, before any parallel lane.
+   - Fix the pre-commit hook inside git worktrees: gitleaks must scan the staged changes there too (mount the common git dir). Test it in a scratch worktree with a planted fake secret, which must be refused; remove the worktree after.
+   - `./dev` in a worktree: derive a distinct compose project name and port block from the worktree (for example `TH_LANE=<n>` → ports 8790+, 5180+), so `./dev up`, `test`, `test-quick`, `lint`, `manage`, `e2e` work in two worktrees at once beside the main stack.
+   - Worktree stacks get their own DB volume and bulk directory under the worktree (`var/`), never the main `var/bulk` or the dev DB volume. Refuse `./dev prod …`, `restore-test` and `import-from-dev` from a worktree.
+   - `./dev lane new <item>` / `./dev lane rm <item>`: create a worktree at `../travel-history-lanes/<item>` on branch `item/<item>` with its `.env` (copied from `.env.example`, never from the real `.env`), and tear it down (stack, volumes, worktree; refuse if the branch isn't merged unless `--force`).
+   - Prove it: two lanes running `./dev test-quick` at once, both green, with the main dev stack and batch 33 untouched; record the host's peak RAM in the report.
+   - Docs: a short "Parallel lanes" section in CLAUDE.md commands and docs/development (or the nearest existing dev doc).
+   - Status: not started
+
 40c. **[X] Authentik sign-in and the account handover (PROPOSED: G-3, G-4, G-5).** Two dispatches.
    - **Dispatch 1 [X]: build.**
      - **Authentik:** point production at Authentik per auth.md §7.2 (per-provider issuer, confidential client, `travel-users` group check, `auth_time`, end-session logout). Prove discovery and JWKS work from inside the prod web container through the public hostname; D-57's back channel is dev-only.
@@ -467,3 +476,4 @@ Nature: mech = mechanical, mod = moderate, hard. Size is S/M/L/XL with approxima
 - 2026-11-18: item 14b done and verified (`./dev test-quick` 2274 + 105 passed; batch 33 intact). Contributors can edit notes on their own legs through the API, but the UI doesn't offer it yet (item 21). Item 40a dispatched.
 - 2026-11-18: item 40a done and verified (`./dev test-quick` 2314 + 105 passed; prod web healthy on 127.0.0.1:8784 only; trips.* → travel.* 301 with forwarded HTTPS; public host stays 404 at scope `tracker`; unknown host 400). The orchestrator added the 8784 port and `./dev prod` to CLAUDE.md (G-1) and approved D-96 under Adam's delegation. Known: dev `./dev restore-test` fails at step 4 on two synthetic raw files lost with the HDD (40b's pruning drops them). Item 40b dispatched with a 10:05 pm CST stop (Adam asked to stop around 10:15 pm).
 - 2026-11-18: item 40b done and verified after a usage-limit stop and resume (`./dev test-quick` 2321 + 105 passed; rehearsal copy in prod: 1 account, batch 33 = 193,009 points, same as dev; dev untouched; no leftovers). Open gate: the encrypted backup needs AGE_RECIPIENT. Next: 40c dispatch 1 (build), which needs Adam's Authentik app/provider and the OIDC values in `.env.prod` to finish.
+- 2026-11-23: Adam approved parallel lanes (Max plan): up to two builders at once in git worktrees (three after the Ryzen move), the orchestrator merging serially (D-98; ORCHESTRATION.md "Parallel lanes"). Added P1 [H] parallel readiness before 40c. The planner adds footprints and lane pairings next.
