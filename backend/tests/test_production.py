@@ -6,6 +6,7 @@ a public name, per-address limits on the public pages, and the landing page offe
 The exposure guard's tracker-only rules before go-live are in test_exposure.py."""
 
 import re
+from pathlib import Path
 from urllib.parse import urlsplit
 
 import pytest
@@ -41,6 +42,7 @@ PROD_ENV = {
     "TRAVEL_PUBLIC_SCOPE": "tracker",
     "OIDC_ISSUER": "",
     "OIDC_BACKCHANNEL_URL": "",
+    "OIDC_SESSION_RECHECK_SECONDS": "3600",
 }
 NAMES = [
     "DEBUG",
@@ -57,6 +59,7 @@ NAMES = [
     "TRAVEL_CANONICAL_HOST",
     "TRAVEL_PUBLIC_SCOPE",
     "RATELIMIT_CLIENT_IP_HEADER",
+    "OIDC_SESSION_RECHECK_SECONDS",
 ]
 
 
@@ -212,6 +215,7 @@ def production_conf(**overrides) -> dict:
         OIDC_ISSUER="https://auth.example.org/application/o/travel/",
         OIDC_CLIENT_ID="travel-web",
         OIDC_CLIENT_SECRET="synthetic-client-secret",
+        OIDC_SESSION_RECHECK_SECONDS=3600,
     )
     conf.update(overrides)
     return conf
@@ -224,7 +228,17 @@ def test_production_problems_lists_nothing_for_production_settings():
 def test_the_ingest_only_service_needs_no_client_secret():
     conf = production_conf(TRAVEL_INGEST_ONLY=True, TRAVEL_PUBLIC_SCOPE="tracker")
     conf["OIDC_CLIENT_SECRET"] = ""  # compose.prod.yaml blanks it for `ingest`
+    conf["OIDC_SESSION_RECHECK_SECONDS"] = 0  # it never signs anyone in
     assert exposure.production_problems(conf) == []
+
+
+def test_compose_prod_forces_the_session_recheck():
+    """The value the production stack runs with (compose.prod.yaml's x-prod-env)."""
+    compose = Path(__file__).resolve().parents[2] / "compose.prod.yaml"
+    if compose.exists():  # the backend container mounts backend/ only
+        assert 'OIDC_SESSION_RECHECK_SECONDS: "3600"' in compose.read_text()
+    result = loaded(load_production())
+    assert result["OIDC_SESSION_RECHECK_SECONDS"] == 3600
 
 
 def test_production_starts_with_the_authentik_client_configured():
@@ -287,6 +301,10 @@ def test_production_starts_with_the_authentik_client_configured():
             ({"MIDDLEWARE": _middleware_moved(name)}, "before WhiteNoiseMiddleware")
             for name in exposure.WRAP_WHITENOISE
         ),
+        # F-3: sessions go back through the provider at least daily.
+        ({"OIDC_SESSION_RECHECK_SECONDS": 0}, "OIDC_SESSION_RECHECK_SECONDS must be"),
+        ({"OIDC_SESSION_RECHECK_SECONDS": 30}, "OIDC_SESSION_RECHECK_SECONDS must be"),
+        ({"OIDC_SESSION_RECHECK_SECONDS": 90000}, "OIDC_SESSION_RECHECK_SECONDS must be"),
         # F-2: no 40 MB bodies by default.
         ({"DATA_UPLOAD_MAX_MEMORY_SIZE": 40 * 1024 * 1024}, "DATA_UPLOAD_MAX_MEMORY_SIZE must be"),
         (

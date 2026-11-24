@@ -449,3 +449,10 @@ def can_manage_access(user) -> bool:
 def can_change_role(user, target: User) -> bool:
     """The Admin changes other users' roles; not their own (no accidental lock-out)."""
     return is_admin(user) and target.pk != user.pk
+
+
+def can_deactivate_account(user, target: User) -> bool:
+    """In the app only the Admin (de)activates accounts, not their own (the database guard
+    allows only the Admin; no endpoint does it yet). The server's `deactivate_account` runs as
+    the owner role, outside the app roles (F-3, D-108)."""
+    return is_admin(user) and target.pk != user.pk

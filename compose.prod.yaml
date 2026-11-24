@@ -20,6 +20,9 @@ x-prod-env: &prod-env
   # join the shared `valhalla` network) can reach these services.
   RATELIMIT_CLIENT_IP_HEADER: CF-Connecting-IP
   OIDC_BACKCHANNEL_URL: ""  # the dev-only back channel (D-57)
+  # Browser sessions go back through Authentik hourly, so leaving travel-users ends access
+  # within the hour (F-3, D-108); silent while Authentik's own session lives.
+  OIDC_SESSION_RECHECK_SECONDS: "3600"
 
 x-prod-image: &prod-image
   image: travel-history-backend:${TRAVEL_IMAGE_TAG:?set by ./dev prod from the release}

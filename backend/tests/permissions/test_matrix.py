@@ -748,6 +748,11 @@ ACTIONS = {
         lambda f, a: updates(User, f.alice.pk, role="admin"),
         lambda f, u: policy.can_change_role(u, f.alice),
     ),
+    # F-3 (D-108): in the app only the Admin; the server's deactivate_account is the owner role.
+    "deactivate_alice": (
+        lambda f, a: updates(User, f.alice.pk, is_active=False),
+        lambda f, u: policy.can_deactivate_account(u, f.alice),
+    ),
     # Account privacy (D-72, D-76): the account row (email, OIDC subject, role) is for the
     # account itself and the Admin; the family reads names through the directory view.
     "view_alice_account": (
@@ -846,6 +851,7 @@ MATRIX = {
     "view_plate":                  (F, T, F, F, F, F, F),
     "view_access_request":         (T, F, F, F, F, F, F),
     "make_alice_admin":            (T, F, F, F, F, F, F),
+    "deactivate_alice":            (T, F, F, F, F, F, F),
     "view_alice_account":          (T, T, F, F, F, F, F),
     "view_ivan_account":           (T, F, F, F, F, F, F),
     "view_alice_name":             (T, T, T, T, T, F, F),

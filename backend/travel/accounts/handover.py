@@ -8,6 +8,10 @@ role through `./dev prod manage` (or `./dev manage`). Never reachable from the a
 - `link_person`: links a family member's new account to the person Adam already put on trips
   (the onboarding step of auth.md §7.3, pulled forward): trips default to `participants`
   visibility (permissions.md §6.2), so an unlinked account can't see the trips it is on.
+- `deactivate_account` (F-3, D-108): ends someone's access now, not at the next provider check:
+  the account is deactivated (it then reads nothing, D-53, and its tracker tokens stop working)
+  and every session it has is deleted. `--reactivate` undoes it; `--sign-out` only deletes the
+  sessions (a lost phone of someone who keeps their access).
 
 Both pick accounts and persons by id only, check everything first, refuse anything outside
 their one case (`Refused`, nothing changed), run in one transaction, append to the audit log
@@ -30,7 +34,7 @@ from travel.core.devcopy import foreign_keys
 from travel.trips.models import Purpose
 
 from . import oidc, provisioning
-from .models import AuditLog, Person, Role, User
+from .models import AuditLog, DeviceToken, Person, Role, User
 
 log = logging.getLogger(__name__)
 
@@ -350,6 +354,104 @@ def link_person(account_id: int, person_id: int, *, execute: bool) -> LinkReport
         person.pk,
     )
     return report
+
+
+# --- deactivate_account -----------------------------------------------------------------------
+
+DEACTIVATE, REACTIVATE, SIGN_OUT = "deactivate", "reactivate", "sign-out"
+ACCOUNT_ACTIONS = {
+    DEACTIVATE: "deactivate_account",
+    REACTIVATE: "reactivate_account",
+    SIGN_OUT: "sign_out_account",
+}
+
+
+@dataclass
+class DeactivateReport:
+    account: dict
+    change: str
+    sessions: int = 0
+    live_tokens: int = 0
+    already: bool = False
+    executed: bool = False
+
+
+def deactivate_account(
+    account_id: int, *, execute: bool, change: str = DEACTIVATE
+) -> DeactivateReport:
+    """Deactivate account `account_id` and delete its sessions (`change` = DEACTIVATE),
+    activate it again (REACTIVATE) or only delete its sessions (SIGN_OUT)."""
+    require_owner_role()
+    if change not in ACCOUNT_ACTIONS:
+        raise Refused(f"unknown change {change!r}")
+    with transaction.atomic():
+        account = User.objects.select_for_update().filter(pk=account_id).first()
+        if account is None:
+            raise Refused(f"no account {account_id}")
+        report = DeactivateReport(
+            account={
+                "id": account.pk,
+                "display_name": account.display_name,
+                "role": account.role,
+                "active": account.is_active,
+            },
+            change=change,
+            live_tokens=DeviceToken.objects.filter(
+                user_id=account.pk, revoked_at__isnull=True
+            ).count(),
+        )
+        if (change == DEACTIVATE and not account.is_active) or (
+            change == REACTIVATE and account.is_active
+        ):
+            report.already = True
+            return report
+        if change == DEACTIVATE and account.role == Role.ADMIN:
+            others = User.objects.filter(role=Role.ADMIN, is_active=True).exclude(pk=account.pk)
+            if not others.exists():
+                raise Refused(
+                    f"account {account.pk} is the only active Admin; deactivating it would "
+                    "leave nobody to run the app (use --sign-out to end its sessions)"
+                )
+        if change != REACTIVATE:
+            keys = session_keys({account.pk})
+            Session.objects.filter(session_key__in=keys).delete()
+            report.sessions = len(keys)
+        if change != SIGN_OUT:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    f"UPDATE {_q(USER_TABLE)} SET is_active = %s WHERE id = %s",  # noqa: S608 - fixed name
+                    [change == REACTIVATE, account.pk],
+                )
+        _audit(
+            ACCOUNT_ACTIONS[change],
+            account.pk,
+            {
+                "was_active": account.is_active,
+                "role": account.role,
+                "sessions_deleted": report.sessions,
+                "live_tokens": report.live_tokens,
+            },
+        )
+        report.executed = execute
+        if not execute:
+            transaction.set_rollback(True)
+    log.info(
+        "deactivate_account %s: %s account %s; %s session(s) deleted",
+        "executed" if execute else "dry run",
+        change,
+        account.pk,
+        report.sessions,
+    )
+    return report
+
+
+def sessions_per_account() -> dict[int, int]:
+    counts: dict[int, int] = defaultdict(int)
+    for session in Session.objects.iterator():
+        user_id = session.get_decoded().get(SESSION_KEY)
+        if user_id:
+            counts[int(user_id)] += 1
+    return dict(counts)
 
 
 # --- listings (what the operator picks ids from) ---------------------------------------------

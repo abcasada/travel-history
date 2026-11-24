@@ -227,6 +227,10 @@ WRAP_WHITENOISE = (
 # of 10,000 points) stay well under 1 MiB; the tracker and upload-chunk endpoints have their
 # own limits (travel.core.bodylimit).
 MAX_DEFAULT_BODY_BYTES = 5 * 1024 * 1024
+# How often a browser session must go back through the provider (F-3, D-108): at least once a
+# day, and not so often that it is a redirect on every other click.
+MIN_RECHECK_SECONDS = 60
+MAX_RECHECK_SECONDS = 24 * 3600
 
 
 def production_problems(conf: Mapping[str, Any]) -> list[str]:
@@ -311,6 +315,12 @@ def production_problems(conf: Mapping[str, Any]) -> list[str]:
             problems.append(
                 "OIDC_CLIENT_ID and OIDC_CLIENT_SECRET must be set (a confidential client)"
             )
+    recheck = conf["OIDC_SESSION_RECHECK_SECONDS"]
+    if signs_in and not MIN_RECHECK_SECONDS <= recheck <= MAX_RECHECK_SECONDS:
+        problems.append(
+            f"OIDC_SESSION_RECHECK_SECONDS must be {MIN_RECHECK_SECONDS}..{MAX_RECHECK_SECONDS} "
+            "(sessions re-checked with the provider, F-3)"
+        )
     if not conf["OIDC_REQUIRED_GROUP"]:
         problems.append("OIDC_REQUIRED_GROUP must name the app's group (travel-users)")
     if not conf["OIDC_SECOND_FACTOR_AMR"]:

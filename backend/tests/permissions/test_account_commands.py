@@ -446,3 +446,153 @@ def test_as_travel_app_linking_is_refused(family):
         with pytest.raises(Exception, match="cannot link this account"), transaction.atomic():
             User.objects.filter(pk=kim.pk).update(person=person)
     assert seen_by(kim.pk)["trips"] == []
+
+
+# --- deactivate_account (F-3, D-108) ------------------------------------------------------------
+
+
+@pytest.fixture
+def members(provider):
+    """Adam (the only Admin) and two family members, each signed in on a phone; Kim also has
+    a tracker token and a trip."""
+    with as_owner():
+        adam = UserFactory(display_name="Synthetic Adam", role=Role.ADMIN, oidc_issuer=AUTHENTIK)
+        kim = UserFactory(display_name="Synthetic Kim", oidc_issuer=AUTHENTIK, oidc_sub="kim")
+        lee = UserFactory(display_name="Synthetic Lee", oidc_issuer=AUTHENTIK, oidc_sub="lee")
+        trip = TripFactory(owner=kim, visibility="family")
+    from tests.factories import device_token
+
+    device_token(kim)
+    sessions = {name: live_session(user) for name, user in (("adam", adam), ("kim", kim))}
+    sessions["kim-laptop"] = live_session(kim)
+    sessions["lee"] = live_session(lee)
+    return {"adam": adam, "kim": kim, "lee": lee, "trip": trip, "sessions": sessions}
+
+
+def live_session(user: User) -> str:
+    """A session the app accepts (sign_in_session's plus the password hash Django checks)."""
+    from django.contrib.auth import HASH_SESSION_KEY
+
+    session = SessionStore()
+    session[SESSION_KEY] = str(user.pk)
+    session[BACKEND_SESSION_KEY] = BACKEND
+    session[HASH_SESSION_KEY] = user.get_session_auth_hash()
+    session.create()
+    return session.session_key
+
+
+def api_me(session_key: str) -> int:
+    from django.test import Client
+
+    client = Client()
+    client.cookies["sessionid"] = session_key
+    return client.get("/api/v1/me").status_code
+
+
+def test_deactivate_lists_accounts_with_their_sessions(members):
+    output = run("deactivate_account")
+    assert f"{members['kim'].pk:>4}  member  yes           2  Synthetic Kim" in output
+    assert f"{members['adam'].pk:>4}  admin   yes           1  Synthetic Adam" in output
+
+
+def test_the_deactivate_dry_run_changes_nothing(members):
+    before = database_state()
+    output = run("deactivate_account", members["kim"].pk)
+    assert "Dry run" in output and "sessions deleted: 2" in output
+    assert "1 tracker token(s) stop working" in output
+    assert database_state() == before
+    assert api_me(members["sessions"]["kim"]) == 200
+
+
+def test_deactivating_ends_access_at_once_and_keeps_the_data(members):
+    kim, sessions = members["kim"], members["sessions"]
+    assert api_me(sessions["kim"]) == 200
+    output = run("deactivate_account", kim.pk, "--execute")
+    assert output.startswith("Executed")
+    with as_owner():
+        assert User.objects.get(pk=kim.pk).is_active is False
+        assert Trip.objects.filter(owner=kim).count() == 1  # the data stays
+        (entry,) = AuditLog.objects.filter(action="deactivate_account")
+    assert entry.object_id == str(kim.pk) and entry.actor_id is None
+    assert entry.details == {
+        "was_active": True,
+        "role": "member",
+        "sessions_deleted": 2,
+        "live_tokens": 1,
+    }
+    remaining = set(Session.objects.values_list("session_key", flat=True))
+    assert remaining == {sessions["adam"], sessions["lee"]}
+    assert api_me(sessions["kim"]) == 401
+    assert api_me(sessions["kim-laptop"]) == 401
+    assert api_me(sessions["lee"]) == 200
+    # As travel_app under RLS: the deactivated account reads nothing, not even itself (D-53);
+    # the family still reads its family trip.
+    assert seen_by(kim.pk)["me"] is None
+    assert seen_by(kim.pk)["trips"] == []
+    assert members["trip"].pk in seen_by(members["lee"].pk)["trips"]
+    # A session made later (a stale cookie re-sent, a race) signs nobody in.
+    assert api_me(live_session(kim)) == 401
+    # And the next Authentik sign-in is refused.
+    with pytest.raises(Exception, match="deactivated"):
+        first_sign_in(authentik_claims("kim", "kim@example.org", "Synthetic Kim"))
+
+
+def test_reactivating_lets_the_account_sign_in_again(members):
+    kim = members["kim"]
+    run("deactivate_account", kim.pk, "--execute")
+    before = database_state()
+    assert "Dry run" in run("deactivate_account", kim.pk, "--reactivate")
+    assert database_state() == before
+    output = run("deactivate_account", kim.pk, "--reactivate", "--execute")
+    assert "active again" in output
+    with as_owner():
+        assert User.objects.get(pk=kim.pk).is_active is True
+        assert AuditLog.objects.filter(action="reactivate_account").count() == 1
+    claims = authentik_claims("kim", "kim@example.org", "Synthetic Kim")
+    assert first_sign_in(claims).pk == kim.pk
+    assert seen_by(kim.pk)["trips"] == [members["trip"].pk]
+
+
+def test_sign_out_only_ends_the_sessions(members):
+    adam, sessions = members["adam"], members["sessions"]
+    output = run("deactivate_account", adam.pk, "--sign-out", "--execute")
+    assert "sessions deleted: 1" in output
+    with as_owner():
+        assert User.objects.get(pk=adam.pk).is_active is True
+        assert AuditLog.objects.filter(action="sign_out_account").count() == 1
+    assert api_me(sessions["adam"]) == 401
+    assert api_me(sessions["kim"]) == 200
+
+
+def test_deactivate_refuses_the_only_admin_and_unknown_accounts(members):
+    refuse("deactivate_account", members["adam"].pk, "--execute", match="only active Admin")
+    refuse("deactivate_account", 999_999, "--execute", match="no account 999999")
+    with as_owner():
+        UserFactory(role=Role.ADMIN, display_name="Synthetic second Admin")
+    output = run("deactivate_account", members["adam"].pk, "--execute")
+    assert output.startswith("Executed")
+
+
+def test_deactivating_twice_changes_nothing_the_second_time(members):
+    run("deactivate_account", members["kim"].pk, "--execute")
+    before = database_state()
+    assert "already deactivated" in run("deactivate_account", members["kim"].pk, "--execute")
+    assert database_state() == before
+
+
+def test_as_travel_app_deactivating_is_refused(members):
+    kim = members["kim"]
+    with rls_context(members["adam"].pk):  # even with the Admin's context
+        refuse("deactivate_account", kim.pk, "--execute", match="owner role", owner=False)
+        refuse("deactivate_account", match="owner role", owner=False)
+    # The statement itself: only the Admin may change the flag in the app (the guard trigger),
+    # and nobody can delete another account's sessions through RLS-covered tables.
+    with rls_context(kim.pk):
+        with (
+            pytest.raises(Exception, match="only the Admin can"),
+            transaction.atomic(),
+        ):
+            User.objects.filter(pk=kim.pk).update(is_active=False)
+    with rls_context(members["lee"].pk):
+        assert User.objects.filter(pk=kim.pk).update(is_active=False) == 0  # can't see the row
+    assert api_me(members["sessions"]["kim"]) == 200

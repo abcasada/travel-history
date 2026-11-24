@@ -45,5 +45,10 @@ class LoginWallMiddleware:
             # Bearer tokens (Android companion) are verified by the API's auth classes.
             if request.headers.get("Authorization", "").startswith("Bearer "):
                 return self.get_response(request)
+            if getattr(request, "sign_in_check_due", False):
+                # The session just ended for a fresh provider check (accounts/sessions.py).
+                from travel.accounts.sessions import DUE_DETAIL
+
+                return JsonResponse({"detail": DUE_DETAIL}, status=401)
             return JsonResponse({"detail": "authentication required"}, status=401)
         return redirect(f"/auth/login?next={request.get_full_path()}")

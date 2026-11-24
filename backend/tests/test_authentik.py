@@ -17,7 +17,7 @@ from joserfc.jwk import KeySet, RSAKey
 
 from tests.factories import UserFactory
 from tests.helpers import as_owner
-from travel.accounts import oidc
+from travel.accounts import oidc, sessions
 from travel.accounts.models import Role, User
 
 pytestmark = pytest.mark.django_db(databases=["default", "ratelimit"])
@@ -424,3 +424,77 @@ def test_docs_and_schema_need_a_signed_in_session(client, authentik, bearer_acco
     with as_owner():
         client.force_login(bearer_account)
     assert client.get(path).status_code == 200
+
+
+# --- Sessions go back through Authentik (F-3, D-108) ------------------------------------------
+
+
+@pytest.fixture
+def recheck(authentik, settings):
+    settings.OIDC_SESSION_RECHECK_SECONDS = 3600  # compose.prod.yaml's value
+    return authentik
+
+
+def age_session(client, seconds: int) -> None:
+    session = client.session
+    session[sessions.CHECKED_AT] -= seconds
+    session.save()
+
+
+def test_a_session_goes_back_through_authentik_after_an_hour(client, recheck):
+    sign_in(client, recheck)
+    assert client.get("/api/v1/me").status_code == 200
+    age_session(client, 3590)
+    assert client.get("/api/v1/me").status_code == 200
+    age_session(client, 20)
+    response = client.get("/api/v1/me")
+    assert response.status_code == 401
+    assert response.json() == {"detail": sessions.DUE_DETAIL}
+    # The session is gone, not just refused once; pages send the browser to sign in.
+    assert client.get("/api/v1/me").json() == {"detail": "authentication required"}
+    page = client.get("/app/trips")
+    assert (page.status_code, page["Location"]) == (302, "/auth/login?next=/app/trips")
+    # Authentik still vouches (its own session lives): a new session straight away.
+    assert sign_in(client, recheck).status_code == 302
+    assert client.get("/api/v1/me").status_code == 200
+    assert len(accounts()) == 1
+
+
+def test_leaving_travel_users_ends_access_at_the_next_check(client, recheck):
+    sign_in(client, recheck)
+    age_session(client, 3601)
+    assert client.get("/api/v1/me").status_code == 401
+    response = sign_in(client, recheck, groups=["authentik Admins"])
+    assert response.status_code == 403
+    assert b"not in the group" in response.content
+    assert client.get("/api/v1/me").status_code == 401
+    assert len(accounts()) == 1  # the account stays; deactivate_account is the server's step
+
+
+def test_a_refused_sign_in_ends_the_browsers_session(client, recheck):
+    sign_in(client, recheck)
+    assert client.get("/api/v1/me").status_code == 200
+    assert sign_in(client, recheck, groups=[]).status_code == 403
+    assert client.get("/api/v1/me").status_code == 401  # though the old one wasn't due yet
+
+
+def test_signing_out_still_ends_authentiks_session_when_the_check_is_due(client, recheck):
+    sign_in(client, recheck)
+    id_token = client.session["id_token"]
+    age_session(client, 3601)
+    response = client.post("/auth/logout")
+    assert response.status_code == 302
+    assert dict(parse_qsl(urlsplit(response["Location"]).query))["id_token_hint"] == id_token
+
+
+def test_sessions_without_the_providers_stamp_are_due(client, recheck):
+    with as_owner():
+        client.force_login(UserFactory())
+    assert client.get("/api/v1/me").status_code == 401
+
+
+def test_development_doesnt_recheck(client, settings):
+    assert settings.OIDC_SESSION_RECHECK_SECONDS == 0
+    with as_owner():
+        client.force_login(UserFactory())
+    assert client.get("/api/v1/me").status_code == 200

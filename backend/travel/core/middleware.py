@@ -18,13 +18,21 @@ class RlsContextMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        from django.contrib.auth import get_user
+        from django.contrib.auth import get_user, logout
+
+        from travel.accounts import sessions
 
         session_uid = request.session.get("_auth_user_id")
         with transaction.atomic():
             set_context(int(session_uid) if session_uid else None)
             user = get_user(request)
             request.user = user
+            if user.is_authenticated and sessions.check_due(request):
+                # The provider hasn't vouched for this session recently enough (F-3): end it,
+                # so this request is signed out and the next sign-in asks the provider again.
+                logout(request)
+                request.sign_in_check_due = True
+                user = request.user
             set_context(user.pk if user.is_authenticated else None)
             response = self.get_response(request)
             if hasattr(response, "render") and callable(response.render):

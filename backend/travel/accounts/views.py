@@ -18,7 +18,7 @@ from joserfc.errors import JoseError
 from travel.core import ratelimit
 from travel.core.rls import set_context
 
-from . import oidc
+from . import oidc, sessions
 from .provisioning import AccessDenied, user_for_claims
 
 BACKEND = "django.contrib.auth.backends.ModelBackend"
@@ -97,7 +97,10 @@ def callback_view(request: HttpRequest) -> HttpResponse:
     try:
         user = user_for_claims(claims)
     except AccessDenied as denied:
+        # The provider says this identity may not use the app now: whatever session this
+        # browser still had ends too (F-3).
         set_context(None)
+        logout(request)
         return render(request, "auth_error.html", {"reason": str(denied)}, status=403)
     if reauth_user is not None and reauth_user != user.pk:
         set_context(None)
@@ -114,6 +117,7 @@ def callback_view(request: HttpRequest) -> HttpResponse:
     fresh = isinstance(auth_time, int | float) and not isinstance(auth_time, bool)
     request.session["auth_at"] = min(int(auth_time), now) if fresh else now
     request.session["id_token"] = token.get("id_token", "")
+    sessions.mark_checked(request)
     return redirect(next_url)
 
 

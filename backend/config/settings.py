@@ -200,6 +200,12 @@ OIDC_ACCEPTED_ISSUERS = [i for i in [OIDC_ISSUER, *env.list("OIDC_EXTRA_ISSUERS"
 OIDC_ACCEPTED_AUDIENCES = [a for a in [OIDC_CLIENT_ID, *env.list("OIDC_EXTRA_AUDIENCES", [])] if a]
 # Approvals and destructive admin actions need a login at most this many seconds old.
 REAUTH_MAX_AGE = env.int("REAUTH_MAX_AGE", 300)
+# F-3 (D-108): a browser session goes back through the provider this long after the provider
+# last vouched for it (sign-in), so an account removed from the group, or a user deactivated in
+# Authentik, loses access at its next request after that. While the provider's own session
+# lives, the trip there needs no typing. 0 = off (development and tests); production forces
+# 3600 (compose.prod.yaml) and refuses anything outside 60..86400.
+OIDC_SESSION_RECHECK_SECONDS = env.int("OIDC_SESSION_RECHECK_SECONDS", 0)
 # Per-address limits on the public pages (auth.md §7.7): sign-in starts and provider callbacks
 # per 10 minutes each, landing-page views per minute.
 AUTH_RATE_PER_IP = env.int("AUTH_RATE_PER_IP", 30)
