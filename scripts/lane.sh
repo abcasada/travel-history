@@ -96,6 +96,8 @@ cmd_new() {
 
   # Public reference downloads only: a copy, never raw/ or media/, never a mount.
   mkdir -p "$path/var/bulk"/{raw,media,backup-outbox,uploads,reference}
+  # Empty: the tools container mounts it, and Docker would create a missing one as root.
+  mkdir -p "$path/data/private"
   local main_bulk
   main_bulk="$(bulk_dir_of "$MAIN_ROOT")"
   if [ -n "$main_bulk" ] && [ -d "$main_bulk/reference" ]; then

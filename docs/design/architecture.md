@@ -65,7 +65,10 @@ Key points:
   into the production stack (project `travel-history-prod`: its own DB volume, networks and
   `.env.prod`, images built from a `git archive` of pushed `main` and tagged by commit, gunicorn
   on `127.0.0.1:8784`, the tracker-only `ingest` on `127.0.0.1:8783`). No development command can
-  reach the production database ([production guide](../production.md)).
+  reach the production database ([production guide](../production.md)). Parallel build lanes
+  (D-98) are git worktrees whose dev stacks are their own projects (`travel-history-lane-<item>`,
+  own DB volume, ports 8800+/5180+, `var/bulk` in the worktree), never the real dev data
+  ([development guide](../development.md)).
 - **One image, three roles.** `web`, `worker` and the one-shot `migrate` job run the same backend
   image. The production SPA is built in a Node stage of the same Dockerfile and served by
   Django (WhiteNoise) from the same origin, so session cookies and CSRF work without CORS.

@@ -82,6 +82,13 @@ All commands run in containers through `./dev` (see `./dev help`):
 - `./dev prod deploy|status|logs|manage|psql|smoke|…` — the separate production stack (`compose.prod.yaml`, files in `~/apps/travel-history-prod/`; deploys only from a clean, pushed main; docs/production.md)
 - Dev URLs (LAN/VPN only): app with hot reload `http://<lan-host>:5173/app/`, Django `:8780`, mock OIDC `:8781`, Mailpit `:8782`
 
+### Parallel lanes (D-98; docs/development.md)
+
+- `./dev lane new <item>` (main checkout only) creates the worktree `../travel-history-lanes/<item>` on branch `item/<item>`. It gets its own `.env` (built from `.env.example`, never the real `.env`), compose project `travel-history-lane-<item>`, DB volume, image tag and `var/bulk`, with only the public reference data copied in.
+- In a lane, `./dev up|test|test-quick|lint|manage|e2e` use that lane's stack. Its ports are bound to 127.0.0.1: lane n has web `8800+10(n-1)`, Vite `5180+10(n-1)`, mock OIDC and Mailpit at web+1 and web+2. Before `./dev e2e`, run `./dev up && ./dev load-reference`.
+- `./dev prod …`, `restore-test`, `tracker` and `valhalla build|up|down` refuse in a worktree.
+- `./dev lane rm <item> [--force]` (main checkout) removes the stack, volumes, image tag and worktree, and deletes the branch once merged. It refuses an unmerged branch without `--force`. `./dev lane list` shows the lanes.
+
 ## Coding conventions
 
 - Python 3.13, Django 6.1, Django Ninja schemas for every endpoint; ruff for lint + format.
