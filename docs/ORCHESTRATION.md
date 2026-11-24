@@ -42,6 +42,12 @@
   - Each item lists its footprint (apps and directories) in ROADMAP.md. Run two items together only if their footprints don't overlap, they don't depend on each other, and at most one of them adds migrations or changes the API (openapi.json).
   - Items that use the main dev stack, real data, or the production stack (40b-style copies, 40c's handover, 40e, item 4) run alone in the main checkout, never in a worktree.
   - **Merging is yours and serial:** after a lane reports, rebase its branch onto main, run the quick suite in the main checkout, fast-forward main, push, remove the worktree. A conflict or red suite goes back to the builder as a failed verification.
+  - Adam's answers (2026-11-23, L-1 to L-5):
+    - A lane may keep building while an item runs alone in the main checkout, as long as free RAM stays above 2 GiB; its merge waits until the main-checkout item is done.
+    - During the go-live pause, Lane B keeps dispatching; Review pauses A and B stop both lanes.
+    - You resolve rebase conflicts confined to shared docs and one-line registrations (routes, menus, e2e) yourself; code conflicts go back to the builder.
+    - From Review pause A on, if the go-live-period merges went smoothly, two items may both change the API or add migrations in different apps; the later merge regenerates openapi.json and the client after its rebase.
+    - After 40e, run `./dev prod deploy` after each verified merge that changes the app.
   - Lanes add RAM pressure: if the host is short of memory (`free -g` under 2 GiB available), drop to one lane and say so.
   - You don't write feature code yourself.
 - **Dispatch:**

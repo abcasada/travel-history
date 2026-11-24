@@ -27,11 +27,11 @@ Only the orchestrator and the planner edit this file. Status values: todo · in 
 > - Still open from earlier: D-89 to D-93 (**yes** to all).
 >
 > **Questions for Adam (2026-11-23, parallel lanes). All PROPOSED: not approved until Adam answers. Recommended defaults in bold.**
-> - **L-1 Lanes beside main-checkout items:** may a worktree lane keep building (its merge waits) while 40c-2, 40c-3, 40e or item 4 runs in the main checkout? Worktree stacks never touch real data. **Yes, while free RAM stays above 2 GiB.** Until answered, drain the lanes first.
-> - **L-2 The go-live pause:** while Lane A waits for the exposure "go", may Lane B keep dispatching? **Yes; Review pauses A and B still stop both lanes.** Until answered, the pause stops both.
-> - **L-3 Conflicts in shared files:** may the orchestrator resolve rebase conflicts confined to the uncounted shared files (key below) itself, sending only code conflicts back to the builder (amends ORCHESTRATION.md)? **Yes.**
-> - **L-4 Two API items at once (amends D-98):** from Review pause A on, allow two items that both change the API, or add migrations in different apps, with the later merge regenerating openapi.json and the client after its rebase? Most later items change the API, so the current rule often leaves one lane idle. **Yes, if the go-live-period merges go smoothly.**
-> - **L-5 Production deploys after 40e:** the orchestrator runs `./dev prod deploy` (it backs up first) after each verified merge that changes the app, so Adam and the family see work as it lands? **Yes; batch them instead if Adam prefers fewer restarts.**
+> - **L-1 Lanes beside main-checkout items:** may a worktree lane keep building (its merge waits) while 40c-2, 40c-3, 40e or item 4 runs in the main checkout? Worktree stacks never touch real data. **Yes, while free RAM stays above 2 GiB.** Until answered, drain the lanes first. **Answered 2026-11-23 by Adam: yes (default).**
+> - **L-2 The go-live pause:** while Lane A waits for the exposure "go", may Lane B keep dispatching? **Yes; Review pauses A and B still stop both lanes.** Until answered, the pause stops both. **Answered 2026-11-23 by Adam: yes (default).**
+> - **L-3 Conflicts in shared files:** may the orchestrator resolve rebase conflicts confined to the uncounted shared files (key below) itself, sending only code conflicts back to the builder (amends ORCHESTRATION.md)? **Yes.** **Answered 2026-11-23 by Adam: yes (default).**
+> - **L-4 Two API items at once (amends D-98):** from Review pause A on, allow two items that both change the API, or add migrations in different apps, with the later merge regenerating openapi.json and the client after its rebase? Most later items change the API, so the current rule often leaves one lane idle. **Yes, if the go-live-period merges go smoothly.** **Answered 2026-11-23 by Adam: yes (default).**
+> - **L-5 Production deploys after 40e:** the orchestrator runs `./dev prod deploy` (it backs up first) after each verified merge that changes the app, so Adam and the family see work as it lands? **Yes; batch them instead if Adam prefers fewer restarts.** **Answered 2026-11-23 by Adam: yes (default).**
 
 Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhigh. Task IDs (T1…T46) and finding numbers (#1…#16) are from the 2026-10-21 audit; their descriptions and dependencies are in the Task reference below. Each item is one dispatch unless noted.
 
@@ -576,3 +576,4 @@ Nature: mech = mechanical, mod = moderate, hard. Size is S/M/L/XL with approxima
 - 2026-11-23 (planner): pulled 32a and 30 forward to run beside 11 and 12 after Review pause B. Reason: both are frontend-only, don't wait on pause A, and would otherwise leave a lane idle.
 - 2026-11-23 (planner): split 46 into 46a–46d (T16, T41, T42, T45, same order). Reason: as one item it spans flights, a new desktop app, the basemap and backend-wide typing, so it couldn't pair with anything.
 - 2026-11-23 (planner): batched L-1 to L-5 for Adam, all PROPOSED. Reason: they interpret or amend D-98 and ORCHESTRATION.md, or set a production deploy cadence.
+- 2026-11-23: Adam answered L-1 to L-5: defaults (yes to all). ORCHESTRATION.md and D-98 updated.
