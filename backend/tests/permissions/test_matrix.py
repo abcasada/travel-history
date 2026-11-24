@@ -33,6 +33,7 @@ from travel.trips.models import (
     Leg,
     LegParticipantOverride,
     Place,
+    Purpose,
     Route,
     Stop,
     Tag,
@@ -786,6 +787,28 @@ ACTIONS = {
         lambda f, a: updates(User, uid(f, a), person=f.kid.pk),
         None,
     ),
+    # Editing people and purposes (work-order item 21b, D-113): the managing Member or the
+    # Admin; a Viewer can't rename even their own person.
+    "edit_own_person": (
+        lambda f, a: updates(Person, person_of(f, a).pk, display_name="Renamed"),
+        lambda f, u: policy.can_edit_person(u, f.person_by_user.get(u.pk) or f.bob.person),
+    ),
+    "edit_alice_person": (
+        lambda f, a: updates(Person, f.alice.person.pk, visibility="private"),
+        lambda f, u: policy.can_edit_person(u, f.alice.person),
+    ),
+    "edit_kid": (
+        lambda f, a: updates(Person, f.kid.pk, display_name="Renamed kid"),
+        lambda f, u: policy.can_edit_person(u, f.kid),
+    ),
+    "create_purpose": (
+        lambda f, a: inserts(lambda: Purpose.objects.create(owner_id=uid(f, a), name="Synthetic")),
+        lambda f, u: policy.can_create_purpose(u),
+    ),
+    "edit_alice_purpose": (
+        lambda f, a: updates(Purpose, f.alice_purpose.pk, name="Renamed purpose"),
+        lambda f, u: policy.can_edit_purpose(u, f.alice_purpose),
+    ),
     **_trips_api_actions(),
     **_contribution_actions(),
     **_trip_sheet_actions(),
@@ -861,6 +884,11 @@ MATRIX = {
     "create_person":               (T, T, T, T, F, F, F),
     "link_own_new_person":         (T, T, T, T, F, F, F),
     "link_own_account_to_kid":     (T, F, F, F, F, F, F),
+    "edit_own_person":             (T, T, T, T, F, F, F),
+    "edit_alice_person":           (T, T, F, F, F, F, F),
+    "edit_kid":                    (T, F, F, F, F, F, F),
+    "create_purpose":              (T, T, T, T, F, F, F),
+    "edit_alice_purpose":          (F, T, F, F, F, F, F),
     # Trips API (work-order item 6)
     "view_core_leg":                        (T, T, T, T, T, F, F),
     "view_bob_participation:participants":  (F, T, T, F, F, F, F),

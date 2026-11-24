@@ -632,6 +632,36 @@ def update_tag(tag: Tag, data: dict[str, Any]) -> Tag:
     return tag
 
 
+# --- Purposes --------------------------------------------------------------------------------
+
+
+def _apply_purpose(purpose: Purpose, data: dict[str, Any]) -> None:
+    _require(data, {"name", "default_visibility", "sort", "archived"})
+    if "name" in data:
+        purpose.name = data["name"].strip()
+        if not purpose.name:
+            raise invalid("name cannot be blank")
+    for field in ("default_visibility", "sort", "archived"):
+        if field in data:
+            setattr(purpose, field, data[field])
+
+
+def create_purpose(user, data: dict[str, Any]) -> Purpose:
+    """A new purpose of the user's own, last in their list unless `sort` says otherwise."""
+    last = Purpose.objects.filter(owner_id=user.pk).aggregate(Max("sort"))["sort__max"]
+    purpose = Purpose(owner_id=user.pk, sort=0 if last is None else last + 1)
+    _apply_purpose(purpose, data)
+    _save(purpose)
+    return purpose
+
+
+def update_purpose(purpose: Purpose, data: dict[str, Any]) -> Purpose:
+    """Purposes are archived, never deleted: trips keep theirs."""
+    _apply_purpose(purpose, data)
+    _save(purpose)
+    return purpose
+
+
 def own_tag(user, *, tag_id: int | None = None, name: str | None = None) -> Tag:
     """One of the user's own tags by id (422 for anyone else's, as for a missing one), or by
     name, created if the user has none by that name yet (names are case-insensitive)."""

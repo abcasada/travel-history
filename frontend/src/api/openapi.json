@@ -1,6 +1,91 @@
 {
   "components": {
     "schemas": {
+      "AirlineOut": {
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "country": {
+            "title": "Country",
+            "type": "string"
+          },
+          "iata": {
+            "title": "Iata",
+            "type": "string"
+          },
+          "icao": {
+            "title": "Icao",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "iata",
+          "icao",
+          "country",
+          "active"
+        ],
+        "title": "AirlineOut",
+        "type": "object"
+      },
+      "AirlineRef": {
+        "properties": {
+          "code": {
+            "description": "IATA, else ICAO, else empty",
+            "title": "Code",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "code"
+        ],
+        "title": "AirlineRef",
+        "type": "object"
+      },
+      "AirlineSearchIn": {
+        "properties": {
+          "limit": {
+            "default": 20,
+            "maximum": 50,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "q": {
+            "description": "IATA/ICAO code or name",
+            "maxLength": 64,
+            "minLength": 2,
+            "title": "Q",
+            "type": "string"
+          }
+        },
+        "required": [
+          "q"
+        ],
+        "title": "AirlineSearchIn",
+        "type": "object"
+      },
       "AirportOut": {
         "properties": {
           "iata_code": {
@@ -57,6 +142,30 @@
           "lat"
         ],
         "title": "AirportOut",
+        "type": "object"
+      },
+      "AirportRef": {
+        "properties": {
+          "code": {
+            "description": "IATA, else ICAO, else the ident",
+            "title": "Code",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "code"
+        ],
+        "title": "AirportRef",
         "type": "object"
       },
       "AirportSearchIn": {
@@ -1348,6 +1457,17 @@
             ],
             "title": "Aircraft Type Id"
           },
+          "airline": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AirlineRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "reference data for airline_id"
+          },
           "airline_id": {
             "anyOf": [
               {
@@ -1385,6 +1505,16 @@
               }
             ],
             "title": "Current Route Id"
+          },
+          "destination_airport": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AirportRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "destination_airport_id": {
             "anyOf": [
@@ -1459,6 +1589,16 @@
             "description": "private free text; never in a public snapshot",
             "title": "Notes",
             "type": "string"
+          },
+          "origin_airport": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AirportRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "origin_airport_id": {
             "anyOf": [
@@ -1563,9 +1703,12 @@
           "current_route_id",
           "distance_m",
           "airline_id",
+          "airline",
           "flight_number",
           "origin_airport_id",
           "destination_airport_id",
+          "origin_airport",
+          "destination_airport",
           "aircraft_type_id",
           "aircraft_registration",
           "seat",
@@ -2529,7 +2672,7 @@
       "PersonOut": {
         "properties": {
           "can_edit": {
-            "description": "the caller manages this person",
+            "description": "the caller may rename this person: their managing user, or the Admin",
             "title": "Can Edit",
             "type": "boolean"
           },
@@ -2551,6 +2694,11 @@
             "title": "Is Me",
             "type": "boolean"
           },
+          "manages": {
+            "description": "the caller is this person's managing user",
+            "title": "Manages",
+            "type": "boolean"
+          },
           "visibility": {
             "title": "Visibility",
             "type": "string"
@@ -2562,9 +2710,40 @@
           "visibility",
           "is_me",
           "has_account",
-          "can_edit"
+          "can_edit",
+          "manages"
         ],
         "title": "PersonOut",
+        "type": "object"
+      },
+      "PersonPatchIn": {
+        "description": "Only the fields sent are changed.",
+        "properties": {
+          "display_name": {
+            "anyOf": [
+              {
+                "maxLength": 150,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "visibility": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PersonVisibility"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "PersonPatchIn",
         "type": "object"
       },
       "PersonRef": {
@@ -2832,6 +3011,43 @@
         "title": "PublicMode",
         "type": "string"
       },
+      "PurposeIn": {
+        "properties": {
+          "default_visibility": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PurposeVisibility"
+              }
+            ],
+            "default": "participants"
+          },
+          "name": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "sort": {
+            "anyOf": [
+              {
+                "maximum": 32767,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "default: last",
+            "title": "Sort"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "PurposeIn",
+        "type": "object"
+      },
       "PurposeOut": {
         "properties": {
           "archived": {
@@ -2865,6 +3081,60 @@
         "title": "PurposeOut",
         "type": "object"
       },
+      "PurposePatchIn": {
+        "description": "Only the fields sent are changed. Archived purposes stay on their trips but aren't\noffered for new ones.",
+        "properties": {
+          "archived": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived"
+          },
+          "default_visibility": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PurposeVisibility"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "sort": {
+            "anyOf": [
+              {
+                "maximum": 32767,
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sort"
+          }
+        },
+        "title": "PurposePatchIn",
+        "type": "object"
+      },
       "PurposeRef": {
         "properties": {
           "id": {
@@ -2882,6 +3152,15 @@
         ],
         "title": "PurposeRef",
         "type": "object"
+      },
+      "PurposeVisibility": {
+        "enum": [
+          "private",
+          "participants",
+          "family"
+        ],
+        "title": "PurposeVisibility",
+        "type": "string"
       },
       "RouteDetailOut": {
         "properties": {
@@ -4702,8 +4981,7 @@
             "type": "string"
           },
           "status": {
-            "title": "Status",
-            "type": "string"
+            "$ref": "#/components/schemas/TripStatus"
           },
           "stops": {
             "items": {
@@ -4850,7 +5128,7 @@
           "status": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/Status"
+                "$ref": "#/components/schemas/TripStatus"
               },
               {
                 "type": "null"
@@ -5153,7 +5431,7 @@
           "status": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/Status"
+                "$ref": "#/components/schemas/TripStatus"
               },
               {
                 "type": "null"
@@ -5321,8 +5599,7 @@
             "type": "string"
           },
           "status": {
-            "title": "Status",
-            "type": "string"
+            "$ref": "#/components/schemas/TripStatus"
           },
           "tags": {
             "items": {
@@ -5716,6 +5993,14 @@
         ],
         "title": "TripSheetPreviewOut",
         "type": "object"
+      },
+      "TripStatus": {
+        "enum": [
+          "candidate",
+          "confirmed"
+        ],
+        "title": "TripStatus",
+        "type": "string"
       },
       "TripTagDetailOut": {
         "properties": {
@@ -7289,6 +7574,57 @@
         ]
       }
     },
+    "/api/v1/persons/{person_id}": {
+      "patch": {
+        "description": "Rename a person or change who sees them: their managing user or the Admin. A person\nthe caller can't see answers 404.",
+        "operationId": "updatePerson",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "person_id",
+            "required": true,
+            "schema": {
+              "title": "Person Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PersonPatchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonOut"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Update Person",
+        "tags": [
+          "people"
+        ]
+      }
+    },
     "/api/v1/preferences": {
       "get": {
         "description": "Values for `any`, overridden by values stored for the given device class.",
@@ -7426,6 +7762,157 @@
         "summary": "List Purposes",
         "tags": [
           "trips"
+        ]
+      },
+      "post": {
+        "description": "A purpose of the caller's own; a name they already use (any case) answers 409.",
+        "operationId": "createPurpose",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PurposeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurposeOut"
+                }
+              }
+            },
+            "description": "Created"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Create Purpose",
+        "tags": [
+          "trips"
+        ]
+      }
+    },
+    "/api/v1/purposes/{purpose_id}": {
+      "patch": {
+        "description": "The caller's own purposes only; anyone else's answers 404 (as a missing one).",
+        "operationId": "updatePurpose",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "purpose_id",
+            "required": true,
+            "schema": {
+              "title": "Purpose Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PurposePatchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurposeOut"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Update Purpose",
+        "tags": [
+          "trips"
+        ]
+      }
+    },
+    "/api/v1/reference/airlines": {
+      "get": {
+        "description": "Airlines by code (IATA or ICAO: exact) or name/alias (contains). Exact code matches\nfirst, then active airlines, then by name; defunct airlines stay findable for old flights.",
+        "operationId": "searchAirlines",
+        "parameters": [
+          {
+            "description": "IATA/ICAO code or name",
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "description": "IATA/ICAO code or name",
+              "maxLength": 64,
+              "minLength": 2,
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 50,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AirlineOut"
+                  },
+                  "title": "Response",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Search Airlines",
+        "tags": [
+          "reference"
         ]
       }
     },
@@ -8172,7 +8659,7 @@
             "schema": {
               "anyOf": [
                 {
-                  "$ref": "#/components/schemas/Status"
+                  "$ref": "#/components/schemas/TripStatus"
                 },
                 {
                   "type": "null"
@@ -8525,7 +9012,7 @@
             "schema": {
               "anyOf": [
                 {
-                  "$ref": "#/components/schemas/Status"
+                  "$ref": "#/components/schemas/TripStatus"
                 },
                 {
                   "type": "null"

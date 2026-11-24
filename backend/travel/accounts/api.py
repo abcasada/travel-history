@@ -93,7 +93,10 @@ class PersonOut(Schema):
     visibility: str
     is_me: bool = Field(description="the caller's own person")
     has_account: bool = Field(description="linked to a family account")
-    can_edit: bool = Field(description="the caller manages this person")
+    can_edit: bool = Field(
+        description="the caller may rename this person: their managing user, or the Admin"
+    )
+    manages: bool = Field(description="the caller is this person's managing user")
 
 
 # Schema names come from class names; Person.Visibility would clash with the trips' Visibility.
@@ -105,23 +108,36 @@ class PersonIn(Schema):
     visibility: PersonVisibility = PersonVisibility.FAMILY
 
 
+class PersonPatchIn(Schema):
+    """Only the fields sent are changed."""
+
+    display_name: str | None = Field(None, min_length=1, max_length=150)
+    visibility: PersonVisibility | None = None
+
+
 def _people_out(user, people: list[Person]) -> list[dict]:
     linked = dict(
         UserDirectory.objects.filter(person_id__in=[p.pk for p in people]).values_list(
             "person_id", "id"
         )
     )
-    return [
-        {
-            "id": p.pk,
-            "display_name": p.display_name,
-            "visibility": p.visibility,
-            "is_me": p.pk == user.person_id,
-            "has_account": p.pk in linked,
-            "can_edit": linked[p.pk] == user.pk if p.pk in linked else p.created_by_id == user.pk,
-        }
-        for p in people
-    ]
+    rows = []
+    for p in people:
+        manages = linked[p.pk] == user.pk if p.pk in linked else p.created_by_id == user.pk
+        rows.append(
+            {
+                "id": p.pk,
+                "display_name": p.display_name,
+                "visibility": p.visibility,
+                "is_me": p.pk == user.person_id,
+                "has_account": p.pk in linked,
+                # The same rule as policy.can_edit_person, from rows already loaded: every
+                # person listed is visible, so only the role and the managing user matter.
+                "can_edit": policy.can_create(user) and (manages or policy.is_admin(user)),
+                "manages": manages and policy.is_family(user),
+            }
+        )
+    return rows
 
 
 @people_router.get("/persons", response=list[PersonOut], operation_id="listPersons")
@@ -146,6 +162,30 @@ def create_person(request, payload: PersonIn):
         created_by=request.user,
     )
     return Status(201, _people_out(request.user, [person])[0])
+
+
+@people_router.patch("/persons/{person_id}", response=PersonOut, operation_id="updatePerson")
+def update_person(request, person_id: int, payload: PersonPatchIn):
+    """Rename a person or change who sees them: their managing user or the Admin. A person
+    the caller can't see answers 404."""
+    user = request.user
+    person = Person.objects.filter(pk=person_id).first()
+    if person is None or not policy.can_view_person(user, person):
+        raise HttpError(404, "person not found")
+    if not policy.can_edit_person(user, person):
+        raise HttpError(403, "only the person's managing user or the Admin can change them")
+    changes = payload.model_dump(exclude_unset=True)
+    if any(value is None for value in changes.values()):
+        raise HttpError(422, "fields cannot be null")
+    if "display_name" in changes:
+        person.display_name = changes["display_name"].strip()
+        if not person.display_name:
+            raise HttpError(422, "display_name cannot be blank")
+    if "visibility" in changes:
+        person.visibility = changes["visibility"]
+    if changes:
+        person.save(update_fields=[*changes, "updated_at"])
+    return _people_out(user, [person])[0]
 
 
 @router.post("/me/person", response={201: MeOut}, operation_id="createMyPerson")

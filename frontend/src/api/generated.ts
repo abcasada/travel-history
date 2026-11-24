@@ -24,6 +24,36 @@ import type {
 } from '@tanstack/react-query';
 
 import { apiFetch } from './client';
+export interface AirlineOut {
+  active: boolean;
+  country: string;
+  iata: string;
+  icao: string;
+  id: number;
+  name: string;
+}
+
+export interface AirlineRef {
+  /** IATA, else ICAO, else empty */
+  code: string;
+  id: number;
+  name: string;
+}
+
+export interface AirlineSearchIn {
+  /**
+     * @minimum 1
+     * @maximum 50
+     */
+  limit?: number;
+  /**
+     * IATA/ICAO code or name
+     * @minLength 2
+     * @maxLength 64
+     */
+  q: string;
+}
+
 export interface AirportOut {
   iata_code: string;
   icao_code: string;
@@ -35,6 +65,13 @@ export interface AirportOut {
   municipality: string;
   name: string;
   type: string;
+}
+
+export interface AirportRef {
+  /** IATA, else ICAO, else the ident */
+  code: string;
+  id: number;
+  name: string;
 }
 
 export interface AirportSearchIn {
@@ -448,6 +485,8 @@ export interface VehicleRef {
 export interface LegOut {
   aircraft_registration: string;
   aircraft_type_id: number | null;
+  /** reference data for airline_id */
+  airline: AirlineRef | null;
   airline_id: number | null;
   author: UserRef;
   cabin_class: string;
@@ -455,6 +494,7 @@ export interface LegOut {
   can_delete: boolean;
   can_edit: boolean;
   current_route_id: number | null;
+  destination_airport: AirportRef | null;
   destination_airport_id: number | null;
   destination_label: string;
   destination_stop_id: number | null;
@@ -467,6 +507,7 @@ export interface LegOut {
   mode: string;
   /** private free text; never in a public snapshot */
   notes: string;
+  origin_airport: AirportRef | null;
   origin_airport_id: number | null;
   origin_label: string;
   origin_stop_id: number | null;
@@ -697,7 +738,7 @@ export interface PersonIn {
 }
 
 export interface PersonOut {
-  /** the caller manages this person */
+  /** the caller may rename this person: their managing user, or the Admin */
   can_edit: boolean;
   display_name: string;
   /** linked to a family account */
@@ -705,7 +746,17 @@ export interface PersonOut {
   id: number;
   /** the caller's own person */
   is_me: boolean;
+  /** the caller is this person's managing user */
+  manages: boolean;
   visibility: string;
+}
+
+/**
+ * Only the fields sent are changed.
+ */
+export interface PersonPatchIn {
+  display_name?: string | null;
+  visibility?: PersonVisibility | null;
 }
 
 export interface PlaceOut {
@@ -775,12 +826,43 @@ export const PublicMode = {
   listed: 'listed',
 } as const;
 
+export type PurposeVisibility = typeof PurposeVisibility[keyof typeof PurposeVisibility];
+
+
+export const PurposeVisibility = {
+  private: 'private',
+  participants: 'participants',
+  family: 'family',
+} as const;
+
+export interface PurposeIn {
+  default_visibility?: PurposeVisibility;
+  /**
+     * @minLength 1
+     * @maxLength 64
+     */
+  name: string;
+  /** default: last */
+  sort?: number | null;
+}
+
 export interface PurposeOut {
   archived: boolean;
   default_visibility: string;
   id: number;
   name: string;
   sort: number;
+}
+
+/**
+ * Only the fields sent are changed. Archived purposes stay on their trips but aren't
+ * offered for new ones.
+ */
+export interface PurposePatchIn {
+  archived?: boolean | null;
+  default_visibility?: PurposeVisibility | null;
+  name?: string | null;
+  sort?: number | null;
 }
 
 export interface PurposeRef {
@@ -1147,6 +1229,14 @@ export interface TripSharingOut {
   public_slug: string;
 }
 
+export type TripStatus = typeof TripStatus[keyof typeof TripStatus];
+
+
+export const TripStatus = {
+  candidate: 'candidate',
+  confirmed: 'confirmed',
+} as const;
+
 /**
  * A tag on a trip. Tags are per user: the owner's are the trip's main tags (`by_owner`),
  * participants' own tags are shown with their author.
@@ -1180,7 +1270,7 @@ export interface TripDetailOut {
   sharing: TripSharingOut | null;
   source: string;
   start_date: string;
-  status: string;
+  status: TripStatus;
   stops: StopOut[];
   tags: TripTagOut[];
   title: string;
@@ -1205,7 +1295,7 @@ export interface TripFilterIn {
   purpose?: number[] | null;
   /** text in the title */
   q?: string | null;
-  status?: Status | null;
+  status?: TripStatus | null;
   /** tag ids (anyone's tag on the trip) */
   tag?: number[] | null;
   /** trips starting on or before */
@@ -1257,7 +1347,7 @@ export interface TripListIn {
   purpose?: number[] | null;
   /** text in the title */
   q?: string | null;
-  status?: Status | null;
+  status?: TripStatus | null;
   /** tag ids (anyone's tag on the trip) */
   tag?: number[] | null;
   /** trips starting on or before */
@@ -1288,7 +1378,7 @@ export interface TripOut {
   purpose: PurposeRef | null;
   source: string;
   start_date: string;
-  status: string;
+  status: TripStatus;
   tags: TripTagOut[];
   title: string;
   updated_at: string;
@@ -1427,6 +1517,20 @@ export type ListPreferences200 = { [key: string]: unknown };
 
 export type SetPreference200 = { [key: string]: unknown };
 
+export type SearchAirlinesParams = {
+/**
+ * IATA/ICAO code or name
+ * @minLength 2
+ * @maxLength 64
+ */
+q: string;
+/**
+ * @minimum 1
+ * @maximum 50
+ */
+limit?: number;
+};
+
 export type SearchAirportsParams = {
 /**
  * code, name or city
@@ -1465,7 +1569,7 @@ from?: string | null;
  */
 to?: string | null;
 visibility?: Visibility | null;
-status?: Status | null;
+status?: TripStatus | null;
 /**
  * trips this person is on
  */
@@ -1515,7 +1619,7 @@ from?: string | null;
  */
 to?: string | null;
 visibility?: Visibility | null;
-status?: Status | null;
+status?: TripStatus | null;
 /**
  * trips this person is on
  */
@@ -4036,6 +4140,97 @@ export const useCreatePerson = <TError = unknown,
       return useMutation(getCreatePersonMutationOptions(options), queryClient);
     }
 
+export const getUpdatePersonUrl = (personId: number,) => {
+
+
+
+
+  return `/api/v1/persons/${personId}`
+}
+
+/**
+ * Rename a person or change who sees them: their managing user or the Admin. A person
+ * the caller can't see answers 404.
+ * @summary Update Person
+ */
+export const updatePerson = async (personId: number,
+    personPatchIn: PersonPatchIn, options?: Parameters<typeof apiFetch>[1]): Promise<PersonOut> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return apiFetch<PersonOut>(getUpdatePersonUrl(personId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(personPatchIn)
+  }
+);}
+
+
+
+
+
+export const getUpdatePersonMutationKey = () => ['updatePerson'] as const;
+
+export const getUpdatePersonMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updatePerson>>, TError,UpdatePersonMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updatePerson>>, TError,UpdatePersonMutationVariables, TContext> => {
+
+const mutationKey = getUpdatePersonMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updatePerson>>, UpdatePersonMutationVariables> = (props) => {
+          const {personId,data} = props ?? {};
+
+          return  updatePerson(personId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdatePersonMutationResult = NonNullable<Awaited<ReturnType<typeof updatePerson>>>
+    export type UpdatePersonMutationBody = PersonPatchIn
+    export type UpdatePersonMutationError = unknown
+    export type UpdatePersonMutationVariables = {personId: number;data: PersonPatchIn}
+
+    /**
+ * @summary Update Person
+ */
+export const useUpdatePerson = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updatePerson>>, TError,UpdatePersonMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof updatePerson>>,
+        TError,
+        UpdatePersonMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdatePersonMutationOptions(options), queryClient);
+    }
+
 export const getListPreferencesUrl = (params?: ListPreferencesParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -4324,6 +4519,295 @@ export function useListPurposes<TData = Awaited<ReturnType<typeof listPurposes>>
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getListPurposesQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreatePurposeUrl = () => {
+
+
+
+
+  return `/api/v1/purposes`
+}
+
+/**
+ * A purpose of the caller's own; a name they already use (any case) answers 409.
+ * @summary Create Purpose
+ */
+export const createPurpose = async (purposeIn: PurposeIn, options?: Parameters<typeof apiFetch>[1]): Promise<PurposeOut> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return apiFetch<PurposeOut>(getCreatePurposeUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(purposeIn)
+  }
+);}
+
+
+
+
+
+export const getCreatePurposeMutationKey = () => ['createPurpose'] as const;
+
+export const getCreatePurposeMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPurpose>>, TError,CreatePurposeMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createPurpose>>, TError,CreatePurposeMutationVariables, TContext> => {
+
+const mutationKey = getCreatePurposeMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createPurpose>>, CreatePurposeMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createPurpose(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreatePurposeMutationResult = NonNullable<Awaited<ReturnType<typeof createPurpose>>>
+    export type CreatePurposeMutationBody = PurposeIn
+    export type CreatePurposeMutationError = unknown
+    export type CreatePurposeMutationVariables = {data: PurposeIn}
+
+    /**
+ * @summary Create Purpose
+ */
+export const useCreatePurpose = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPurpose>>, TError,CreatePurposeMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof createPurpose>>,
+        TError,
+        CreatePurposeMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreatePurposeMutationOptions(options), queryClient);
+    }
+
+export const getUpdatePurposeUrl = (purposeId: number,) => {
+
+
+
+
+  return `/api/v1/purposes/${purposeId}`
+}
+
+/**
+ * The caller's own purposes only; anyone else's answers 404 (as a missing one).
+ * @summary Update Purpose
+ */
+export const updatePurpose = async (purposeId: number,
+    purposePatchIn: PurposePatchIn, options?: Parameters<typeof apiFetch>[1]): Promise<PurposeOut> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return apiFetch<PurposeOut>(getUpdatePurposeUrl(purposeId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(purposePatchIn)
+  }
+);}
+
+
+
+
+
+export const getUpdatePurposeMutationKey = () => ['updatePurpose'] as const;
+
+export const getUpdatePurposeMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updatePurpose>>, TError,UpdatePurposeMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updatePurpose>>, TError,UpdatePurposeMutationVariables, TContext> => {
+
+const mutationKey = getUpdatePurposeMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updatePurpose>>, UpdatePurposeMutationVariables> = (props) => {
+          const {purposeId,data} = props ?? {};
+
+          return  updatePurpose(purposeId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdatePurposeMutationResult = NonNullable<Awaited<ReturnType<typeof updatePurpose>>>
+    export type UpdatePurposeMutationBody = PurposePatchIn
+    export type UpdatePurposeMutationError = unknown
+    export type UpdatePurposeMutationVariables = {purposeId: number;data: PurposePatchIn}
+
+    /**
+ * @summary Update Purpose
+ */
+export const useUpdatePurpose = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updatePurpose>>, TError,UpdatePurposeMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof updatePurpose>>,
+        TError,
+        UpdatePurposeMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdatePurposeMutationOptions(options), queryClient);
+    }
+
+export const getSearchAirlinesUrl = (params: SearchAirlinesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/reference/airlines?${stringifiedParams}` : `/api/v1/reference/airlines`
+}
+
+/**
+ * Airlines by code (IATA or ICAO: exact) or name/alias (contains). Exact code matches
+ * first, then active airlines, then by name; defunct airlines stay findable for old flights.
+ * @summary Search Airlines
+ */
+export const searchAirlines = async (params: SearchAirlinesParams, options?: Parameters<typeof apiFetch>[1]): Promise<AirlineOut[]> => {
+
+  return apiFetch<AirlineOut[]>(getSearchAirlinesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getSearchAirlinesQueryKey = (params?: SearchAirlinesParams,) => {
+    return [
+    `/api/v1/reference/airlines`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getSearchAirlinesQueryOptions = <TData = Awaited<ReturnType<typeof searchAirlines>>, TError = unknown>(params: SearchAirlinesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchAirlines>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getSearchAirlinesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof searchAirlines>>> = ({ signal }) => searchAirlines(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof searchAirlines>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type SearchAirlinesQueryResult = NonNullable<Awaited<ReturnType<typeof searchAirlines>>>
+export type SearchAirlinesQueryError = unknown
+
+
+export function useSearchAirlines<TData = Awaited<ReturnType<typeof searchAirlines>>, TError = unknown>(
+ params: SearchAirlinesParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchAirlines>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof searchAirlines>>,
+          TError,
+          Awaited<ReturnType<typeof searchAirlines>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useSearchAirlines<TData = Awaited<ReturnType<typeof searchAirlines>>, TError = unknown>(
+ params: SearchAirlinesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchAirlines>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof searchAirlines>>,
+          TError,
+          Awaited<ReturnType<typeof searchAirlines>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useSearchAirlines<TData = Awaited<ReturnType<typeof searchAirlines>>, TError = unknown>(
+ params: SearchAirlinesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchAirlines>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Search Airlines
+ */
+
+export function useSearchAirlines<TData = Awaited<ReturnType<typeof searchAirlines>>, TError = unknown>(
+ params: SearchAirlinesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchAirlines>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getSearchAirlinesQueryOptions(params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

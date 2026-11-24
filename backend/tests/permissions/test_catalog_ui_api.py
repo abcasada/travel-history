@@ -85,7 +85,9 @@ def test_people_say_who_is_me_and_who_I_manage(client, scenario):
     assert rows[0]["display_name"] == "Admin" and rows[0]["is_me"]
     by_name = {p["display_name"]: p for p in rows}
     assert by_name["Kid"]["can_edit"] and not by_name["Kid"]["has_account"]
-    assert by_name["Alice"]["has_account"] and not by_name["Alice"]["can_edit"]
+    # The Admin may rename anyone (D-113) but manages only people without another account.
+    assert by_name["Alice"]["has_account"] and not by_name["Alice"]["manages"]
+    assert by_name["Alice"]["can_edit"]
     assert not any(p["is_me"] for p in rows[1:])
 
 

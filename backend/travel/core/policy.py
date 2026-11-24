@@ -257,6 +257,17 @@ def can_edit_tag(user, tag: Tag) -> bool:
     return is_family(user) and tag.owner_id == user.pk
 
 
+def can_create_purpose(user) -> bool:
+    """Purposes are per user like tags; Viewers own no trips, so they have none to add."""
+    return can_create(user)
+
+
+def can_edit_purpose(user, purpose: Purpose) -> bool:
+    """Rename, reorder, archive, or change the default visibility: its owner only. Viewers
+    are read-only (and are seeded no purposes)."""
+    return can_create(user) and purpose.owner_id == user.pk
+
+
 def can_set_leg_participation(user, leg: Leg, person: Person) -> bool:
     """Core editors manage everyone's legs; participants set which legs they themselves were on.
     Either way only for people the user can see (a leg must not reveal a hidden person)."""
@@ -319,6 +330,15 @@ def can_create_own_person(user) -> bool:
     traveller who can be put on trips. Linking to an existing person stays an Admin task
     (the SQL guard allows it only for a person the user manages)."""
     return can_create_person(user) and user.person_id is None
+
+
+def can_edit_person(user, person: Person) -> bool:
+    """Rename a person or change their visibility (§6.3 'Person: edit'): the managing user or
+    the Admin, for a person they can see. Viewers are read-only, even for their own person
+    (D-113; app.person_update agrees)."""
+    if not can_create(user) or not can_view_person(user, person):
+        return False
+    return is_admin(user) or manages_person(user, person)
 
 
 def manages_person(user, person: Person) -> bool:

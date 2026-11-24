@@ -24,6 +24,7 @@ from pydantic import AfterValidator, AwareDatetime
 from travel.accounts.models import Person, UserDirectory
 from travel.core import policy
 from travel.core.choices import DatePrecision, TravelMode, Visibility
+from travel.geo.models import Airline, Airport
 from travel.media.models import Media
 from travel.routing import services as routing
 from travel.vehicles.models import Vehicle
@@ -50,6 +51,13 @@ router = Router(tags=["trips"])
 # Schema names in the OpenAPI document come from class names; Stop.Kind would clash with the
 # import batch's Kind enum.
 StopKind = StrEnum("StopKind", [(value.upper(), value) for value in Stop.Kind.values])
+# Trip.Status would clash with FlightRecord.Status: the generated client got one "Status" type
+# holding the flight record's values, so the trip list couldn't filter by status (D-113).
+TripStatus = StrEnum("TripStatus", [(value.upper(), value) for value in Trip.Status.values])
+# Purposes never default to public: nothing renders public trips before T37 (D-109).
+PurposeVisibility = StrEnum(
+    "PurposeVisibility", [(v.upper(), v) for v in Visibility.values if v != Visibility.PUBLIC]
+)
 
 
 # --- Output schemas ---------------------------------------------------------------------------
@@ -75,6 +83,18 @@ class PurposeRef(Schema):
 class VehicleRef(Schema):
     id: int
     label: str
+
+
+class AirlineRef(Schema):
+    id: int
+    name: str
+    code: str = Field(description="IATA, else ICAO, else empty")
+
+
+class AirportRef(Schema):
+    id: int
+    name: str
+    code: str = Field(description="IATA, else ICAO, else the ident")
 
 
 class TripTagOut(Schema):
@@ -114,7 +134,7 @@ class TripOut(Schema):
     start_date: dt.date
     end_date: dt.date
     date_precision: str
-    status: str
+    status: TripStatus
     visibility: str
     source: str
     locked: bool
@@ -156,9 +176,12 @@ class LegOut(Schema):
     current_route_id: int | None
     distance_m: float | None
     airline_id: int | None
+    airline: AirlineRef | None = Field(description="reference data for airline_id")
     flight_number: str
     origin_airport_id: int | None
     destination_airport_id: int | None
+    origin_airport: AirportRef | None
+    destination_airport: AirportRef | None
     aircraft_type_id: int | None
     aircraft_registration: str
     seat: str
@@ -463,7 +486,7 @@ class TripFilterIn(Schema):
     start: dt.date | None = Field(None, alias="from", description="trips ending on or after")
     end: dt.date | None = Field(None, alias="to", description="trips starting on or before")
     visibility: Visibility | None = None
-    status: Trip.Status | None = None
+    status: TripStatus | None = None
     person: int | None = Field(None, description="trips this person is on")
     q: str | None = Field(None, max_length=200, description="text in the title")
     purpose: list[int] | None = Field(None, description="purpose ids")
@@ -542,6 +565,22 @@ class TagIn(Schema):
 class TagPatchIn(Schema):
     name: str | None = Field(None, min_length=1, max_length=64)
     color: str | None = Field(None, max_length=7)
+
+
+class PurposeIn(Schema):
+    name: str = Field(min_length=1, max_length=64)
+    default_visibility: PurposeVisibility = PurposeVisibility.PARTICIPANTS
+    sort: int | None = Field(None, ge=0, le=32767, description="default: last")
+
+
+class PurposePatchIn(Schema):
+    """Only the fields sent are changed. Archived purposes stay on their trips but aren't
+    offered for new ones."""
+
+    name: str | None = Field(None, min_length=1, max_length=64)
+    default_visibility: PurposeVisibility | None = None
+    sort: int | None = Field(None, ge=0, le=32767)
+    archived: bool | None = None
 
 
 class TripTagIn(Schema):
@@ -713,6 +752,24 @@ def _visible_vehicles(user, vehicle_ids: set[int]) -> dict[int, dict]:
     }
 
 
+def _airlines(ids: set[int]) -> dict[int, dict]:
+    """Reference data (no RLS): names and codes for the flight legs shown."""
+    rows = Airline.objects.filter(pk__in=ids).only("name", "iata", "icao") if ids else []
+    return {a.pk: {"id": a.pk, "name": a.name, "code": a.iata or a.icao} for a in rows}
+
+
+def _airports(ids: set[int]) -> dict[int, dict]:
+    rows = (
+        Airport.objects.filter(pk__in=ids).only("name", "iata_code", "icao_code", "ident")
+        if ids
+        else []
+    )
+    return {
+        a.pk: {"id": a.pk, "name": a.name, "code": a.iata_code or a.icao_code or a.ident}
+        for a in rows
+    }
+
+
 def _visible_people(user, person_ids: set[int]) -> dict[int, Person]:
     people = Person.objects.filter(pk__in=person_ids)
     return {p.pk: p for p in people if policy.can_view_person(user, p)}
@@ -771,6 +828,10 @@ class _TripView:
         self.people = _visible_people(user, everyone)
         self.vehicles = _visible_vehicles(user, {g.vehicle_id for g in self.legs if g.vehicle_id})
         self.authors = _directory({g.author_id for g in self.legs})
+        self.airlines = _airlines({g.airline_id for g in self.legs if g.airline_id})
+        self.airports = _airports(
+            {a for g in self.legs for a in (g.origin_airport_id, g.destination_airport_id) if a}
+        )
 
     def leg(self, leg: Leg) -> dict:
         return {
@@ -806,6 +867,9 @@ class _TripView:
                 )
             },
             "vehicle": self.vehicles.get(leg.vehicle_id) if leg.vehicle_id else None,
+            "airline": self.airlines.get(leg.airline_id),
+            "origin_airport": self.airports.get(leg.origin_airport_id),
+            "destination_airport": self.airports.get(leg.destination_airport_id),
             "author": self.authors[leg.author_id],
             "participant_ids": sorted(p for p in self.part.legs[leg.pk] if p in self.people),
             "can_edit": policy.can_edit_leg(self.user, leg),
@@ -1467,14 +1531,50 @@ def delete_tag(request, tag_id: int):
     return Status(204, None)
 
 
+def _purpose_out(purpose: Purpose) -> dict:
+    return {
+        f: getattr(purpose, f) for f in ("id", "name", "default_visibility", "sort", "archived")
+    }
+
+
 @router.get("/purposes", response=list[PurposeOut], operation_id="listPurposes")
 def list_purposes(request):
     """The caller's own purposes (a trip takes only its owner's)."""
     rows = Purpose.objects.filter(owner_id=request.user.pk).order_by("sort", "name", "pk")
-    return [
-        {f: getattr(p, f) for f in ("id", "name", "default_visibility", "sort", "archived")}
-        for p in rows
-    ]
+    return [_purpose_out(p) for p in rows]
+
+
+@router.post("/purposes", response={201: PurposeOut}, operation_id="createPurpose")
+def create_purpose(request, payload: PurposeIn):
+    """A purpose of the caller's own; a name they already use (any case) answers 409."""
+    if not policy.can_create_purpose(request.user):
+        raise HttpError(403, "your role cannot add purposes")
+    data = _changes(payload) | {
+        "name": payload.name,
+        "default_visibility": payload.default_visibility,
+    }
+    if payload.sort is None:
+        data.pop("sort", None)
+    try:
+        purpose = services.create_purpose(request.user, data)
+    except TripError as error:
+        _fail(error)
+    return Status(201, _purpose_out(purpose))
+
+
+@router.patch("/purposes/{purpose_id}", response=PurposeOut, operation_id="updatePurpose")
+def update_purpose(request, purpose_id: int, payload: PurposePatchIn):
+    """The caller's own purposes only; anyone else's answers 404 (as a missing one)."""
+    purpose = Purpose.objects.filter(pk=purpose_id, owner_id=request.user.pk).first()
+    if purpose is None:
+        raise HttpError(404, "purpose not found")
+    if not policy.can_edit_purpose(request.user, purpose):
+        raise HttpError(403, "your role cannot change purposes")
+    try:
+        services.update_purpose(purpose, _changes(payload))
+    except TripError as error:
+        _fail(error)
+    return _purpose_out(purpose)
 
 
 # --- Tags on a trip --------------------------------------------------------------------------
