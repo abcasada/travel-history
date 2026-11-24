@@ -410,6 +410,12 @@ P1. **[H] Parallel readiness (Adam, 2026-11-23; D-98).** Runs alone, in the main
    - When the hourly session re-check (D-108) answers 401 with its reason, the SPA goes straight to Authentik instead of showing its Sign in screen, so family members don't tap Sign in every hour; keep the screen for real sign-outs and refusals.
    - Lanes: `./dev build` in a lane must not retag shared images (`travel-history-backup:latest`): give lane builds a lane-specific tag.
    - Footprint: fe:api/auth handling (the 401 path, sign-in screen), `scripts/stack.sh` (image tags). Flags: none.
+   - Status: done (2026-11-24; D-120, D-121)
+
+43c. **[X] Don't lose a save to the hourly re-check** (added 2026-11-24 from 43b's report; D-108, D-120).
+   - Today a write that arrives after the re-check is due gets 401, the SPA redirects and the form's input is lost. Let unsafe requests (POST/PUT/PATCH/DELETE) through during a grace window after the re-check falls due (for example up to 2× the interval), while safe requests trigger the re-check as now; past the window everything gets 401. Removing someone from travel-users still takes effect within the window; record the new bound in D-108's terms and go-live.md "Removing someone's access".
+   - Tests: session and API tests for due, within grace and past grace, per method; the 43b redirect still fires on the next GET; the go-live smoke's F-3 check updated.
+   - Footprint: `accounts` (sessions), fe:auth only if needed, scripts/golive-smoke.sh, docs. Flags: none.
    - Status: todo
 
 42a. **[X] Go-live hardening from 41a** (re-scoped 2026-11-24: 41a found no blockers, but these are cheap and should land before 40c-2 deploys; docs/review/2026-11-24-go-live.md).
@@ -602,3 +608,4 @@ Nature: mech = mechanical, mod = moderate, hard. Size is S/M/L/XL with approxima
 - 2026-11-24: item 27 done and verified in lane 1, merged (`./dev test-quick` 2580 + 182 passed in the main checkout; e2e green in the lane; D-106). Added 43a [M] small fixes beside 42a. Reason: 21b overlaps 42a's `trips` footprint, and 11/12 wait for Review pause B, so lane 1 takes queued fixes.
 - 2026-11-24: item 43a done and verified in lane 1, merged (`./dev test-quick` 2580 + 184 passed in the main checkout). Split 14a into 14a-1 (geo loaders + reverse-geocoding service) and 14a-2 (stop names in trips/UI), and pulled 14a-1 forward into lane 1. Reason: 21b overlaps 42a's `trips` footprint and 11/12 wait for Review pause B; 14a-1 is geo-only, nothing a pause reviews, and its merge waits for 40e.
 - 2026-11-24: item 42a done and verified in lane 2, merged (`./dev test-quick` 2696 + 184 passed in the main checkout; images rebuilt on refreshed digests; local go-live smoke passed in the lane). D-107–D-111. 14a-1 built in lane 1 (its D-107 renumbered D-112; merge after 40e). Added 43b [M] (hourly re-check UX, lane image tags) and folded the trip status enum fix into 21b; both build now, 21b merges after 40e.
+- 2026-11-24: item 43b done and verified in lane 3, merged (`./dev test-quick` 2696 + 192 passed in the main checkout; `./dev e2e --recheck` green in the lane). D-120, D-121. Added 43c [X]: a save that meets the hourly re-check loses its form input; let writes through for a grace window. Reason: family members editing trips would lose work hourly.
