@@ -1061,7 +1061,8 @@
           "tripit",
           "jetlog",
           "byair",
-          "gpx"
+          "gpx",
+          "trip_sheet"
         ],
         "title": "Kind",
         "type": "string"
@@ -3283,6 +3284,32 @@
         "title": "RoutingErrorOut",
         "type": "object"
       },
+      "SeenIn": {
+        "properties": {
+          "record_id": {
+            "title": "Record Id",
+            "type": "integer"
+          },
+          "trip_updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trip Updated At"
+          }
+        },
+        "required": [
+          "record_id",
+          "trip_updated_at"
+        ],
+        "title": "SeenIn",
+        "type": "object"
+      },
       "Setup": {
         "description": "How to point one tracker app at this server. `link` and both QR codes contain the\ntoken; none of this can be shown again.",
         "properties": {
@@ -3359,6 +3386,564 @@
           "token_qr"
         ],
         "title": "Setup",
+        "type": "object"
+      },
+      "SheetConflictOut": {
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "records": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Records",
+            "type": "array"
+          }
+        },
+        "required": [
+          "detail",
+          "records"
+        ],
+        "title": "SheetConflictOut",
+        "type": "object"
+      },
+      "SheetDiffOut": {
+        "properties": {
+          "legs": {
+            "$ref": "#/components/schemas/SheetPartDiffOut"
+          },
+          "people_added": {
+            "items": {
+              "type": "string"
+            },
+            "title": "People Added",
+            "type": "array"
+          },
+          "stops": {
+            "$ref": "#/components/schemas/SheetPartDiffOut"
+          },
+          "tags_added": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags Added",
+            "type": "array"
+          },
+          "trip": {
+            "items": {
+              "$ref": "#/components/schemas/SheetFieldChangeOut"
+            },
+            "title": "Trip",
+            "type": "array"
+          }
+        },
+        "required": [
+          "trip",
+          "people_added",
+          "tags_added",
+          "stops",
+          "legs"
+        ],
+        "title": "SheetDiffOut",
+        "type": "object"
+      },
+      "SheetFieldChangeOut": {
+        "properties": {
+          "field": {
+            "title": "Field",
+            "type": "string"
+          },
+          "new": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New"
+          },
+          "old": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Old"
+          }
+        },
+        "required": [
+          "field",
+          "old",
+          "new"
+        ],
+        "title": "SheetFieldChangeOut",
+        "type": "object"
+      },
+      "SheetIssueOut": {
+        "properties": {
+          "candidates": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Candidates",
+            "type": "array"
+          },
+          "column": {
+            "title": "Column",
+            "type": "string"
+          },
+          "field": {
+            "title": "Field",
+            "type": "string"
+          },
+          "header": {
+            "title": "Header",
+            "type": "string"
+          },
+          "hint": {
+            "title": "Hint",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "row": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Row"
+          },
+          "severity": {
+            "title": "Severity",
+            "type": "string"
+          },
+          "tab": {
+            "title": "Tab",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tab",
+          "row",
+          "column",
+          "header",
+          "field",
+          "severity",
+          "reason",
+          "message",
+          "hint",
+          "candidates"
+        ],
+        "title": "SheetIssueOut",
+        "type": "object"
+      },
+      "SheetMapLegOut": {
+        "properties": {
+          "destination": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination"
+          },
+          "mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mode"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "origin": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origin"
+          },
+          "row": {
+            "title": "Row",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "row",
+          "name",
+          "mode",
+          "origin",
+          "destination"
+        ],
+        "title": "SheetMapLegOut",
+        "type": "object"
+      },
+      "SheetMapStopOut": {
+        "properties": {
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "lat": {
+            "title": "Lat",
+            "type": "number"
+          },
+          "lon": {
+            "title": "Lon",
+            "type": "number"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "row": {
+            "title": "Row",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "row",
+          "name",
+          "kind",
+          "lon",
+          "lat"
+        ],
+        "title": "SheetMapStopOut",
+        "type": "object"
+      },
+      "SheetPartDiffOut": {
+        "properties": {
+          "added": {
+            "items": {
+              "$ref": "#/components/schemas/SheetRowOut"
+            },
+            "title": "Added",
+            "type": "array"
+          },
+          "changed": {
+            "items": {
+              "$ref": "#/components/schemas/SheetRowOut"
+            },
+            "title": "Changed",
+            "type": "array"
+          },
+          "kept": {
+            "items": {
+              "$ref": "#/components/schemas/SheetRowOut"
+            },
+            "title": "Kept",
+            "type": "array"
+          }
+        },
+        "required": [
+          "added",
+          "changed",
+          "kept"
+        ],
+        "title": "SheetPartDiffOut",
+        "type": "object"
+      },
+      "SheetRowOut": {
+        "properties": {
+          "changes": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/SheetFieldChangeOut"
+            },
+            "title": "Changes",
+            "type": "array"
+          },
+          "leg_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Leg Id"
+          },
+          "mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mode"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "row": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Row"
+          },
+          "stop_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Id"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "SheetRowOut",
+        "type": "object"
+      },
+      "SheetTabOut": {
+        "properties": {
+          "can_commit": {
+            "title": "Can Commit",
+            "type": "boolean"
+          },
+          "committed": {
+            "title": "Committed",
+            "type": "string"
+          },
+          "diff": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SheetDiffOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/SheetIssueOut"
+            },
+            "title": "Issues",
+            "type": "array"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "last_imported_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Imported At"
+          },
+          "legs": {
+            "items": {
+              "$ref": "#/components/schemas/SheetMapLegOut"
+            },
+            "title": "Legs",
+            "type": "array"
+          },
+          "new_tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "New Tags",
+            "type": "array"
+          },
+          "outcome": {
+            "title": "Outcome",
+            "type": "string"
+          },
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "record_id": {
+            "title": "Record Id",
+            "type": "integer"
+          },
+          "stops": {
+            "items": {
+              "$ref": "#/components/schemas/SheetMapStopOut"
+            },
+            "title": "Stops",
+            "type": "array"
+          },
+          "tab": {
+            "title": "Tab",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "trip_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trip Id"
+          },
+          "trip_updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trip Updated At"
+          },
+          "unknown_people": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unknown People",
+            "type": "array"
+          }
+        },
+        "required": [
+          "record_id",
+          "tab",
+          "position",
+          "key",
+          "title",
+          "outcome",
+          "committed",
+          "can_commit",
+          "issues",
+          "unknown_people",
+          "new_tags",
+          "trip_id",
+          "trip_updated_at",
+          "last_imported_at",
+          "diff",
+          "stops",
+          "legs"
+        ],
+        "title": "SheetTabOut",
+        "type": "object"
+      },
+      "SheetTabResultOut": {
+        "properties": {
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "outcome": {
+            "title": "Outcome",
+            "type": "string"
+          },
+          "record_id": {
+            "title": "Record Id",
+            "type": "integer"
+          },
+          "tab": {
+            "title": "Tab",
+            "type": "string"
+          },
+          "trip_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trip Id"
+          }
+        },
+        "required": [
+          "record_id",
+          "tab",
+          "outcome",
+          "trip_id",
+          "message"
+        ],
+        "title": "SheetTabResultOut",
         "type": "object"
       },
       "SnappedWaypoint": {
@@ -3557,6 +4142,11 @@
           "place": {
             "$ref": "#/components/schemas/PlaceOut"
           },
+          "time_precision": {
+            "description": "exact; day, month or year: a date-only stop",
+            "title": "Time Precision",
+            "type": "string"
+          },
           "trip_id": {
             "title": "Trip Id",
             "type": "integer"
@@ -3574,6 +4164,7 @@
           "arrive_utc",
           "depart_utc",
           "tz",
+          "time_precision",
           "notes",
           "place",
           "author",
@@ -4991,6 +5582,141 @@
         "title": "TripSharingOut",
         "type": "object"
       },
+      "TripSheetCommitIn": {
+        "properties": {
+          "create_people": {
+            "default": [],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Create People",
+            "type": "array"
+          },
+          "records": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Records"
+          },
+          "recreate": {
+            "default": [],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Recreate",
+            "type": "array"
+          },
+          "remove_missing": {
+            "default": [],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Remove Missing",
+            "type": "array"
+          },
+          "seen": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SeenIn"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seen"
+          }
+        },
+        "title": "TripSheetCommitIn",
+        "type": "object"
+      },
+      "TripSheetCommitOut": {
+        "properties": {
+          "batch_id": {
+            "title": "Batch Id",
+            "type": "integer"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/SheetTabResultOut"
+            },
+            "title": "Results",
+            "type": "array"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "batch_id",
+          "status",
+          "results"
+        ],
+        "title": "TripSheetCommitOut",
+        "type": "object"
+      },
+      "TripSheetPreviewOut": {
+        "properties": {
+          "batch_id": {
+            "title": "Batch Id",
+            "type": "integer"
+          },
+          "can_commit": {
+            "title": "Can Commit",
+            "type": "boolean"
+          },
+          "original_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Name"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "tabs": {
+            "items": {
+              "$ref": "#/components/schemas/SheetTabOut"
+            },
+            "title": "Tabs",
+            "type": "array"
+          },
+          "workbook_issues": {
+            "items": {
+              "$ref": "#/components/schemas/SheetIssueOut"
+            },
+            "title": "Workbook Issues",
+            "type": "array"
+          }
+        },
+        "required": [
+          "batch_id",
+          "status",
+          "original_name",
+          "can_commit",
+          "workbook_issues",
+          "tabs"
+        ],
+        "title": "TripSheetPreviewOut",
+        "type": "object"
+      },
       "TripTagDetailOut": {
         "properties": {
           "author": {
@@ -5697,6 +6423,155 @@
         ],
         "summary": "Get Import",
         "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/v1/imports/{batch_id}/commit": {
+      "post": {
+        "description": "Apply the chosen tabs (default: every importable one), one transaction per tab, as the\ncaller. Lists in `create_people`, `recreate` and `remove_missing` are record ids: create\nthe unknown people the preview listed (Q-20), bring back a trip deleted in the app, remove\nthe stops and legs the sheet no longer has (Q-19). The batch is then `done`.",
+        "operationId": "commitTripSheet",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "title": "Batch Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TripSheetCommitIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TripSheetCommitOut"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SheetConflictOut"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SheetConflictOut"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Commit Trip Sheet",
+        "tags": [
+          "trips",
+          "imports"
+        ]
+      }
+    },
+    "/api/v1/imports/{batch_id}/discard": {
+      "post": {
+        "description": "End the import without writing trips; the raw file stays archived.",
+        "operationId": "discardTripSheet",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "title": "Batch Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Discard Trip Sheet",
+        "tags": [
+          "trips",
+          "imports"
+        ]
+      }
+    },
+    "/api/v1/imports/{batch_id}/trip-sheet": {
+      "get": {
+        "description": "Per tab: its outcome (`new`, `update`, `identical`, `review` (edited in the app),\n`deleted` or `transferred` (skipped), `blocked` by problems), its issues, and the diff\nagainst the trip. `trip_updated_at` goes back in the commit's `seen` (409 if the trip\nchanged meanwhile). A tab blocked only by unknown people becomes importable when the commit\nlists it in `create_people`.",
+        "operationId": "getTripSheetPreview",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "title": "Batch Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TripSheetPreviewOut"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Trip Sheet Preview",
+        "tags": [
+          "trips",
           "imports"
         ]
       }
@@ -7820,6 +8695,33 @@
           }
         ],
         "summary": "Trip Map",
+        "tags": [
+          "trips"
+        ]
+      }
+    },
+    "/api/v1/trips/sheet-template.xlsx": {
+      "get": {
+        "description": "The trip spreadsheet template (docs/trips/trip-template.xlsx, SYNTHETIC example tab;\ndocs/design/trip-sheet.md \u00a728).",
+        "operationId": "getTripSheetTemplate",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {}
+            },
+            "description": "The trip spreadsheet template"
+          }
+        },
+        "security": [
+          {
+            "BrowserSession": []
+          },
+          {
+            "OidcBearer": []
+          }
+        ],
+        "summary": "Trip Sheet Template",
         "tags": [
           "trips"
         ]

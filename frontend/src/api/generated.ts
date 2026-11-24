@@ -369,6 +369,7 @@ export const Kind = {
   jetlog: 'jetlog',
   byair: 'byair',
   gpx: 'gpx',
+  trip_sheet: 'trip_sheet',
 } as const;
 
 export type TravelMode = typeof TravelMode[keyof typeof TravelMode];
@@ -888,6 +889,102 @@ export interface RoutingErrorOut {
   detail: string;
 }
 
+export interface SeenIn {
+  record_id: number;
+  trip_updated_at: string | null;
+}
+
+export interface SheetConflictOut {
+  detail: string;
+  records: number[];
+}
+
+export interface SheetFieldChangeOut {
+  field: string;
+  new: string | number | boolean | null;
+  old: string | number | boolean | null;
+}
+
+export interface SheetRowOut {
+  changes?: SheetFieldChangeOut[];
+  leg_id?: number | null;
+  mode?: string | null;
+  name: string;
+  row?: number | null;
+  stop_id?: number | null;
+}
+
+export interface SheetPartDiffOut {
+  added: SheetRowOut[];
+  changed: SheetRowOut[];
+  kept: SheetRowOut[];
+}
+
+export interface SheetDiffOut {
+  legs: SheetPartDiffOut;
+  people_added: string[];
+  stops: SheetPartDiffOut;
+  tags_added: string[];
+  trip: SheetFieldChangeOut[];
+}
+
+export interface SheetIssueOut {
+  candidates: string[];
+  column: string;
+  field: string;
+  header: string;
+  hint: string;
+  message: string;
+  reason: string;
+  row: number | null;
+  severity: string;
+  tab: string;
+}
+
+export interface SheetMapLegOut {
+  destination: number[] | null;
+  mode: string | null;
+  name: string;
+  origin: number[] | null;
+  row: number;
+}
+
+export interface SheetMapStopOut {
+  kind: string | null;
+  lat: number;
+  lon: number;
+  name: string;
+  row: number;
+}
+
+export interface SheetTabOut {
+  can_commit: boolean;
+  committed: string;
+  diff: SheetDiffOut | null;
+  issues: SheetIssueOut[];
+  key: string;
+  last_imported_at: string | null;
+  legs: SheetMapLegOut[];
+  new_tags: string[];
+  outcome: string;
+  position: number;
+  record_id: number;
+  stops: SheetMapStopOut[];
+  tab: string;
+  title: string;
+  trip_id: number | null;
+  trip_updated_at: string | null;
+  unknown_people: string[];
+}
+
+export interface SheetTabResultOut {
+  message: string;
+  outcome: string;
+  record_id: number;
+  tab: string;
+  trip_id: number | null;
+}
+
 export type Status = typeof Status[keyof typeof Status];
 
 
@@ -932,6 +1029,8 @@ export interface StopOut {
   /** private free text; never in a public snapshot */
   notes: string;
   place: PlaceOut;
+  /** exact; day, month or year: a date-only stop */
+  time_precision: string;
   trip_id: number;
   tz: string;
 }
@@ -1218,6 +1317,29 @@ export interface TripPatchIn {
   start_date?: string | null;
   title?: string | null;
   visibility?: Visibility | null;
+}
+
+export interface TripSheetCommitIn {
+  create_people?: number[];
+  records?: number[] | null;
+  recreate?: number[];
+  remove_missing?: number[];
+  seen?: SeenIn[] | null;
+}
+
+export interface TripSheetCommitOut {
+  batch_id: number;
+  results: SheetTabResultOut[];
+  status: string;
+}
+
+export interface TripSheetPreviewOut {
+  batch_id: number;
+  can_commit: boolean;
+  original_name: string | null;
+  status: string;
+  tabs: SheetTabOut[];
+  workbook_issues: SheetIssueOut[];
 }
 
 export interface TripTagDetailOut {
@@ -2123,6 +2245,280 @@ export function useGetImport<TData = Awaited<ReturnType<typeof getImport>>, TErr
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetImportQueryOptions(batchId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCommitTripSheetUrl = (batchId: number,) => {
+
+
+
+
+  return `/api/v1/imports/${batchId}/commit`
+}
+
+/**
+ * Apply the chosen tabs (default: every importable one), one transaction per tab, as the
+ * caller. Lists in `create_people`, `recreate` and `remove_missing` are record ids: create
+ * the unknown people the preview listed (Q-20), bring back a trip deleted in the app, remove
+ * the stops and legs the sheet no longer has (Q-19). The batch is then `done`.
+ * @summary Commit Trip Sheet
+ */
+export const commitTripSheet = async (batchId: number,
+    tripSheetCommitIn: TripSheetCommitIn, options?: Parameters<typeof apiFetch>[1]): Promise<TripSheetCommitOut> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return apiFetch<TripSheetCommitOut>(getCommitTripSheetUrl(batchId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(tripSheetCommitIn)
+  }
+);}
+
+
+
+
+
+export const getCommitTripSheetMutationKey = () => ['commitTripSheet'] as const;
+
+export const getCommitTripSheetMutationOptions = <TError = SheetConflictOut,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof commitTripSheet>>, TError,CommitTripSheetMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof commitTripSheet>>, TError,CommitTripSheetMutationVariables, TContext> => {
+
+const mutationKey = getCommitTripSheetMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof commitTripSheet>>, CommitTripSheetMutationVariables> = (props) => {
+          const {batchId,data} = props ?? {};
+
+          return  commitTripSheet(batchId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CommitTripSheetMutationResult = NonNullable<Awaited<ReturnType<typeof commitTripSheet>>>
+    export type CommitTripSheetMutationBody = TripSheetCommitIn
+    export type CommitTripSheetMutationError = SheetConflictOut
+    export type CommitTripSheetMutationVariables = {batchId: number;data: TripSheetCommitIn}
+
+    /**
+ * @summary Commit Trip Sheet
+ */
+export const useCommitTripSheet = <TError = SheetConflictOut,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof commitTripSheet>>, TError,CommitTripSheetMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof commitTripSheet>>,
+        TError,
+        CommitTripSheetMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCommitTripSheetMutationOptions(options), queryClient);
+    }
+
+export const getDiscardTripSheetUrl = (batchId: number,) => {
+
+
+
+
+  return `/api/v1/imports/${batchId}/discard`
+}
+
+/**
+ * End the import without writing trips; the raw file stays archived.
+ * @summary Discard Trip Sheet
+ */
+export const discardTripSheet = async (batchId: number, options?: Parameters<typeof apiFetch>[1]): Promise<void> => {
+
+  return apiFetch<void>(getDiscardTripSheetUrl(batchId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getDiscardTripSheetMutationKey = () => ['discardTripSheet'] as const;
+
+export const getDiscardTripSheetMutationOptions = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof discardTripSheet>>, TError,DiscardTripSheetMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof discardTripSheet>>, TError,DiscardTripSheetMutationVariables, TContext> => {
+
+const mutationKey = getDiscardTripSheetMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof discardTripSheet>>, DiscardTripSheetMutationVariables> = (props) => {
+          const {batchId} = props ?? {};
+
+          return  discardTripSheet(batchId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DiscardTripSheetMutationResult = NonNullable<Awaited<ReturnType<typeof discardTripSheet>>>
+
+    export type DiscardTripSheetMutationError = unknown
+    export type DiscardTripSheetMutationVariables = {batchId: number}
+
+    /**
+ * @summary Discard Trip Sheet
+ */
+export const useDiscardTripSheet = <TError = unknown,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof discardTripSheet>>, TError,DiscardTripSheetMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof discardTripSheet>>,
+        TError,
+        DiscardTripSheetMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDiscardTripSheetMutationOptions(options), queryClient);
+    }
+
+export const getGetTripSheetPreviewUrl = (batchId: number,) => {
+
+
+
+
+  return `/api/v1/imports/${batchId}/trip-sheet`
+}
+
+/**
+ * Per tab: its outcome (`new`, `update`, `identical`, `review` (edited in the app),
+ * `deleted` or `transferred` (skipped), `blocked` by problems), its issues, and the diff
+ * against the trip. `trip_updated_at` goes back in the commit's `seen` (409 if the trip
+ * changed meanwhile). A tab blocked only by unknown people becomes importable when the commit
+ * lists it in `create_people`.
+ * @summary Trip Sheet Preview
+ */
+export const getTripSheetPreview = async (batchId: number, options?: Parameters<typeof apiFetch>[1]): Promise<TripSheetPreviewOut> => {
+
+  return apiFetch<TripSheetPreviewOut>(getGetTripSheetPreviewUrl(batchId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetTripSheetPreviewQueryKey = (batchId: number,) => {
+    return [
+    `/api/v1/imports/${batchId}/trip-sheet`
+    ] as const;
+    }
+
+
+export const getGetTripSheetPreviewQueryOptions = <TData = Awaited<ReturnType<typeof getTripSheetPreview>>, TError = unknown>(batchId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTripSheetPreview>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetTripSheetPreviewQueryKey(batchId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTripSheetPreview>>> = ({ signal }) => getTripSheetPreview(batchId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: batchId !== null && batchId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTripSheetPreview>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetTripSheetPreviewQueryResult = NonNullable<Awaited<ReturnType<typeof getTripSheetPreview>>>
+export type GetTripSheetPreviewQueryError = unknown
+
+
+export function useGetTripSheetPreview<TData = Awaited<ReturnType<typeof getTripSheetPreview>>, TError = unknown>(
+ batchId: number, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTripSheetPreview>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getTripSheetPreview>>,
+          TError,
+          Awaited<ReturnType<typeof getTripSheetPreview>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetTripSheetPreview<TData = Awaited<ReturnType<typeof getTripSheetPreview>>, TError = unknown>(
+ batchId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTripSheetPreview>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getTripSheetPreview>>,
+          TError,
+          Awaited<ReturnType<typeof getTripSheetPreview>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetTripSheetPreview<TData = Awaited<ReturnType<typeof getTripSheetPreview>>, TError = unknown>(
+ batchId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTripSheetPreview>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Trip Sheet Preview
+ */
+
+export function useGetTripSheetPreview<TData = Awaited<ReturnType<typeof getTripSheetPreview>>, TError = unknown>(
+ batchId: number, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTripSheetPreview>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetTripSheetPreviewQueryOptions(batchId,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -5803,6 +6199,109 @@ export function useGetTripMap<TData = Awaited<ReturnType<typeof getTripMap>>, TE
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetTripMapQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetTripSheetTemplateUrl = () => {
+
+
+
+
+  return `/api/v1/trips/sheet-template.xlsx`
+}
+
+/**
+ * The trip spreadsheet template (docs/trips/trip-template.xlsx, SYNTHETIC example tab;
+ * docs/design/trip-sheet.md §28).
+ * @summary Trip Sheet Template
+ */
+export const getTripSheetTemplate = async ( options?: Parameters<typeof apiFetch>[1]): Promise<unknown> => {
+
+  return apiFetch<unknown>(getGetTripSheetTemplateUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetTripSheetTemplateQueryKey = () => {
+    return [
+    `/api/v1/trips/sheet-template.xlsx`
+    ] as const;
+    }
+
+
+export const getGetTripSheetTemplateQueryOptions = <TData = Awaited<ReturnType<typeof getTripSheetTemplate>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTripSheetTemplate>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetTripSheetTemplateQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTripSheetTemplate>>> = ({ signal }) => getTripSheetTemplate({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTripSheetTemplate>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetTripSheetTemplateQueryResult = NonNullable<Awaited<ReturnType<typeof getTripSheetTemplate>>>
+export type GetTripSheetTemplateQueryError = unknown
+
+
+export function useGetTripSheetTemplate<TData = Awaited<ReturnType<typeof getTripSheetTemplate>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTripSheetTemplate>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getTripSheetTemplate>>,
+          TError,
+          Awaited<ReturnType<typeof getTripSheetTemplate>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetTripSheetTemplate<TData = Awaited<ReturnType<typeof getTripSheetTemplate>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTripSheetTemplate>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getTripSheetTemplate>>,
+          TError,
+          Awaited<ReturnType<typeof getTripSheetTemplate>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetTripSheetTemplate<TData = Awaited<ReturnType<typeof getTripSheetTemplate>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTripSheetTemplate>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Trip Sheet Template
+ */
+
+export function useGetTripSheetTemplate<TData = Awaited<ReturnType<typeof getTripSheetTemplate>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTripSheetTemplate>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetTripSheetTemplateQueryOptions(options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

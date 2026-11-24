@@ -43,6 +43,7 @@ export function makeStop(over: Partial<StopOut> = {}): StopOut {
     arrive_utc: null,
     depart_utc: null,
     tz: "America/Chicago",
+    time_precision: "exact",
     notes: "",
     place: {
       id: 500,
