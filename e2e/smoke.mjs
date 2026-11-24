@@ -135,7 +135,7 @@ await page.getByLabel("Note for this version").fill("E2E drag");
 await page.getByRole("button", { name: "Save the edited route" }).click();
 await page.getByText(/Version 2 · hand_edited · \d+\.\d km \(current\)/).waitFor();
 // The version list says what the hand-edited version is made of (Route.sources).
-await page.getByTestId("route-sources").getByText(/Valhalla \(self-hosted\) route, [\d,]+ points, checked/).waitFor();
+await page.getByTestId("route-sources").filter({ hasText: /Valhalla \(self-hosted\) route, [\d,]+ points, checked/ }).first().waitFor();
 await page.getByRole("link", { name: /Back to the trip/ }).click();
 await page.getByRole("heading", { name: title }).waitFor();
 await page.getByRole("link", { name: "Edit" }).click();
