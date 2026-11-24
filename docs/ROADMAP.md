@@ -130,7 +130,7 @@ Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhi
     - **14a. [M] T26 part 2: Natural Earth and Census boundaries + offline reverse geocoding.** Two dispatches (split 2026-11-24 so part 1 can run beside 42a).
       - **14a-1 [M] geo only:** Natural Earth admin-0/1 and Census county loaders, same pattern as item 14 (pinned snapshot + SHA-256, D-94), plus a reverse-geocoding service ("near <town>, <state>", phases.md 6.1, D-20) with tests. No `trips` or frontend change. Its merge waits until 40e's smoke passes (backend freeze).
         - Footprint: `geo`. Flags: migrations (?).
-        - Status: todo
+        - Status: built 2026-11-24 on item/14a-1 (renumbered D-107 → D-112); merge after 40e, then `load_boundaries` in dev and prod (66 MB pinned downloads)
       - **14a-2 [M] stop names:** use the service for offline stop names in `trips` and the stop editor. Runs before item 28 (territories), which needs the boundaries.
         - Footprint: `trips` (offline stop names), fe:trips (stop editor). Flags: api (?).
         - Status: todo
@@ -167,7 +167,7 @@ Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhi
     - **21a [M] the list as a working tool** (§8): keyboard navigation, bulk bar, paging, more filters, the header search.
       - Footprint: fe:trips (list, filters, selection store), fe:shells (header search, shortcut help), fe:map (selection highlight). Flags: none.
       - Status: done (2026-11-24; the status filter waits on the enum-name fix)
-    - **21b [M] the trip page complete** (§8), plus 14b's leftover: participants edit the notes on their own contributed legs in the UI (the API already allows it).
+    - **21b [M] the trip page complete** (§8), plus 14b's leftover: participants edit the notes on their own contributed legs in the UI (the API already allows it). Also (added 2026-11-24): rename the trip status enum in the OpenAPI schema (`TripStatus`; it clashes with `FlightRecord.Status`, so the generated type is wrong), regenerate the client, and add 21a's left-out trip status filter. Builds now; merges after 40e (backend freeze).
       - Footprint: fe:trips (trip page, leg form, tags page), `trips` (`PATCH /persons`, purposes), `geo` (`GET /reference/airlines`), `core.policy` (API tests per actor). Flags: api.
       - Status: todo
     - **→ Review pause B:** the desktop catalog UI, once 21, 27 and 40e are done (Adam reviews in production).
@@ -406,11 +406,17 @@ P1. **[H] Parallel readiness (Adam, 2026-11-23; D-98).** Runs alone, in the main
    - Footprint: `dev` (lane subcommand), `scripts/lane.sh`, fe:trips (mobile search only), docs/trips template, fe:map style/glyphs, e2e. Flags: none.
    - Status: done (2026-11-24; glyph 404 is an upstream OpenFreeMap gap, ignored for that exact URL)
 
+43b. **[M] Go-live follow-ups from 42a** (added 2026-11-24).
+   - When the hourly session re-check (D-108) answers 401 with its reason, the SPA goes straight to Authentik instead of showing its Sign in screen, so family members don't tap Sign in every hour; keep the screen for real sign-outs and refusals.
+   - Lanes: `./dev build` in a lane must not retag shared images (`travel-history-backup:latest`): give lane builds a lane-specific tag.
+   - Footprint: fe:api/auth handling (the 401 path, sign-in screen), `scripts/stack.sh` (image tags). Flags: none.
+   - Status: todo
+
 42a. **[X] Go-live hardening from 41a** (re-scoped 2026-11-24: 41a found no blockers, but these are cheap and should land before 40c-2 deploys; docs/review/2026-11-24-go-live.md).
    - F-1 CSP for the installed PWA (WhiteNoise serves before the CSP middleware); F-2 no 40 MB anonymous bodies (per-endpoint limits); F-3 removing travel-users ends sessions at next request or refresh, plus an owner-role deactivate command; F-6 refresh pinned base digests and re-run the CPU smoke test (no AVX); F-7 Ninja docs/schema off in production, `requests` errors in `OidcBearer` → no user; F-8 tunnel requests with a non-public Host → 404; F-9 scope `all` requires an https issuer and client credentials; F-10 `public` visibility refused (422) until T37; F-11 dev-copy pruning and `e2e_cleanup` cover e2e persons, the `e2e` tag and trip-sheet batches. Smoke checks for each where possible.
    - F-4 is checked in 40c-2 against the real token; F-5 is recorded in docs (40e); F-12 onward go to item 43.
    - Footprint: `core.web` (exposure, loginwall, CSP), `config`, `accounts` (oidc, provisioning, deactivate), `core` (devcopy), `trips` (visibility validation), Dockerfiles/compose pins, `scripts` (smoke). Flags: none expected (no migration; the API change is validation only).
-   - Status: todo
+   - Status: done (2026-11-24; D-107–D-111)
 42. **[H] Blocker fixes.**
     - Footprint: from item 41's findings. Flags: set when dispatched.
     - Status: todo
@@ -595,3 +601,4 @@ Nature: mech = mechanical, mod = moderate, hard. Size is S/M/L/XL with approxima
 - 2026-11-24: item 21a done and verified in lane 2, merged (`./dev test-quick` 2580 + 163 passed in the main checkout; e2e green in the lane). Left out: the trip status filter (OpenAPI enum name clash; fix item queued).
 - 2026-11-24: item 27 done and verified in lane 1, merged (`./dev test-quick` 2580 + 182 passed in the main checkout; e2e green in the lane; D-106). Added 43a [M] small fixes beside 42a. Reason: 21b overlaps 42a's `trips` footprint, and 11/12 wait for Review pause B, so lane 1 takes queued fixes.
 - 2026-11-24: item 43a done and verified in lane 1, merged (`./dev test-quick` 2580 + 184 passed in the main checkout). Split 14a into 14a-1 (geo loaders + reverse-geocoding service) and 14a-2 (stop names in trips/UI), and pulled 14a-1 forward into lane 1. Reason: 21b overlaps 42a's `trips` footprint and 11/12 wait for Review pause B; 14a-1 is geo-only, nothing a pause reviews, and its merge waits for 40e.
+- 2026-11-24: item 42a done and verified in lane 2, merged (`./dev test-quick` 2696 + 184 passed in the main checkout; images rebuilt on refreshed digests; local go-live smoke passed in the lane). D-107–D-111. 14a-1 built in lane 1 (its D-107 renumbered D-112; merge after 40e). Added 43b [M] (hourly re-check UX, lane image tags) and folded the trip status enum fix into 21b; both build now, 21b merges after 40e.
