@@ -246,6 +246,13 @@ CASES = {
         lambda f: {"trip_ids": trip_ids(f, "family", "public"), "visibility": "family"},
         (200, 200, 403, 403, 403, *R),
     ),
+    # F-10 (D-109): no trip becomes public before T37, whoever asks.
+    "bulk_make_public": (
+        "POST",
+        lambda f: f"{API}/trips/bulk",
+        lambda f: {"trip_ids": trip_ids(f, "family"), "visibility": "public"},
+        (422, 422, 422, 422, 422, *R),
+    ),
     "bulk_including_a_private_trip": (
         "POST",
         lambda f: f"{API}/trips/bulk",

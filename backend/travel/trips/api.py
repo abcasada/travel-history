@@ -19,7 +19,7 @@ from django.utils import timezone
 from geojson_pydantic import MultiLineString
 from ninja import Field, Query, Router, Schema, Status
 from ninja.errors import HttpError
-from pydantic import AwareDatetime
+from pydantic import AfterValidator, AwareDatetime
 
 from travel.accounts.models import Person, UserDirectory
 from travel.core import policy
@@ -408,13 +408,25 @@ class TripMapOut(Schema):
 # --- Input schemas ----------------------------------------------------------------------------
 
 
+def _not_public_yet(value: Visibility) -> Visibility:
+    # F-10 (D-109): nothing renders public trips before T37, whose snapshot builder needs the
+    # participants' consent first; a row marked public now would be published without it.
+    if value == Visibility.PUBLIC:
+        raise ValueError(services.PUBLIC_NOT_YET)
+    return value
+
+
+# Validation only: the schema still lists every visibility (trips already stored keep theirs).
+SettableVisibility = Annotated[Visibility, AfterValidator(_not_public_yet)]
+
+
 class TripIn(Schema):
     title: str = Field(min_length=1, max_length=200)
     start_date: dt.date
     end_date: dt.date
     date_precision: DatePrecision | None = None
     purpose_id: int | None = None
-    visibility: Visibility | None = Field(
+    visibility: SettableVisibility | None = Field(
         None, description="default: the purpose's default visibility, else participants"
     )
     public_mode: Trip.PublicMode | None = Field(None, description="public trips only")
@@ -434,7 +446,7 @@ class TripPatchIn(Schema):
     end_date: dt.date | None = None
     date_precision: DatePrecision | None = None
     purpose_id: int | None = None
-    visibility: Visibility | None = None
+    visibility: SettableVisibility | None = None
     public_mode: Trip.PublicMode | None = None
     notes: str | None = None
     public_description: str | None = None
@@ -603,7 +615,7 @@ class BulkTripsIn(Schema):
 
     trip_ids: list[int] = Field(min_length=1, max_length=500)
     purpose_id: int | None = None
-    visibility: Visibility | None = None
+    visibility: SettableVisibility | None = None
     add_tag_ids: list[int] = Field(default_factory=list, max_length=50)
     remove_tag_ids: list[int] = Field(default_factory=list, max_length=50)
     add_person_ids: list[int] = Field(default_factory=list, max_length=50)

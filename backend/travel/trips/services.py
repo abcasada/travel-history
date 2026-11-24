@@ -145,11 +145,20 @@ def _apply_purpose(user, trip: Trip, purpose_id: int | None) -> None:
     trip.purpose = purpose
 
 
+# F-10 (D-109): until public pages exist (T37), with the participants' consent flow, no trip
+# becomes public: not through the API, the bulk edit, the trip spreadsheet or a purpose's
+# default. Trips stored as public before keep their visibility and mode.
+PUBLIC_NOT_YET = "trips can't be made public yet (public pages come later, T37)"
+
+
 def _apply_visibility(trip: Trip, visibility: str | None, public_mode: str | None) -> None:
+    if visibility == Visibility.PUBLIC or (visibility is None and public_mode):
+        raise invalid(PUBLIC_NOT_YET)
     if visibility is not None:
         trip.visibility = visibility
     if trip.visibility == Visibility.PUBLIC:
-        # Unlisted is the narrower choice; listing on a profile has to be asked for.
+        # Unreachable until T37 (see PUBLIC_NOT_YET). Unlisted is the narrower choice; listing
+        # on a profile has to be asked for.
         trip.public_mode = public_mode or trip.public_mode or Trip.PublicMode.UNLISTED
     elif public_mode:
         raise invalid("public_mode applies only to public trips")
@@ -849,6 +858,8 @@ def bulk_edit(user, trips: list[Trip], data: dict[str, Any]) -> None:
     (§17 `POST /trips/bulk`). All or nothing: if any trip may not take the change, nothing is
     written and every refused trip is listed. Adding something already there, or removing
     something absent, is not an error."""
+    if data.get("visibility") == Visibility.PUBLIC:
+        raise invalid(PUBLIC_NOT_YET)  # before the per-trip refusals: no trip may take it
     purpose = None
     if data.get("purpose_id") is not None:
         purpose = _lookup(Purpose, data["purpose_id"], "purpose")

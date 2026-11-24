@@ -113,8 +113,15 @@ CASES = {
     "edit_trip:family": (
         "PATCH",
         lambda f: trip_path(f, "family"),
-        lambda f: {"title": "edited", "visibility": "public"},
+        lambda f: {"title": "edited", "visibility": "family"},
         (200, 200, 403, 403, 403, 401, 401),
+    ),
+    # F-10 (D-109): no trip becomes public before T37, whoever asks.
+    "make_trip_public:family": (
+        "PATCH",
+        lambda f: trip_path(f, "family"),
+        lambda f: {"title": "edited", "visibility": "public"},
+        (422, 422, 422, 422, 422, 401, 401),
     ),
     # The Admin can't make a trip invisible to themselves (RLS checks the updated row).
     "make_trip_private:family": (
@@ -516,8 +523,8 @@ def test_create_trip_defaults(client, scenario):
     worktrip = call(client, "POST", f"{API}/trips", {**NEW_TRIP, "purpose_id": work.pk}).json()
     assert worktrip["visibility"] == "private"
     assert worktrip["purpose"] == {"id": work.pk, "name": "Work"}
-    public = call(client, "POST", f"{API}/trips", {**NEW_TRIP, "visibility": "public"}).json()
-    assert public["sharing"]["public_mode"] == "unlisted"
+    public = call(client, "POST", f"{API}/trips", {**NEW_TRIP, "visibility": "public"})
+    assert public.status_code == 422  # F-10: not before T37
 
 
 @pytest.mark.parametrize(
@@ -527,6 +534,8 @@ def test_create_trip_defaults(client, scenario):
         ({**NEW_TRIP, "title": ""}, 422),
         ({**NEW_TRIP, "public_mode": "listed"}, 422),
         ({**NEW_TRIP, "visibility": "secret"}, 422),
+        ({**NEW_TRIP, "visibility": "public"}, 422),
+        ({**NEW_TRIP, "visibility": "public", "public_mode": "unlisted"}, 422),
         ({**NEW_TRIP, "notes": None}, 422),
     ],
 )
@@ -569,18 +578,67 @@ def test_create_leg_validation(client, scenario, body, status):
 def test_owner_edits_visibility_and_records_the_in_app_edit(client, scenario):
     f = scenario
     login(client, f.alice)
-    response = call(
-        client, "PATCH", trip_path(f, "family"), {"visibility": "public", "public_mode": "listed"}
-    )
+    response = call(client, "PATCH", trip_path(f, "family"), {"visibility": "participants"})
     assert response.status_code == 200
     with as_owner():
         trip = Trip.objects.get(pk=f.trips["family"].pk)
-    assert (trip.visibility, trip.public_mode) == ("public", "listed")
+    assert (trip.visibility, trip.public_mode) == ("participants", "")
     assert trip.edited_in_app_at is not None
-    back = call(client, "PATCH", trip_path(f, "family"), {"visibility": "participants"})
-    assert back.json()["sharing"]["public_mode"] == ""
     login(client, f.carol)
     assert call(client, "GET", trip_path(f, "family")).status_code == 404
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"visibility": "public"},
+        {"visibility": "public", "public_mode": "listed"},
+        {"public_mode": "listed"},
+        {"title": "x", "visibility": "public"},
+    ],
+)
+def test_no_trip_becomes_public_before_t37(client, scenario, body):
+    """F-10 (D-109): the UI hides "public", and the API refuses it too, so T37's snapshot
+    builder can't find rows marked public without its consent flow."""
+    f = scenario
+    login(client, f.alice)
+    before = _trip_state(f.trips["family"].pk)
+    response = call(client, "PATCH", trip_path(f, "family"), body)
+    assert response.status_code == 422, response.content
+    assert _trip_state(f.trips["family"].pk) == before
+
+
+def _trip_state(pk: int) -> tuple:
+    with as_owner():
+        return Trip.objects.filter(pk=pk).values_list("title", "visibility", "public_mode").get()
+
+
+def test_a_trip_stored_as_public_keeps_its_visibility(client, scenario):
+    """Rows from before the rule stay as they are: editing other fields doesn't touch them, and
+    they can be made non-public (but not public again)."""
+    f = scenario
+    login(client, f.alice)
+    response = call(client, "PATCH", trip_path(f, "public"), {"title": "edited"})
+    assert response.status_code == 200
+    assert _trip_state(f.trips["public"].pk) == ("edited", "public", "unlisted")
+    response = call(client, "PATCH", trip_path(f, "public"), {"public_mode": "listed"})
+    assert response.status_code == 422
+    response = call(client, "PATCH", trip_path(f, "public"), {"visibility": "family"})
+    assert response.status_code == 200
+    assert _trip_state(f.trips["public"].pk) == ("edited", "family", "")
+    response = call(client, "PATCH", trip_path(f, "public"), {"visibility": "public"})
+    assert response.status_code == 422
+
+
+def test_a_purpose_defaulting_to_public_makes_no_public_trip(client, scenario):
+    """No endpoint sets a purpose's default yet; the service refuses one anyway."""
+    f = scenario
+    with as_owner():
+        Purpose.objects.filter(pk=f.alice_purpose.pk).update(default_visibility="public")
+    login(client, f.alice)
+    response = call(client, "POST", f"{API}/trips", {**NEW_TRIP, "purpose_id": f.alice_purpose.pk})
+    assert response.status_code == 422
+    assert "can't be made public" in response.json()["detail"]
 
 
 def test_owner_delete_removes_legs_and_participants(client, scenario):
