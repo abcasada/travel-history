@@ -389,7 +389,7 @@ P1. **[H] Parallel readiness (Adam, 2026-11-23; D-98).** Runs alone, in the main
    - **Baseline:** main at 41a's start, including whatever Lane B merged by then (for example 14c's `trip_sheet` upload: defusedxml, size and archive limits). Backend merges wait from here until 40e's smoke passes.
    - **Output:** findings by severity. Blockers stop go-live.
    - Footprint: read-only (reviewer; doesn't count toward the lane limit); runs 40d's local mode. Flags: none.
-   - Status: todo
+   - Status: done (2026-11-24): 0 blockers, 6 fix soon, 11 minor (docs/review/2026-11-24-go-live.md); its delta-review checklist (12 steps) runs after 40c-3, before 40e.
    - **→ Pause:** 41a's findings summary, then ask for the exposure "go".
 41. **[R] Full security and data-integrity review, read-only** (builds on 41a):
     - RLS, public routes, tokens, rate limits, headers, secrets, dependencies, leak tests;
@@ -397,11 +397,10 @@ P1. **[H] Parallel readiness (Adam, 2026-11-23; D-98).** Runs alone, in the main
     - Footprint: read-only (reviewer). Flags: none.
     - Status: todo
     - **→ Pause:** the findings summary.
-42a. **[H] Go-live blocker fixes from 41a.**
-   - Skip this item if 41a finds no blockers.
-   - Fixes to auth, RLS or the exposure guard are dispatched at [X].
-   - Non-blocking findings go to item 43.
-   - Footprint: from 41a's findings, likely `accounts`, `core.web`, `config` (?). Flags: set when dispatched; `main-checkout` only if a fix must be applied to the production stack.
+42a. **[X] Go-live hardening from 41a** (re-scoped 2026-11-24: 41a found no blockers, but these are cheap and should land before 40c-2 deploys; docs/review/2026-11-24-go-live.md).
+   - F-1 CSP for the installed PWA (WhiteNoise serves before the CSP middleware); F-2 no 40 MB anonymous bodies (per-endpoint limits); F-3 removing travel-users ends sessions at next request or refresh, plus an owner-role deactivate command; F-6 refresh pinned base digests and re-run the CPU smoke test (no AVX); F-7 Ninja docs/schema off in production, `requests` errors in `OidcBearer` → no user; F-8 tunnel requests with a non-public Host → 404; F-9 scope `all` requires an https issuer and client credentials; F-10 `public` visibility refused (422) until T37; F-11 dev-copy pruning and `e2e_cleanup` cover e2e persons, the `e2e` tag and trip-sheet batches. Smoke checks for each where possible.
+   - F-4 is checked in 40c-2 against the real token; F-5 is recorded in docs (40e); F-12 onward go to item 43.
+   - Footprint: `core.web` (exposure, loginwall, CSP), `config`, `accounts` (oidc, provisioning, deactivate), `core` (devcopy), `trips` (visibility validation), Dockerfiles/compose pins, `scripts` (smoke). Flags: none expected (no migration; the API change is validation only).
    - Status: todo
 42. **[H] Blocker fixes.**
     - Footprint: from item 41's findings. Flags: set when dispatched.
@@ -583,3 +582,4 @@ Nature: mech = mechanical, mod = moderate, hard. Size is S/M/L/XL with approxima
 - 2026-11-24: item 14c-2 done and verified in lane 2, merged (rebased cleanly; `./dev test-quick` 2580 + 133 passed in the main checkout; e2e green twice in the lane, not run in the main checkout because it writes to the real dev DB). Lane 2 takes 21a.
 - 2026-11-24: item 40d done and verified in lane 1, merged (`./dev test-quick` 2580 + 133 passed in the main checkout; local go-live smoke passed in the lane). D-105.
 - 2026-11-24: moved 41a ahead of 40c-2. Reason: Lane A waits on Adam's Authentik values, and the review is on the critical path; 40c-2/40c-3 add little code, so a short delta review of them (and 41a's handover checks) runs before 40e. Lane 1 takes 27 beside 21a; backend merges are frozen until 40e's smoke passes.
+- 2026-11-24: item 41a done (reviewer, in a worktree; merged docs only): 0 blockers, 6 fix soon, 11 minor. Re-scoped 42a [H → X] to the cheap fix-soon and minor findings that touch auth and exposure (F-1–F-3, F-6–F-11), to run before 40c-2. Reason: they'd otherwise ship to the internet and wait for item 43; the delta review covers 42a's diff.
