@@ -16,7 +16,9 @@ runs separately from dev (item 40a, 2026-11-19: `./dev prod …`, web on `127.0.
 exposed; [docs/production.md](docs/production.md), D-96); the copy of the real data from dev
 into production is built and rehearsed (item 40b, `./dev prod import-from-dev`, D-97); the
 Authentik sign-in and the handover commands are built (item 40c-1, D-103, D-104; deployed in 40c-2);
-41a's go-live review fixes are in (item 42a, D-107 to D-111).
+41a's go-live review fixes are in (item 42a, D-107 to D-111). The trip page is complete (item 21b,
+D-113: tags, notes, per-leg people, consent, participants' own legs, flight details; /tags,
+/purposes, /people pages; built in a lane, merged after 40e).
 
 | Phase | Status | Detail |
 |---|---|---|
@@ -180,6 +182,7 @@ Frontend conventions: [docs/design/frontend-patterns.md](docs/design/frontend-pa
 - D-109 No trip becomes public before T37: 422 on create, edit, bulk; services refuse it everywhere else
 - D-110 e2e leftovers: dev copy and `e2e_cleanup` remove E2E persons, e2e tags and SYNTHETIC trip-sheet batches (by workbook title); raw files kept
 - D-111 Base digests refreshed; builds run `apt-get upgrade` (Debian security updates); CPU smoke passed (amends D-78)
+- D-113 Trip page API (21b): `TripStatus` enum, `PATCH /persons` (managing Member or Admin; Viewers never, RLS too), own purposes created/edited/archived (never public), `GET /reference/airlines`, airline/airport codes on legs
 
 ## 25. Open questions (for Adam, answer whenever — nothing is blocked on these)
 

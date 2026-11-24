@@ -212,6 +212,21 @@ Notes:
     the matrix rows `create_person`, `link_own_new_person`, `link_own_account_to_kid` (now
     98 actions × 7 actors).
 
+- The complete trip page (work-order item 21b, D-113; endpoints in [api.md](api.md) §17):
+  - `PATCH /persons/{id}` asks `policy.can_edit_person`: a person the caller can see (404
+    otherwise), changed by the Admin or by its managing user when that user is a Member. Accounts
+    migration 0005 adds `app.can_create()` to `person_update`, so a Viewer can no longer update
+    even their own linked person at the SQL level (the matrix said ❌ already).
+    `PersonOut.can_edit` follows the same rule; `manages` names the managing user.
+  - `POST /purposes` asks `policy.can_create_purpose` (Admin/Member; `purpose_write` agrees);
+    `PATCH /purposes/{id}` finds only the caller's own purposes (anyone else's: 404) and asks
+    `policy.can_edit_purpose`. No delete: purposes are archived.
+  - `GET /reference/airlines` is reference data (no RLS) for signed-in family members, like
+    airports and places. `LegOut`'s airline and airport labels come from the same tables.
+  - Tests: `tests/permissions/test_trip_page_api.py` (every new endpoint × every actor, the
+    trip status filter) and the matrix rows `edit_own_person`, `edit_alice_person`, `edit_kid`,
+    `create_purpose`, `edit_alice_purpose` (now 113 actions × 7 actors).
+
 - Routing (work-order item 25, D-92; endpoints in [api.md](api.md) §17):
   - `POST /routing/route` needs `policy.can_propose_route` (Admin/Member; Viewers are
     read-only, 403). Proposals are cached per user in `routing_routerequestcache`: RLS shows and

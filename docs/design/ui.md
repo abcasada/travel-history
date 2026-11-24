@@ -40,7 +40,10 @@ stats pages are lazy-loaded chunks imported only by the desktop shell.
 and every trip on the map; `/trips/:id` replaces the list with the trip's detail (`e` edits);
 `/trips/:id/edit` edits fields, people, stops and legs; `/trips/:id/legs/:legId/route` is a leg's
 route view, where the route editor will open. Selection, bulk edit and list shortcuts come in
-item 21. How pages are built: [frontend-patterns.md](frontend-patterns.md).
+item 21. How pages are built: [frontend-patterns.md](frontend-patterns.md). Item 21b (2026-11-24) completed the trip page:
+tags with their authors, notes, per-leg people and "I was on this leg", public consent,
+participants' own legs, flight details (airport codes, airline, seat, cabin); and the small
+pages `/tags`, `/purposes`, `/people` from the account menu.
 
 ### 18.3 Mobile
 

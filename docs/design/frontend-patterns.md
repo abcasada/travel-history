@@ -265,23 +265,32 @@ Each dispatch: follow sections 2-7, add tests for every new page and mutation, k
       working after clicking a row's checkbox); Enter on a focused link or button keeps its
       native meaning; a bare Shift keydown doesn't cancel a pending `*` sequence.
 
-**21b: the trip page complete.**
-- [ ] Tags on a trip: `listTripTags`/`addTripTag` (`{tag_id}` or `{name}` creates an own tag)/
-      `removeTripTag`, shown with author; a small "My tags" page (`/tags`: rename, colour, delete
-      via `updateTag`/`deleteTag`).
-- [ ] Per-leg participants (`setLegParticipation`, `setMyLegParticipation`) and public consent
-      (`setParticipantConsent`, only where `can_set_consent`).
-- [ ] Notes (`listNotes`, `addNote`, `updateNote`, `deleteNote`, honouring `can_edit` /
-      `can_delete`); participants who may contribute (`access.add_leg === "contribution"`) can
-      add their own legs (the leg form, with `participant_scope` fixed to author).
-- [ ] Flight legs: airline search (new `GET /reference/airlines?q=`, read-only reference data,
-      same tests as `searchAirports`), `airline_id`, seat, cabin; show airport codes on the
-      detail page (add the airport labels to `LegOut` or look them up).
-- [ ] People you manage: rename/visibility (new `PATCH /persons/{id}`: managing user or Admin;
-      matrix row exists as "Person: edit"; API tests per actor).
-- [ ] Purpose management (new `POST/PATCH /purposes`, own purposes; API tests per actor) if
-      Adam wants more than the seven defaults.
-- [ ] Leg vehicle picker waits for `GET /vehicles` (item 23, T21); leave a TODO in the leg form.
+**21b: the trip page complete.** Done 2026-11-24 (D-113; merges after 40e).
+- [x] Tags on a trip (`trips/TripTags.tsx`): the detail's tags at once, then `listTripTags` for
+      `can_remove`; others' tags show their author. Typing a name you already use sends
+      `{tag_id}`, a new name `{name}` (the API creates it). `/tags` (`trips/TagsPage.tsx`):
+      rename, colour (`#rrggbb`), delete (asks, saying how many trips lose it).
+- [x] Per-leg people: core editors open "People" on a leg in the edit page (`LegPeople`: tick
+      the trip's people, or add someone only to that leg); anyone who may contribute and has a
+      person gets "I was on this leg" on the trip page (`MyLegToggle`). Public consent is a
+      switch on the participant chip where `can_set_consent` (no trip can be public yet, D-109).
+- [x] Notes (`trips/NotesSection.tsx`) on the trip page: add when `access.contribute`, edit and
+      delete by the flags. Participants with `access.add_leg === "contribution"` add their own
+      legs on the trip page ("+ My leg", the same `LegForm`; the API makes them author-only) and
+      edit or delete them there, notes included (14b's leftover). Core legs stay on the edit page.
+- [x] Flight legs: `AirlineSearch` (`GET /reference/airlines`), airline, seat and cabin in the
+      leg form (cleared when the mode isn't flight); picked airports and airline show with a
+      clear button. `LegOut` carries `airline`, `origin_airport`, `destination_airport`; the trip
+      page shows "ICT → DEN · UA 1234 · seat 12A · Economy" (`flightDetails`).
+- [x] People you manage: `/people` (`people/PeoplePage.tsx`, `PATCH /persons/{id}`): rename and
+      visibility for every person with `can_edit`; the rest listed read-only.
+- [x] Purposes: `/purposes` (`trips/PurposesPage.tsx`, `POST/PATCH /purposes`): add, rename,
+      default visibility (never public), reorder (renumbers the changed rows), archive/restore.
+- [x] The trip status filter (21a's leftover): `TripStatus` in the schema, `status` in
+      `filter.ts` and a Status select in the filters.
+- [ ] Leg vehicle picker waits for `GET /vehicles` (item 23, T21); a TODO sits in `toLegPayload`.
+- The account menu links My tags, My purposes and People (Members and the Admin).
+- `trips/cache.ts` `invalidateTrip` also refreshes the trip's tags and notes and your tag list.
 
 Not in item 21: route proposal and editor (items 25-26), photos (T31), GPS tracks UI (T22),
 review queue (item 19), mobile tabs (item 30), public sharing settings (phase 8).
