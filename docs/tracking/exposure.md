@@ -1,6 +1,8 @@
 # Tracker exposure: making the tracker endpoints reachable from the internet
 
-Work-order item 8, decisions D-73 and D-85. Until go-live (Authentik with 2FA, phase 8), only the
+Work-order item 8, decisions D-73 and D-85. This page covers the tracker-only period, served
+by the production stack's `ingest` service (D-96); go-live replaces it with the
+[go-live runbook](../go-live.md). Until go-live (Authentik with 2FA, phase 8), only the
 two tracker endpoints are reachable from the internet, at `https://travel.adamcasada.com`:
 
 - `POST /api/v1/ingest/owntracks`
@@ -202,12 +204,18 @@ The [setup guides](README.md) also cover revoking, what is stored, and troublesh
 - **If the route ever points at the dev server by mistake,** every path on the public hostname
   answers 404, the tracker paths included. A server running with DEBUG never answers the public
   hostname.
-- **Go-live (item 40e):**
-  - point the route at `localhost:8784` (the production `web`) with no path rule;
-  - set `TRAVEL_PUBLIC_SCOPE=all` in `.env.prod` and run `./dev prod up` (production already
-    forces `DJANGO_BEHIND_TLS_PROXY=true`, HSTS and `RATELIMIT_CLIENT_IP_HEADER=CF-Connecting-IP`,
-    and has no LAN binding);
-  - retire `ingest`, or keep it behind a tracker-only path rule.
+- **Go-live (item 40e, [go-live runbook](../go-live.md), D-105):**
+  - the travel.* route loses its path rule and points at `localhost:8784` (the production
+    `web`), and trips.* gets the same route; Disable Chunked Encoding stays on;
+  - `TRAVEL_PUBLIC_SCOPE=all` in `.env.prod`, then `./dev prod up` (production already forces
+    `DJANGO_BEHIND_TLS_PROXY=true`, HSTS and `RATELIMIT_CLIENT_IP_HEADER=CF-Connecting-IP`, and
+    has no LAN binding);
+  - the tracker path rule is retired: `web` serves both tracker endpoints with the same code,
+    token checks, size caps and rate limits, so phones keep their setup unchanged and `ingest`
+    stays stopped. Everything this page says about Cloudflare's visibility then applies to the
+    whole app (the runbook's "What Cloudflare can see");
+  - `./dev golive-smoke https://travel.adamcasada.com` replaces `./dev prod tracker smoke` as the
+    outside test; `./dev golive-smoke local` rehearses it beforehand with a throwaway stack.
 
 ## How each item 8 condition is met
 

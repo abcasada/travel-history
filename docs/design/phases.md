@@ -102,7 +102,7 @@ Status markers: ✅ done · 🔄 in progress · ⏳ not started · ⛔ blocked o
 | 8.3 Duplicates | Overlap check offers "join existing trip"; merge tool (earlier creator stays owner) |
 | 8.4 Transfers | Bulk transfer of trips/vehicles to a new member; shared trips stay with Adam |
 | 8.5 Public | Snapshot builder, public renderer on `travel_public`, privacy zones, consent, leak tests, rate limits, profiles |
-| 8.6 Go-live checklist | Written for Adam: Authentik + 2FA, SMTP account + DNS, Turnstile keys, tunnel hostname (move the route from the tracker-only `ingest` service on 8783 to the production `web` on 8784, `TRAVEL_PUBLIC_SCOPE=all` in `.env.prod`; the TLS-proxy, HSTS and `CF-Connecting-IP` settings are already forced by compose.prod.yaml; docs/tracking/exposure.md, docs/production.md) |
+| 8.6 Go-live checklist 🔄 2026-11-23 (item 40d, D-105: the go-live slice) | Written for Adam in docs/go-live.md: Authentik checks (group binding, strict redirect URIs, forced second factor, removing G-4's temporary URIs), adding a family member (`travel-users` → second factor → Member → `link_person`), tunnel routes (travel.* and trips.* to the production `web` on `localhost:8784`, the tracker path rule retired, `ingest` stays stopped), DNS, the scope flip (`TRAVEL_PUBLIC_SCOPE=all`; TLS-proxy, HSTS and `CF-Connecting-IP` already forced by compose.prod.yaml), rollback, what Cloudflare sees. `./dev golive-smoke`: `local` runs HEAD's production image with scope `all` against a throwaway DB on 127.0.0.1 (for 41a), a URL checks through Cloudflare (40e). Open (item 40): SMTP account + DNS, Turnstile keys, request access, public pages |
 
 ### Phase 9 — Android companion ⏳ (against the mock OIDC provider until Authentik is live)
 

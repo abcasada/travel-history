@@ -7,7 +7,8 @@
 #
 # The `ingest` service belongs to the production stack (D-96); its settings come from .env.prod.
 #
-# Checks: every other path answers 404; the tracker endpoints answer, with HSTS and the other
+# Checks: every other path answers 404 (through Cloudflare, its own bare 404s and its managed
+# robots.txt are expected); the tracker endpoints answer, with HSTS and the other
 # security headers and no cookies; a bogus token is refused; locally, plain HTTP is redirected
 # and unknown hosts are refused. With a test token (TRACKER_SMOKE_TOKEN, or typed at the hidden
 # prompt) it also sends one OwnTracks message and one Overland batch that store nothing (an
@@ -25,7 +26,7 @@ base=""
 for arg in "$@"; do
   case "$arg" in
     --store) store=true ;;
-    -h|--help) sed -n '2,17p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,18p' "$0"; exit 0 ;;
     *) base="$arg" ;;
   esac
 done
@@ -102,13 +103,28 @@ echo "Tracker endpoint smoke test: $base$($local_mode && echo " (Host: $public_h
 
 echo "Everything else is 404:"
 for path in / /healthz /app/ /app/trackers /app/assets/index.js /app/manifest.webmanifest \
-  /static/admin/x.css /robots.txt /favicon.ico /auth/login /api/v1/ /api/v1/me \
+  /static/admin/x.css /favicon.ico /auth/login /api/v1/ /api/v1/me \
   /api/v1/openapi.json /api/v1/docs /api/v1/tracking/tokens /api/v1/ingest/ \
   /api/v1/ingest/owntracksx /admin/ /.env; do
   expect "GET $path" 404 "$(request GET "$path")"
 done
 expect "POST /api/v1/tracking/tokens" 404 "$(request POST /api/v1/tracking/tokens)"
-security_headers "404"
+# Through Cloudflare, the tunnel's path rule forwards only the tracker paths: every other path
+# gets Cloudflare's own bare 404, without the app's headers (2026-11-19). Locally it is the app's.
+if $local_mode || [ -n "$(grep -i '^content-security-policy:' "$work/headers")" ]; then
+  security_headers "404"
+else
+  echo "  note  404s come from Cloudflare (the path rule doesn't forward them): no app headers to check"
+fi
+status="$(request GET /robots.txt)"
+if [ "$status" = 404 ]; then
+  pass "GET /robots.txt 404"
+elif ! $local_mode && [ "$status" = 200 ] && grep -qi '^user-agent:' "$work/body"; then
+  # Cloudflare's managed robots.txt answers at the edge when the origin has none.
+  pass "GET /robots.txt 200 (Cloudflare's managed file)"
+else
+  fail "GET /robots.txt answered $status"
+fi
 
 echo "The tracker endpoints answer:"
 expect "GET /api/v1/ingest/owntracks (POST only)" 405 "$(request GET /api/v1/ingest/owntracks)"

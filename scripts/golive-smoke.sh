@@ -122,13 +122,17 @@ local_token() {
   local secret
   secret="trk_$(head -c 32 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=\n' | head -c 43)"
   printf '%s' "$secret" | sha256sum | cut -d' ' -f1 > "$LOCAL_DIR/token.sha256"
-  local_compose --profile tools run --rm --no-deps -T -v "$LOCAL_DIR/token.sha256:/work/h:ro" \
-    tools python manage.py shell >/dev/null <<'PY'
+  if ! local_compose --profile tools run --rm --no-deps -T -v "$LOCAL_DIR/token.sha256:/work/h:ro" \
+    tools python manage.py shell >"$work/token.log" 2>&1 <<'PY'
 from travel.accounts.models import DeviceToken, User
 user, _ = User.objects.get_or_create(email="golive-smoke@example.invalid", defaults={"display_name": "SYNTHETIC smoke"})
 digest = open("/work/h").read().strip()
 DeviceToken.objects.get_or_create(token_hash=digest, defaults={"user": user, "name": "golive smoke", "kind": "colota", "token_prefix": "trk_smok"})
 PY
+  then
+    cat "$work/token.log" >&2
+    die "could not create the synthetic token"
+  fi
   rm -f "$LOCAL_DIR/token.sha256"
   echo "$secret"
 }
@@ -147,7 +151,7 @@ fail() {
 expect() {  # description expected actual
   if [ "$2" = "$3" ]; then pass "$1"; else fail "$1 (got $3, expected $2)"; fi
 }
-header() { grep -i "^$1:" "$work/headers" | tail -1 | cut -d: -f2- | tr -d '\r' | sed 's/^ *//'; }
+header() { { grep -i "^$1:" "$work/headers" || true; } | tail -1 | cut -d: -f2- | tr -d '\r' | sed 's/^ *//'; }
 
 mode=""        # local | remote
 base=""        # local: http://127.0.0.1:<port>
@@ -235,7 +239,7 @@ check_sign_in() {
   local status location cookie
   status="$(request GET "$canonical" '/auth/login?next=/app/trips')"
   location="$(header location)"
-  cookie="$(app_cookies | grep -i 'sessionid=' | tail -1)"
+  cookie="$(app_cookies | { grep -i 'sessionid=' || true; } | tail -1)"
   if [ "$status" = 302 ]; then
     [[ "$location" == https://* && "$location" != "https://$canonical/"* ]] &&
       pass "GET /auth/login -> the provider (${location%%\?*})" || fail "GET /auth/login -> $location"
@@ -252,7 +256,9 @@ check_sign_in() {
   else
     fail "GET /auth/login answered $status"
   fi
-  if [ -n "$cookie" ]; then
+  if [ "$status" != 302 ]; then
+    note "  no session cookie to check (Django saves no session on a 5xx answer)"
+  elif [ -n "$cookie" ]; then
     local missing=()
     grep -qi '; *secure' <<<"$cookie" || missing+=("Secure")
     grep -qi '; *httponly' <<<"$cookie" || missing+=("HttpOnly")
@@ -308,7 +314,7 @@ PY
 check_not_found() {
   echo "404s and robots.txt ($canonical):"
   local path status
-  for path in /static/nope.css /app/assets/nope.js /t/nope /u/nope/ /pm/1/large /invite/nope; do
+  for path in /static/nope.css /t/nope /u/nope/ /pm/1/large /invite/nope; do
     status="$(request GET "$canonical" "$path")"
     if [ "$status" != 404 ]; then
       fail "GET $path answered $status (no public renderer or invitations yet)"
@@ -321,6 +327,16 @@ check_not_found() {
       fail "GET $path 404 without the app's headers (route not pointing at the app?)"
     fi
   done
+  # The login wall lets /app/assets/ through and spa_index answers any /app/ path, so an unknown
+  # asset gets the SPA shell (code references only, no data), not a 404. Reported for item 41a.
+  status="$(request GET "$canonical" /app/assets/nope.js)"
+  if [ "$status" = 404 ]; then
+    pass "GET /app/assets/nope.js 404"
+  elif [ "$status" = 200 ] && grep -q '<div id="root"></div>' "$work/body" && from_app; then
+    note "GET /app/assets/nope.js: 200 with the SPA shell (no data)"
+  else
+    fail "GET /app/assets/nope.js answered $status"
+  fi
   status="$(request GET "$canonical" /robots.txt)"
   if [ "$status" = 200 ] && [ "$mode" = remote ]; then
     # Cloudflare's managed robots.txt answers when the origin has none (the app has none).

@@ -2,7 +2,7 @@
 
 Work-order item 40a, decision D-96 (pending Adam), G-1. The family's data lives here, never in
 the development stack. Go-live (Authentik sign-in, the tunnel route, `TRAVEL_PUBLIC_SCOPE=all`)
-comes in items 40c–40e; until then nothing here is reachable from the internet except, when
+comes in items 40c–40e ([go-live runbook](go-live.md)); until then nothing here is reachable from the internet except, when
 tracking resumes, the two tracker endpoints through the `ingest` service.
 
 ## Why a separate stack
@@ -189,6 +189,10 @@ the Authentik provider lists the temporary redirect URI `http://localhost:8784/a
   the redirect from trips.* (including a `//host` path) and its tracker exemption.
 - **Development:** if the dev stack runs, `127.0.0.1:8780` answers 404 to both public names.
 
+For go-live itself ([go-live runbook](go-live.md)), `./dev golive-smoke local` runs the same image
+with scope `all` against a throwaway database (any checkout, lanes included), and
+`./dev golive-smoke https://travel.adamcasada.com` checks the public names through Cloudflare.
+
 ## Copying the data from development (item 40b, D-97)
 
 Adam's real data (the Timeline import, batch 33, and the trips he typed in) was entered through
@@ -281,7 +285,7 @@ It refuses anything else: the wrong way round, an account that owns data, an ide
 another provider, a target that already has a real identity. Afterwards `import-from-dev` is
 refused for good (production has a real identity).
 
-Family members (after go-live, 40d's runbook): once a member has signed in once,
+Family members (after go-live, [go-live runbook](go-live.md#adding-a-family-member)): once a member has signed in once,
 `./dev prod manage link_person` lists accounts and the persons without one, and
 `link_person ACCOUNT PERSON --execute` links the account to the person already on their trips,
 so the trips shared with `participants` visibility appear.
