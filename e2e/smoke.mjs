@@ -214,6 +214,58 @@ await page
   .getByText(/(new|unchanged) segments|already imported/)
   .waitFor({ timeout: 60000 });
 await page.screenshot({ path: "out/history.png" });
+// Trip spreadsheet import (item 14c-2): upload the SYNTHETIC sheet, check the preview, tick the
+// unticked options it offers, commit, open the trip, then delete it. The first run offers
+// "create these people" (an unknown person in the sheet); later runs find the trip deleted and
+// offer "re-create" instead. Both need the catalog step's Add me (the sheet says "me").
+const sheetRequests = [];
+page.on("response", (r) => {
+  const path = new URL(r.url()).pathname;
+  if (/^\/api\/v1\/imports\/\d+\/(trip-sheet|commit)$/.test(path)) sheetRequests.push([r.request().method(), path, r.status()]);
+});
+await page.getByRole("link", { name: "Trips" }).click();
+await page.getByRole("link", { name: "Import", exact: true }).click();
+await page.getByRole("heading", { name: "Import trips from a spreadsheet" }).waitFor();
+const sheetChooser = page.waitForEvent("filechooser");
+await page.getByRole("button", { name: /Upload a trip spreadsheet/ }).click();
+await (await sheetChooser).setFiles("fixtures/trip-sheet-synthetic.xlsx");
+await page.waitForURL(/\/app\/imports\/\d+$/, { timeout: 60000 });
+const sheetCard = page.getByRole("region", { name: "Tab E2E sheet trip" });
+const openPreview = page.getByRole("link", { name: "Open that preview" });
+// A run that stopped before committing leaves its preview open: the same bytes then point there.
+await sheetCard.or(openPreview).first().waitFor({ timeout: 60000 });
+if (await openPreview.isVisible()) {
+  await openPreview.click();
+  await sheetCard.waitFor({ timeout: 30000 });
+}
+const sheetBatchId = Number(page.url().match(/imports\/(\d+)/)[1]);
+for (const option of [/^Create these people: E2E Sheet Cousin/, /^Re-create this trip/]) {
+  const box = sheetCard.getByLabel(option);
+  if (await box.count()) await box.check();
+}
+await page.getByRole("button", { name: "Show on map" }).click();
+await page.waitForTimeout(2000);
+await page.screenshot({ path: "out/trip-sheet-preview.png" });
+await page.getByRole("button", { name: "Import 1 trip" }).click();
+const sheetResults = page.getByRole("region", { name: "Import results" });
+await sheetResults.getByText(/E2E sheet trip: (Imported: new trip|No changes)/).waitFor({ timeout: 30000 });
+await sheetCard.getByText(/^(Imported: new trip|No changes)$/).waitFor();
+await sheetResults.getByRole("link", { name: "Open" }).click();
+await page.getByRole("heading", { name: "E2E sheet trip" }).waitFor();
+await page.getByRole("region", { name: "Who went" }).getByText("E2E Sheet Cousin").waitFor();
+await page.getByRole("region", { name: "Itinerary" }).getByText(/E2E Sheet Start → E2E Sheet Lake/).first().waitFor();
+await page.screenshot({ path: "out/trip-sheet-trip.png" });
+// The same preview in the mobile shell (the batch is done now: outcomes, no import button).
+await m.goto(`${base}/app/imports/${sheetBatchId}`);
+await m.getByRole("region", { name: "Tab E2E sheet trip" }).waitFor({ timeout: 20000 });
+await m.waitForTimeout(2000);
+await m.screenshot({ path: "out/mobile-trip-sheet.png" });
+page.once("dialog", (dialog) => dialog.accept());
+await page.getByRole("button", { name: "Delete" }).click();
+await page.waitForURL(/\/app\/trips$/);
+const failedSheet = sheetRequests.filter(([, , status]) => status >= 400);
+const committed = sheetRequests.some(([m, path, status]) => m === "POST" && path.endsWith("/commit") && status === 200);
+if (failedSheet.length || !committed) throw new Error(`trip sheet requests: ${JSON.stringify(sheetRequests)}`);
 } catch (e) {
   await page.screenshot({ path: "out/failure.png" }).catch(() => {});
   console.log(JSON.stringify({ failedAt: page.url(), consoleErrors: log, body: (await page.locator("body").innerText().catch(() => "")).slice(0, 400), error: String(e).slice(0, 300) }));
