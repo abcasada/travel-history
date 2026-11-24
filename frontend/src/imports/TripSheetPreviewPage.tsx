@@ -163,11 +163,10 @@ function PreviewBody({ preview }: { preview: TripSheetPreviewOut }) {
           resultsRef.current?.scrollIntoView?.({ behavior: "smooth", block: "nearest" });
           // Every trip list, the trip map and each trip the commit wrote.
           const tripIds = new Set(result.results.flatMap((r) => (r.trip_id ? [r.trip_id] : [])));
-          await Promise.all([
-            invalidateTrip(queryClient),
-            ...[...tripIds].map((tripId) => invalidateTrip(queryClient, tripId)),
-            refresh(),
-          ]);
+          const trips = tripIds.size
+            ? [...tripIds].map((tripId) => invalidateTrip(queryClient, tripId))
+            : [invalidateTrip(queryClient)];
+          await Promise.all([...trips, refresh()]);
         },
         onError: async (error) => {
           const records =
