@@ -21,8 +21,8 @@
 # index.html and sw.js with the CSP (F-1); plain HTTP redirected; a loopback Host through the
 # tunnel refused (F-8); no docs or schema and junk Bearer tokens refused cleanly (F-7); large
 # anonymous bodies refused (F-2); locally, scope all refusing to start without the provider
-# (F-9) and a signed-in Member: public visibility refused (F-10), the hourly provider check and
-# deactivate_account (F-3);
+# (F-9) and a signed-in Member: public visibility refused (F-10), the hourly provider check with
+# its grace for saves (D-122) and deactivate_account (F-3);
 # sign-in (redirect to the provider with state, nonce, PKCE S256 and the canonical callback;
 # cookie flags); every API operation in the OpenAPI schema and the private pages refuse anonymous
 # requests; unknown and public-renderer paths 404 without DEBUG pages; robots.txt (Cloudflare
@@ -517,8 +517,9 @@ check_local_stack() {
   fi
 }
 
-# A synthetic Member with a trip and two sessions in the throwaway database: one the provider
-# vouched for just now, one two hours ago. Prints: account trip fresh-session stale-session.
+# A synthetic Member with a trip and three sessions in the throwaway database: one the provider
+# vouched for just now, one 90 minutes ago (due, within the grace for saves: D-122) and one three
+# hours ago (past it). Prints: account trip fresh-session grace-session stale-session.
 local_sessions() {
   if ! local_compose --profile tools run --rm --no-deps -T tools python manage.py shell \
     >"$work/sessions.log" 2>&1 <<'PY'
@@ -536,7 +537,8 @@ def session(checked):
     s[HASH_SESSION_KEY], s["oidc_checked_at"] = user.get_session_auth_hash(), checked
     s.create()
     return s.session_key
-print("SMOKE", user.pk, trip.pk, session(int(time.time())), session(int(time.time()) - 7200))
+now = int(time.time())
+print("SMOKE", user.pk, trip.pk, session(now), session(now - 5400), session(now - 10800))
 PY
   then
     cat "$work/sessions.log" >&2
@@ -547,8 +549,8 @@ PY
 
 check_signed_in() {  # local only: a signed-in Member, as the session cookie makes one
   echo "Signed in (a synthetic Member's sessions in the throwaway database):"
-  local account trip fresh stale csrf
-  read -r account trip fresh stale < <(local_sessions)
+  local account trip fresh grace stale csrf
+  read -r account trip fresh grace stale < <(local_sessions)
   csrf="$(head -c 96 /dev/urandom | base64 -w0 | tr -dc 'A-Za-z0-9' | head -c 32)"
   signed() {  # session method path [json]
     local key="$1" method="$2" path="$3"
@@ -567,10 +569,19 @@ check_signed_in() {  # local only: a signed-in Member, as the session cookie mak
     "$(signed "$fresh" POST /api/v1/trips/bulk "{\"trip_ids\":[$trip],\"visibility\":\"public\"}")"
   expect "PATCH /api/v1/trips/$trip to family still works" 200 \
     "$(signed "$fresh" PATCH "/api/v1/trips/$trip" '{"visibility":"family"}')"
-  # F-3: a session the provider last vouched for two hours ago is signed out.
-  expect "a session past the hourly provider check: 401 (F-3)" 401 "$(signed "$stale" GET /api/v1/me)"
+  # F-3, D-122: vouched for 90 minutes ago, so the hourly check is due but within the grace: a
+  # save still lands, a read is refused and says why, and the session stays for the next save.
+  expect "a save after the hourly provider check fell due: 200 (F-3, D-122)" 200 \
+    "$(signed "$grace" PATCH "/api/v1/trips/$trip" '{"title":"SYNTHETIC saved in the grace"}')"
+  expect "  a read: 401 (F-3)" 401 "$(signed "$grace" GET /api/v1/me)"
+  grep -q "fresh check with the sign-in provider" "$work/body" && pass "  says why" || fail "  no reason given"
+  expect "  another save still lands" 200 "$(signed "$grace" PUT /api/v1/preferences/smoke '{"value":1}')"
+  # F-3: vouched for three hours ago, past the grace: a save is refused too and the session ends.
+  expect "a save past the grace: 401 (F-3)" 401 \
+    "$(signed "$stale" PATCH "/api/v1/trips/$trip" '{"title":"SYNTHETIC too late"}')"
   grep -q "fresh check with the sign-in provider" "$work/body" && pass "  says why" || fail "  no reason given"
   expect "  and it is gone" 401 "$(signed "$stale" GET /api/v1/me)"
+  grep -q "authentication required" "$work/body" && pass "  (signed out)" || fail "  the session is still there"
   # F-3: deactivate_account ends the account's access at once.
   if local_compose --profile tools run --rm --no-deps -T tools \
     python manage.py deactivate_account "$account" --execute >"$work/deactivate" 2>&1; then
