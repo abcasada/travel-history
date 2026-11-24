@@ -420,7 +420,7 @@ P1. **[H] Parallel readiness (Adam, 2026-11-23; D-98).** Runs alone, in the main
 
 43d. **[M] Flaky TitleSearch "fast typing" test** (added 2026-11-24 from 21b's report: fails about 1 run in 3). Make it deterministic (fake timers or awaiting the debounced URL write), and check the hook (`trips/useFollowedText.ts`) has no real race behind it.
    - Footprint: fe:trips (TitleSearch test, useFollowedText). Flags: none.
-   - Status: todo
+   - Status: done (2026-11-24; a real race in useFollowedText, fixed with an echo queue; 30/30 isolated runs green)
 
 43e. **[H] Forms hold the re-check redirect while they have unsaved input** (added 2026-11-24 from 43c's report). A read during an edit after the check fell due (a refetch on tab focus, a place search while typing) still redirects and loses the form; the server already keeps the session for the save (D-122). Forms with unsaved input defer the redirect (or keep the draft in sessionStorage and restore it after sign-in). Runs after 21b merges (it changes many of those forms).
    - Footprint: fe:auth (recheck), fe:trips forms, fe:routing editor (unsaved line). Flags: none.
@@ -619,3 +619,4 @@ Nature: mech = mechanical, mod = moderate, hard. Size is S/M/L/XL with approxima
 - 2026-11-24: item 43b done and verified in lane 3, merged (`./dev test-quick` 2696 + 192 passed in the main checkout; `./dev e2e --recheck` green in the lane). D-120, D-121. Added 43c [X]: a save that meets the hourly re-check loses its form input; let writes through for a grace window. Reason: family members editing trips would lose work hourly.
 - 2026-11-24: 21b built in lane 2 (backend quick 2811 passed, e2e green; merge after 40e). Added 43d [M] for the flaky TitleSearch test it found.
 - 2026-11-24: item 43c done and verified in lane 3, merged (`./dev test-quick` 2744 + 192 passed in the main checkout; `./dev e2e --recheck` and the local go-live smoke, 101 checks, green in the lane). D-122. Added 43e [H] (forms hold the redirect), after 21b merges.
+- 2026-11-24: item 43d done and verified in lane 4, merged (`./dev test-quick` 2744 + 193 passed in the main checkout). Lanes now idle: Lane A waits on Adam (exposure "go", Authentik values, AGE_RECIPIENT); 21b and 14a-1 wait for 40e; 11/12 wait for Review pause B; 43e waits for 21b.
