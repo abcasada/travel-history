@@ -165,7 +165,7 @@ Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhi
 21. **[M] The rest of T19,** following the patterns doc (2 dispatches, frontend-patterns.md §8).
     - **21a [M] the list as a working tool** (§8): keyboard navigation, bulk bar, paging, more filters, the header search.
       - Footprint: fe:trips (list, filters, selection store), fe:shells (header search, shortcut help), fe:map (selection highlight). Flags: none.
-      - Status: todo
+      - Status: done (2026-11-24; the status filter waits on the enum-name fix)
     - **21b [M] the trip page complete** (§8), plus 14b's leftover: participants edit the notes on their own contributed legs in the UI (the API already allows it).
       - Footprint: fe:trips (trip page, leg form, tags page), `trips` (`PATCH /persons`, purposes), `geo` (`GET /reference/airlines`), `core.policy` (API tests per actor). Flags: api.
       - Status: todo
@@ -583,3 +583,4 @@ Nature: mech = mechanical, mod = moderate, hard. Size is S/M/L/XL with approxima
 - 2026-11-24: item 40d done and verified in lane 1, merged (`./dev test-quick` 2580 + 133 passed in the main checkout; local go-live smoke passed in the lane). D-105.
 - 2026-11-24: moved 41a ahead of 40c-2. Reason: Lane A waits on Adam's Authentik values, and the review is on the critical path; 40c-2/40c-3 add little code, so a short delta review of them (and 41a's handover checks) runs before 40e. Lane 1 takes 27 beside 21a; backend merges are frozen until 40e's smoke passes.
 - 2026-11-24: item 41a done (reviewer, in a worktree; merged docs only): 0 blockers, 6 fix soon, 11 minor. Re-scoped 42a [H → X] to the cheap fix-soon and minor findings that touch auth and exposure (F-1–F-3, F-6–F-11), to run before 40c-2. Reason: they'd otherwise ship to the internet and wait for item 43; the delta review covers 42a's diff.
+- 2026-11-24: item 21a done and verified in lane 2, merged (`./dev test-quick` 2580 + 163 passed in the main checkout; e2e green in the lane). Left out: the trip status filter (OpenAPI enum name clash; fix item queued).
