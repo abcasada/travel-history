@@ -191,7 +191,7 @@ Tiers: [M] builder-medium, [H] builder-high, [X] builder-xhigh, [R] reviewer-xhi
 
     It runs before Review pause B, which reviews the desktop catalog including the route editor.
     - Footprint: fe:routing (editor, version list). Flags: none (the routes API already returns `sources`; `api` only if re-proposing needs a backend change (?)).
-    - Status: todo
+    - Status: done (2026-11-24; D-106; real-device touch test at Review pause B)
 28. **[H] T27:** territory stats.
     - Footprint: `geo` or a new stats app (the `territory_visit` cache) (?), `trips` (participation, read only), `core.jobs` (rebuild), fe:stats (new). Flags: migrations, api.
     - Status: todo
@@ -397,6 +397,14 @@ P1. **[H] Parallel readiness (Adam, 2026-11-23; D-98).** Runs alone, in the main
     - Footprint: read-only (reviewer). Flags: none.
     - Status: todo
     - **→ Pause:** the findings summary.
+43a. **[M] Small fixes (frontend and tooling), beside 42a** (added 2026-11-24 from the NEXT.md fix list).
+   - `./dev lane rm` deletes a merged branch even after the orchestrator rebased it (is-ancestor-of-main check instead of `git branch -d`), and removes the remote branch; lane builders get lane-specific scratch/log names.
+   - The mobile list's search box keeps its text locally (21a's header-search fix), so fast typing doesn't drop letters.
+   - The template's Instructions tab matches the UI's wording ("Import" / "Import trips from a spreadsheet"): rebuild docs/trips/trip-template.xlsx with its generator.
+   - The basemap glyph 404 in the e2e: find the cause and fix it, or make the e2e ignore only that exact URL if it's an upstream gap (say which).
+   - Footprint: `dev` (lane subcommand), `scripts/lane.sh`, fe:trips (mobile search only), docs/trips template, fe:map style/glyphs, e2e. Flags: none.
+   - Status: todo
+
 42a. **[X] Go-live hardening from 41a** (re-scoped 2026-11-24: 41a found no blockers, but these are cheap and should land before 40c-2 deploys; docs/review/2026-11-24-go-live.md).
    - F-1 CSP for the installed PWA (WhiteNoise serves before the CSP middleware); F-2 no 40 MB anonymous bodies (per-endpoint limits); F-3 removing travel-users ends sessions at next request or refresh, plus an owner-role deactivate command; F-6 refresh pinned base digests and re-run the CPU smoke test (no AVX); F-7 Ninja docs/schema off in production, `requests` errors in `OidcBearer` → no user; F-8 tunnel requests with a non-public Host → 404; F-9 scope `all` requires an https issuer and client credentials; F-10 `public` visibility refused (422) until T37; F-11 dev-copy pruning and `e2e_cleanup` cover e2e persons, the `e2e` tag and trip-sheet batches. Smoke checks for each where possible.
    - F-4 is checked in 40c-2 against the real token; F-5 is recorded in docs (40e); F-12 onward go to item 43.
@@ -584,3 +592,4 @@ Nature: mech = mechanical, mod = moderate, hard. Size is S/M/L/XL with approxima
 - 2026-11-24: moved 41a ahead of 40c-2. Reason: Lane A waits on Adam's Authentik values, and the review is on the critical path; 40c-2/40c-3 add little code, so a short delta review of them (and 41a's handover checks) runs before 40e. Lane 1 takes 27 beside 21a; backend merges are frozen until 40e's smoke passes.
 - 2026-11-24: item 41a done (reviewer, in a worktree; merged docs only): 0 blockers, 6 fix soon, 11 minor. Re-scoped 42a [H → X] to the cheap fix-soon and minor findings that touch auth and exposure (F-1–F-3, F-6–F-11), to run before 40c-2. Reason: they'd otherwise ship to the internet and wait for item 43; the delta review covers 42a's diff.
 - 2026-11-24: item 21a done and verified in lane 2, merged (`./dev test-quick` 2580 + 163 passed in the main checkout; e2e green in the lane). Left out: the trip status filter (OpenAPI enum name clash; fix item queued).
+- 2026-11-24: item 27 done and verified in lane 1, merged (`./dev test-quick` 2580 + 182 passed in the main checkout; e2e green in the lane; D-106). Added 43a [M] small fixes beside 42a. Reason: 21b overlaps 42a's `trips` footprint, and 11/12 wait for Review pause B, so lane 1 takes queued fixes.
