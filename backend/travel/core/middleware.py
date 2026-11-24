@@ -19,6 +19,7 @@ class RlsContextMiddleware:
 
     def __call__(self, request):
         from django.contrib.auth import get_user, logout
+        from django.contrib.auth.models import AnonymousUser
 
         from travel.accounts import sessions
 
@@ -27,10 +28,16 @@ class RlsContextMiddleware:
             set_context(int(session_uid) if session_uid else None)
             user = get_user(request)
             request.user = user
-            if user.is_authenticated and sessions.check_due(request):
-                # The provider hasn't vouched for this session recently enough (F-3): end it,
-                # so this request is signed out and the next sign-in asks the provider again.
-                logout(request)
+            check = sessions.recheck(request) if user.is_authenticated else sessions.Recheck.ALLOW
+            if check is not sessions.Recheck.ALLOW:
+                # The provider hasn't vouched for this session recently enough (F-3): this
+                # request is signed out, so the next sign-in asks the provider again. Within the
+                # grace the session stays for the writes still on their way (D-122); past it, it
+                # ends.
+                if check is sessions.Recheck.END:
+                    logout(request)
+                else:
+                    request.user = AnonymousUser()
                 request.sign_in_check_due = True
                 user = request.user
             set_context(user.pk if user.is_authenticated else None)

@@ -6,6 +6,7 @@ shaped like Authentik's: a per-provider issuer with a trailing slash, a hashed s
 
 import base64
 import hashlib
+import json
 import time
 from urllib.parse import parse_qs, parse_qsl, urlsplit
 
@@ -426,7 +427,7 @@ def test_docs_and_schema_need_a_signed_in_session(client, authentik, bearer_acco
     assert client.get(path).status_code == 200
 
 
-# --- Sessions go back through Authentik (F-3, D-108) ------------------------------------------
+# --- Sessions go back through Authentik (F-3, D-108, D-122) -----------------------------------
 
 
 @pytest.fixture
@@ -450,14 +451,43 @@ def test_a_session_goes_back_through_authentik_after_an_hour(client, recheck):
     response = client.get("/api/v1/me")
     assert response.status_code == 401
     assert response.json() == {"detail": sessions.DUE_DETAIL}
-    # The session is gone, not just refused once; pages send the browser to sign in.
-    assert client.get("/api/v1/me").json() == {"detail": "authentication required"}
+    # Every read says so until the provider vouches again (within the grace the session stays
+    # for saves on their way, D-122); pages send the browser to sign in.
+    assert client.get("/api/v1/me").json() == {"detail": sessions.DUE_DETAIL}
     page = client.get("/app/trips")
     assert (page.status_code, page["Location"]) == (302, "/auth/login?next=/app/trips")
     # Authentik still vouches (its own session lives): a new session straight away.
     assert sign_in(client, recheck).status_code == 302
     assert client.get("/api/v1/me").status_code == 200
     assert len(accounts()) == 1
+
+
+def put_preference(client, **headers):
+    return client.put(
+        "/api/v1/preferences/grace_check",
+        json.dumps({"value": 1}),
+        content_type="application/json",
+        **headers,
+    )
+
+
+def test_a_save_that_meets_the_check_lands_and_the_next_read_signs_in_again(client, recheck):
+    sign_in(client, recheck)
+    age_session(client, 3601)
+    assert put_preference(client).status_code == 200  # the form filled in before the check
+    assert client.get("/api/v1/me").json() == {"detail": sessions.DUE_DETAIL}
+    assert sign_in(client, recheck).status_code == 302
+    assert client.get("/api/v1/preferences").json()["grace_check"] == 1
+
+
+def test_past_the_grace_the_session_ends(client, recheck):
+    sign_in(client, recheck)
+    age_session(client, 7201)
+    response = put_preference(client)
+    assert (response.status_code, response.json()) == (401, {"detail": sessions.DUE_DETAIL})
+    assert client.get("/api/v1/me").json() == {"detail": "authentication required"}
+    assert sign_in(client, recheck).status_code == 302
+    assert "grace_check" not in client.get("/api/v1/preferences").json()  # nothing written
 
 
 def test_leaving_travel_users_ends_access_at_the_next_check(client, recheck):
@@ -468,7 +498,32 @@ def test_leaving_travel_users_ends_access_at_the_next_check(client, recheck):
     assert response.status_code == 403
     assert b"not in the group" in response.content
     assert client.get("/api/v1/me").status_code == 401
+    # The refused sign-in ended the session: no grace for writes either.
+    assert put_preference(client).status_code == 401
     assert len(accounts()) == 1  # the account stays; deactivate_account is the server's step
+
+
+def test_when_authentik_refuses_before_the_callback_writes_end_with_the_grace(client, recheck):
+    """Authentik's own group binding refuses the sign-in on its side, so the app never hears
+    no: reads end an hour after the provider last vouched, writes an hour later (D-122)."""
+    sign_in(client, recheck)
+    age_session(client, 3601)
+    assert client.get("/api/v1/me").status_code == 401
+    assert put_preference(client).status_code == 200
+    age_session(client, 3600)
+    assert put_preference(client).status_code == 401
+    assert client.get("/api/v1/me").json() == {"detail": "authentication required"}
+
+
+def test_bearer_tokens_have_no_grace(client, recheck, bearer_account):
+    """The grace is for browser sessions: a bearer token is checked on every request, writes
+    included (D-108 (3))."""
+    token = access_token(recheck)
+    assert put_preference(client, HTTP_AUTHORIZATION=f"Bearer {token}").status_code == 200
+    assert me_with(client, token).status_code == 200
+    gone = access_token(recheck, groups=["authentik Admins"])
+    assert put_preference(client, HTTP_AUTHORIZATION=f"Bearer {gone}").status_code == 401
+    assert me_with(client, gone).status_code == 401
 
 
 def test_a_refused_sign_in_ends_the_browsers_session(client, recheck):
@@ -490,6 +545,7 @@ def test_signing_out_still_ends_authentiks_session_when_the_check_is_due(client,
 def test_sessions_without_the_providers_stamp_are_due(client, recheck):
     with as_owner():
         client.force_login(UserFactory())
+    assert put_preference(client).status_code == 401  # no stamp, no grace
     assert client.get("/api/v1/me").status_code == 401
 
 
