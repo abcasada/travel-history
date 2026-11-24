@@ -182,6 +182,6 @@ test("map features: stops per tab, legs with both ends, flights as arcs", () => 
   expect(legs.features[0]?.geometry.coordinates).toHaveLength(2);
   expect(legs.features[1]?.geometry.coordinates.length).toBeGreaterThan(2);
   const box = sheetBounds([tab])?.flat() ?? [];
-  [-97.3, 26, -80, 38.2].forEach((value, i) => expect(box[i]).toBeCloseTo(value, 6));
+  for (const [i, value] of [-97.3, 26, -80, 38.2].entries()) expect(box[i]).toBeCloseTo(value, 6);
   expect(sheetBounds([makeTab({ stops: [], legs: [] })])).toBeNull();
 });
