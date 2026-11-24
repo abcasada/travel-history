@@ -79,6 +79,7 @@ All commands run in containers through `./dev` (see `./dev help`):
 - `./dev e2e [base-url]` — headless-Chrome smoke test of sign-in, honesty notice, map and both shells (dev stack; screenshots in `e2e/out/`)
 - After changing the API: `./dev manage export_openapi > frontend/src/api/openapi.json && ./dev npm run gen:api` (commit both generated files)
 - `./dev restore-test` — backup → restore into a scratch DB → verify
+- `./dev golive-smoke local [--keep] | local-check | local-down | https://<host>` — go-live smoke: local mode runs the production image with scope `all` on loopback against a throwaway DB (docs/go-live.md)
 - `./dev prod deploy|status|logs|manage|psql|smoke|…` — the separate production stack (`compose.prod.yaml`, files in `~/apps/travel-history-prod/`; deploys only from a clean, pushed main; docs/production.md)
 - Dev URLs (LAN/VPN only): app with hot reload `http://<lan-host>:5173/app/`, Django `:8780`, mock OIDC `:8781`, Mailpit `:8782`
 

@@ -344,7 +344,7 @@ P1. **[H] Parallel readiness (Adam, 2026-11-23; D-98).** Runs alone, in the main
      - Include a local mode that runs the production image with scope `all` on an unpublished port, so 41a can test the exact go-live configuration before the "go". It builds the image from the current checkout and uses a throwaway DB, never production's, so 40d and 41a need no main checkout.
    - **Docs:** update phases.md 8.6 and docs/tracking/exposure.md for the production stack. The rest of T38 stays in item 40.
    - Footprint: `scripts` (smoke scripts), `dev`, docs (go-live.md, tracking/exposure.md, production.md). Flags: none.
-   - Status: todo
+   - Status: done (2026-11-24)
 40e. **[H] Exposure, only after Adam's "go" and his tunnel change.**
    - Set production's scope to `all` (HSTS on) and redeploy.
    - Run the go-live smoke from outside the LAN.
@@ -581,3 +581,5 @@ Nature: mech = mechanical, mod = moderate, hard. Size is S/M/L/XL with approxima
 - 2026-11-24: item 14c-1 done and verified in lane 2, merged (rebased on main, `./dev test-quick` 2472 + 105 passed in the main checkout; images rebuilt for defusedxml; dev migrated to history 0014 / trips 0008; batch 33 intact). D-100–D-102. Lane 2 takes 14c-2 next.
 - 2026-11-24: item 40c-1 done and verified in lane 1, merged (rebased on main; its decisions renumbered D-100/D-101 → D-103/D-104 because 14c-1 took D-100–D-102; `./dev test-quick` 2580 + 105 passed in the main checkout). 40c-2 waits on Adam's Authentik values. Lane 1 takes 40d.
 - 2026-11-24: item 14c-2 done and verified in lane 2, merged (rebased cleanly; `./dev test-quick` 2580 + 133 passed in the main checkout; e2e green twice in the lane, not run in the main checkout because it writes to the real dev DB). Lane 2 takes 21a.
+- 2026-11-24: item 40d done and verified in lane 1, merged (`./dev test-quick` 2580 + 133 passed in the main checkout; local go-live smoke passed in the lane). D-105.
+- 2026-11-24: moved 41a ahead of 40c-2. Reason: Lane A waits on Adam's Authentik values, and the review is on the critical path; 40c-2/40c-3 add little code, so a short delta review of them (and 41a's handover checks) runs before 40e. Lane 1 takes 27 beside 21a; backend merges are frozen until 40e's smoke passes.
