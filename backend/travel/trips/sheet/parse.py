@@ -356,11 +356,13 @@ class TabParser:
                     visibility = choice(cell.value, VISIBILITIES, "visibility")
                 except CellProblem as problem:
                     self.trip_issue("visibility", problem)
-        notes = self.trip_text("notes") or None
+        cell = self.trip_value("notes")  # line breaks kept
+        notes = str(cell.value).strip() if cell is not None and not is_blank(cell.value) else None
         if notes and len(notes) > MAX_NOTES:
             self.trip_issue(
                 "notes", CellProblem("bad_value", "Notes are longer than 20,000 characters")
             )
+            notes = notes[:MAX_NOTES]
         return {
             "title": title or None,
             "default_title": self.raw.name[:MAX_TITLE],
@@ -457,17 +459,17 @@ class TabParser:
                 stop.tz_given = zone_name(get("tz"))
             except CellProblem as problem:
                 self.cell_issue(block, row, "tz", problem)
-            notes = text(cells["notes"].value) if "notes" in cells else ""
-            if len(notes) > MAX_NOTES:
+            # Notes keep their line breaks (text() would collapse them).
+            raw_notes = get("notes")
+            stop.notes = str(raw_notes).strip() if not is_blank(raw_notes) else None
+            if stop.notes and len(stop.notes) > MAX_NOTES:
                 self.cell_issue(
                     block,
                     row,
                     "notes",
                     CellProblem("bad_value", "Notes are longer than 20,000 characters"),
                 )
-            # Notes keep their line breaks: n.text would collapse them.
-            raw_notes = cells["notes"].value if "notes" in cells else None
-            stop.notes = str(raw_notes).strip()[:MAX_NOTES] if not is_blank(raw_notes) else None
+                stop.notes = stop.notes[:MAX_NOTES]
             if "place" not in block.columns or is_blank(get("place")):
                 self.cell_issue(
                     block, row, "place", CellProblem("missing_field", "a stop needs a Place")
@@ -477,8 +479,9 @@ class TabParser:
 
     def resolve_stops(self, stops: list[_Stop], start: dt.date | None) -> None:
         block = self.layout.stops
+        rows = dict(block.rows) if block else {}
         for stop in stops:
-            cells = dict(block.rows)[stop.row]
+            cells = rows[stop.row]
             place_cell = cells.get("place")
             if place_cell is None or is_blank(place_cell.value):
                 continue

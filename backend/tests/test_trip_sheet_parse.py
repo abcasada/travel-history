@@ -391,3 +391,11 @@ def test_formula_references(alice):
     assert tab.content["legs"][0]["origin_key"] == "label:home"
     assert tab.content["legs"][0]["destination_row"] == 8
     assert len(STOPS) == 4 and len(LEGS) == 3
+
+
+def test_notes_keep_line_breaks(alice):
+    fields = {"Title": "x", "Notes": "SYNTHETIC line 1\nline 2", "People": "me", "Tags": ""}
+    stops = [[*STOPS[0][:7], "first\nsecond"], *STOPS[1:]]
+    tab = one(alice, example(fields=fields, stops=stops))
+    assert tab.content["trip"]["notes"] == "SYNTHETIC line 1\nline 2"
+    assert tab.content["stops"][0]["notes"] == "first\nsecond"
