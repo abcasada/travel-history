@@ -253,7 +253,9 @@ check_landing() {
     expect "  the shell has no inline scripts" 0 "$inline"
   fi
   if [ "$mode" = local ]; then
-    expect "unknown Host refused" 400 "$(request GET evil.example /)"
+    # Through the tunnel (CF-Connecting-IP) an unknown Host meets the F-8 rule first: the bare
+    # 404 (without the tunnel's header Django refuses it with 400; ./dev prod smoke checks that).
+    expect "unknown Host through the tunnel refused" 404 "$(request GET evil.example /)"
     no_debug_page "  unknown Host"
     proto=http
     expect "loopback Host through the tunnel still redirected" 301 "$(request GET localhost /)"
