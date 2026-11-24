@@ -11,6 +11,13 @@ like "PLAN.md §N" still resolve; the section map in PLAN.md says which file hol
   against the provider's JWKS) with ~50 lines of our own login/callback/logout/re-auth views.
   Users are matched on `(issuer, sub)`, never on email alone. See D-07 for why not
   mozilla-django-oidc or django-allauth.
+- **Before any account is found or created** (D-100, `travel/accounts/provisioning.py`): the ID
+  token must come from `OIDC_ISSUER` (compared without the trailing slash Authentik's issuers
+  carry), list the `travel-users` group in its `groups` array, and, when it carries `amr`, show a
+  second factor (G-5: `mfa`, or `user` for a passkey; `["pwd"]` alone is refused; no `amr` at
+  all passes). A token Authlib refuses (signature, issuer, audience, expiry, nonce, `at_hash`)
+  answers 400 and creates nothing. Tested against a synthetic Authentik in
+  `tests/test_authentik.py`.
 - **Sessions:** Django sessions (cookie `Secure` in production, `HttpOnly`, `SameSite=Lax`,
   rotated at login), CSRF on every unsafe method. The SPA is served from the same origin.
 - **Re-authentication** for approvals and destructive admin actions: redirect to the provider
@@ -34,7 +41,17 @@ budget ~2–2.5 GB RAM (§21, §26).
    - OAuth2/OpenID provider, client type **confidential**, signing key RSA (RS256),
      `sub_mode` = `hashed_user_id` (default; stable), issuer mode `per_provider`.
    - Redirect URIs (strict): `https://travel.adamcasada.com/auth/callback`; logout redirect
-     `https://travel.adamcasada.com/`.
+     `https://travel.adamcasada.com/` (Authentik: *Post-logout redirect URIs*, strict; the app
+     sends `id_token_hint`, without which Authentik ignores the redirect).
+   - **Until go-live only (G-4):** also the redirect URI `http://localhost:8784/auth/callback`
+     and the post-logout URI `http://localhost:8784/`, for signing in over an SSH port-forward
+     ([production guide](../production.md#signing-in-before-go-live-g-4)). Remove both at go-live.
+   - Keep *Include claims in id_token* on (the default): the app reads `groups`, `email` and
+     `name` from the ID token, not from the userinfo endpoint, so without it every sign-in is
+     refused as "not in the group".
+   - The client ID and secret go into `.env.prod` as `OIDC_CLIENT_ID` and `OIDC_CLIENT_SECRET`,
+     the provider's issuer (`https://<authentik host>/application/o/<app slug>/`) as
+     `OIDC_ISSUER`; production refuses to start with an issuer but no secret.
    - Scopes: `openid`, `email`, `profile` (claims used: `sub`, `email`, `name`,
      `preferred_username`, `groups`). Authentik reports `email_verified = false` by default, so the
      app trusts the email only because Authentik itself verified it at enrollment (the app never
@@ -51,7 +68,10 @@ budget ~2–2.5 GB RAM (§21, §26).
 5. **Second factor required:** in the authentication flow, an Authenticator Validation stage with
    device classes WebAuthn (passkeys) and TOTP, `not_configured_action = configure` (forces
    enrollment of a second factor at first login), WebAuthn user verification `preferred`.
-   Optionally passkey autofill on the Identification stage.
+   Optionally passkey autofill on the Identification stage. The app checks the result too
+   (G-5, D-100): Authentik's ID token reports `amr: ["pwd", "mfa"]` after a password and an
+   authenticator and `["user"]` after a passkey, both accepted; a password alone (`["pwd"]`)
+   is refused.
 6. **API token** for this app (user `travel-provisioner`, intent `api`) with permission to
    create users and invitations and add users to `travel-users`, used by the approval flow:
    `POST /api/v3/stages/invitation/invitations/` (+ `.../send_email/`) or
@@ -142,6 +162,34 @@ same-origin` · `ALLOWED_HOSTS` explicit · `DEBUG` off by default · secrets on
 Enforced since item 40a (D-96, [production guide](../production.md)): every production process
 sets `TRAVEL_PRODUCTION`, and `settings.py` refuses to start unless the settings above hold
 (`production_problems` in `travel/core/exposure.py`; HSTS required once `TRAVEL_PUBLIC_SCOPE=all`,
-and `RATELIMIT_CLIENT_IP_HEADER=CF-Connecting-IP`). `/`, `/auth/login` and `/auth/callback` are
-limited per address (60 a minute; 30 per 10 minutes each). `./dev prod smoke` checks the rest
-(ports, networks, non-root, `.env.prod` mode, headers, anonymous refusals).
+and `RATELIMIT_CLIENT_IP_HEADER=CF-Connecting-IP`; since item 40c-1 also a confidential client,
+the group and the second-factor rule, D-100). The redirect to HTTPS is
+`HttpsRedirectMiddleware`'s: it serves plain HTTP only to `/healthz` and to the server's own
+loopback names without the tunnel's headers (the SSH port-forward, G-4). `/`, `/auth/login`
+and `/auth/callback` are limited per address (60 a minute; 30 per 10 minutes each).
+`./dev prod smoke` checks the rest (ports, networks, non-root, `.env.prod` mode, headers,
+anonymous refusals).
+
+### 7.8 Account handover and linking (server commands)
+
+Two owner-role commands (D-101, `travel/accounts/handover.py`), run with `./dev prod manage`
+and never reachable from the app. Both take ids only (without arguments they list what to
+choose from), change nothing without `--execute`, run in one transaction, and write an
+`accounts_auditlog` row and a log line.
+
+- **`rebind_identity NEW OLD` (G-3, item 40c-3):** Adam's first Authentik sign-in creates an empty
+  account NEW, because accounts are never matched by email. The command moves NEW's identity
+  (issuer, subject, email, name) onto OLD, the account copied from dev that holds his data, so
+  every row stays put, then deletes NEW (its default purposes and UI preferences go with it)
+  and both accounts' sessions. It refuses unless NEW is a brand-new active Member with an
+  identity from `OIDC_ISSUER`, no person and no other rows (checked over every foreign key to
+  `accounts_user`), newer than OLD, and OLD is active without a real identity yet.
+- **`link_person ACCOUNT PERSON`:** links a family member's account to the person Adam already
+  put on trips (the linking step of the onboarding in §7.3, pulled forward from T33). Trips
+  default to `participants` visibility (permissions.md §6.2), so until then the account can't
+  see the trips its person is on. It refuses a person another account has and an account that
+  already has a person.
+
+Tests: `tests/permissions/test_account_commands.py` (as `travel_app`: the commands and their
+statements are refused; after them, row-level security shows the kept rows, the moved identity
+and the linked person's trips; every refusal leaves the database unchanged).

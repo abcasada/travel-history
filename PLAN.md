@@ -14,7 +14,8 @@ orchestrated work order in [docs/ROADMAP.md](docs/ROADMAP.md) (process:
 [docs/ORCHESTRATION.md](docs/ORCHESTRATION.md)). Family go-live slice: the production stack
 runs separately from dev (item 40a, 2026-11-19: `./dev prod …`, web on `127.0.0.1:8784`, not
 exposed; [docs/production.md](docs/production.md), D-96); the copy of the real data from dev
-into production is built and rehearsed (item 40b, `./dev prod import-from-dev`, D-97).
+into production is built and rehearsed (item 40b, `./dev prod import-from-dev`, D-97); the
+Authentik sign-in and the handover commands are built (item 40c-1, D-100, D-101; deployed in 40c-2).
 
 | Phase | Status | Detail |
 |---|---|---|
@@ -169,6 +170,8 @@ Frontend conventions: [docs/design/frontend-patterns.md](docs/design/frontend-pa
 - D-100 Identical trip-sheet bytes: shown again only while their preview is open, else parsed again
 - D-101 Trip-sheet commit: `seen` (trip_updated_at from the preview, 409 if stale) and per-tab record-id lists create_people / recreate / remove_missing
 - D-102 Trip-sheet writes: services with `in_app=False` (no edited_in_app_at), places reused by id/coords + name, blank dates only widen, people/tags only added, hash without row numbers
+- D-103 Authentik sign-in: issuer, `travel-users` list and `amr` second factor (G-5; `mfa` or passkey) checked before any account; confidential client required; HTTPS redirect in own middleware so plain HTTP on localhost (G-4's SSH port-forward) is served
+- D-104 Go-live commands `rebind_identity` (G-3) and `link_person`: owner role, ids only (never email), dry run unless `--execute`, one transaction, audit log; refuse every other case
 
 ## 25. Open questions (for Adam, answer whenever — nothing is blocked on these)
 

@@ -97,15 +97,20 @@ auth.md §7.7 holds:
 
 - `DEBUG` off; a generated secret key of 40+ characters (no placeholders);
 - explicit `ALLOWED_HOSTS` (no `*`, no `.domain` wildcards) and at least one public host name;
-- behind the TLS proxy (`X-Forwarded-Proto` from cloudflared), HTTPS redirect, secure session
-  and CSRF cookies; HSTS (1 year, subdomains) required once `TRAVEL_PUBLIC_SCOPE=all` and on
-  the ingest-only service;
+- behind the TLS proxy (`X-Forwarded-Proto` from cloudflared), HTTPS redirect (by
+  `HttpsRedirectMiddleware`, which serves plain HTTP only to `/healthz` and to the SSH
+  port-forward on localhost, [below](#signing-in-before-go-live-g-4)), secure session and CSRF
+  cookies; HSTS (1 year, subdomains) required once `TRAVEL_PUBLIC_SCOPE=all` and on the
+  ingest-only service;
 - `RATELIMIT_CLIENT_IP_HEADER=CF-Connecting-IP` (per-address limits use the visitor's address,
   not the tunnel's);
 - CSP with `default-src` and `frame-ancestors 'none'`, nosniff, `Referrer-Policy: same-origin`,
   `X-Frame-Options: DENY`, and the middleware that sends them;
 - upload size limits set;
-- no OIDC back channel (D-57 is development only) and an `https://` issuer (no mock provider).
+- no OIDC back channel (D-57 is development only) and an `https://` issuer (no mock provider);
+- a confidential client: `OIDC_CLIENT_ID` and `OIDC_CLIENT_SECRET` once `OIDC_ISSUER` is set
+  (not on `ingest`, which signs nobody in), the `travel-users` group check and the second-factor
+  rule (G-5) switched on, and no loopback name among the public host names (D-100).
 
 Per-address rate limits cover `/` (60 a minute), `/auth/login` and `/auth/callback` (30 each per
 10 minutes), alongside the tracker endpoints' own limits. Containers run as the host user (the
@@ -113,9 +118,11 @@ database as uid 999), with all capabilities dropped, `no-new-privileges`, memory
 rotation; `web` and `ingest` have read-only root filesystems. The database publishes no port.
 
 `.env.prod` holds the secrets and must stay mode 0600; every `./dev prod` command checks that.
-Adam adds `OIDC_ISSUER`, `OIDC_CLIENT_ID` and `OIDC_CLIENT_SECRET` (item 40c) and
-`AGE_RECIPIENT` himself, then runs `./dev prod up` to apply them (it recreates only the
-containers whose settings changed, with the deployed image).
+Adam adds `OIDC_ISSUER` (the Authentik provider's issuer,
+`https://<authentik host>/application/o/<app slug>/`, with or without the final slash),
+`OIDC_CLIENT_ID` and `OIDC_CLIENT_SECRET` (item 40c; auth.md §7.2) and `AGE_RECIPIENT` himself,
+then runs `./dev prod up` to apply them (it recreates only the containers whose settings
+changed, with the deployed image).
 Until `AGE_RECIPIENT` is set, the nightly backup only logs a warning and `backup-now` refuses.
 
 ## Public names
@@ -135,7 +142,33 @@ Until `AGE_RECIPIENT` is set, the nightly backup only logs a warning and `backup
   at port 8780 by mistake, it would show nothing.
 
 Until go-live, the web service is reached only over an SSH port-forward to
-`localhost:8784` (G-4, item 40c).
+`localhost:8784` ([next section](#signing-in-before-go-live-g-4)).
+
+## Signing in before go-live (G-4)
+
+Item 40c-1, D-100. Before the tunnel route exists, Adam signs in to production through an SSH
+port-forward from his own computer:
+
+```
+ssh -N -L 8784:127.0.0.1:8784 <user>@<server>
+```
+
+then opens `http://localhost:8784/` in Chrome or Firefox. The local port must be 8784, because
+the Authentik provider lists the temporary redirect URI `http://localhost:8784/auth/callback`
+(and the post-logout URI `http://localhost:8784/`) until go-live, when both are removed.
+
+- The browser speaks plain HTTP to the forward, so `HttpsRedirectMiddleware` serves requests
+  whose Host is `localhost`, `127.0.0.1` or `[::1]` and that carry neither `X-Forwarded-Proto`
+  nor `CF-Connecting-IP` without redirecting them to HTTPS. Every request through the tunnel
+  carries the public host name and both headers, so the public names keep the HTTPS redirect,
+  HSTS and everything else; the port is published on 127.0.0.1 only.
+- Nothing else is relaxed: the session and CSRF cookies stay `Secure` (Chrome and Firefox accept
+  Secure cookies from `http://localhost`; Safari drops them, so sign-in loops there), CSRF checks
+  the forward's own origin, and the public names still answer only the tracker paths until
+  `TRAVEL_PUBLIC_SCOPE=all`.
+- After go-live the exemption stays, but signing in over the forward stops working once the
+  temporary URIs are gone from Authentik. Only someone with a shell on the server can reach
+  127.0.0.1:8784 at all.
 
 ## The smoke test
 
@@ -147,8 +180,9 @@ Until go-live, the web service is reached only over an SSH port-forward to
   `127.0.0.1:8784` only; `.env.prod` 0600; bulk storage outside any git working tree.
 - **Health and the landing page:** `/healthz`, and `/` over HTTPS with HSTS, nosniff,
   X-Frame-Options, Referrer-Policy, COOP and CSP, no cookies, noindex, and only a "Sign in"
-  link; plain HTTP redirected; an unknown host refused without DEBUG's page; the SPA build
-  present.
+  link; plain HTTP through the tunnel redirected (also with a loopback Host header), plain
+  HTTP on localhost served without HSTS (G-4); an unknown host refused without DEBUG's page;
+  the SPA build present.
 - **Private paths:** every API operation in the release's OpenAPI schema answers 401
   anonymously, and the SPA and re-auth pages send you to sign in.
 - **Public names:** before go-live, 404 on the canonical name except the tracker endpoints;
@@ -215,7 +249,8 @@ only the migration list and the verification counts) are removed on exit, whatev
 
 The final copy runs in item 40c, right before Adam's first sign-in, so whatever he enters in dev
 until then carries over. After that sign-in, item 40c moves his Authentik identity onto the copied
-account, and production refuses `import-from-dev` from then on.
+account ([below](#handing-the-copied-account-to-adams-authentik-sign-in-g-3)), and production
+refuses `import-from-dev` from then on.
 
 **Rehearsal, 2026-11-19 (item 40b):** the copy passed: the dry-run inventory showed `dev-admin`
 (925,326 rows, including batch 33's 193,009 points, 53,438 segments and 678,836 roll-ups) and
@@ -225,6 +260,31 @@ HDD); after pruning, one account, 45 identical checks, 1 raw file verified, and
 moved into `scripts/import-from-dev.sh`, passed the same way (the raw file already in place was
 compared, not copied again); dev still had its 2 accounts and 193,033 points. The backup gate (an encrypted
 backup with the real key) stays open until `AGE_RECIPIENT` is set.
+
+## Handing the copied account to Adam's Authentik sign-in (G-3)
+
+Item 40c-3, with the commands built in 40c-1 (D-101, auth.md §7.8). Adam's first Authentik sign-in
+creates a new, empty Member account, because accounts are matched by issuer and subject and never
+by email. The copied account (`dev-admin`, Admin, all the data) still carries the dev mock's
+identity, which production can't sign in with. Then:
+
+1. `./dev prod manage rebind_identity` lists the accounts: the new one (Member, Authentik's
+   issuer, only its default purposes) and the copied one (Admin, the mock's `http://` issuer,
+   all the rows).
+2. `./dev prod manage rebind_identity NEW OLD` is the dry run: it prints the identity that moves,
+   the rows the copied account keeps, what is deleted with the empty account and how many
+   sessions end.
+3. The same with `--execute` does it in one transaction and writes an audit log row. Adam signs
+   in again (his session ended) and lands on the copied account, still Admin.
+
+It refuses anything else: the wrong way round, an account that owns data, an identity from
+another provider, a target that already has a real identity. Afterwards `import-from-dev` is
+refused for good (production has a real identity).
+
+Family members (after go-live, 40d's runbook): once a member has signed in once,
+`./dev prod manage link_person` lists accounts and the persons without one, and
+`link_person ACCOUNT PERSON --execute` links the account to the person already on their trips,
+so the trips shared with `participants` visibility appear.
 
 ## Memory
 
