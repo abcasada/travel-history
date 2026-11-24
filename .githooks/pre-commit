@@ -14,6 +14,25 @@ if ! command -v docker >/dev/null 2>&1; then
   echo "pre-commit: docker not found; cannot run gitleaks. Refusing to commit." >&2
   exit 1
 fi
-docker run --rm -v "$repo_root:/repo" -w /repo --user "$(id -u):$(id -g)" \
-  "$GITLEAKS_IMAGE" git --pre-commit --staged --redact --no-banner \
-  --config /repo/.gitleaks.toml /repo
+# In a git worktree (parallel lanes, D-98) `.git` is a file pointing into the main checkout's
+# git dir, so mount the common git dir too, both at their host paths: otherwise git inside the
+# container finds no repository and gitleaks scans 0 bytes and passes.
+git_common="$(git rev-parse --path-format=absolute --git-common-dir)"
+mounts=(-v "$repo_root:$repo_root")
+case "$git_common/" in
+  "$repo_root"/*) ;;
+  *) mounts+=(-v "$git_common:$git_common") ;;
+esac
+out="$(mktemp)"
+trap 'rm -f "$out"' EXIT
+status=0
+docker run --rm "${mounts[@]}" -w "$repo_root" --user "$(id -u):$(id -g)" \
+  "$GITLEAKS_IMAGE" git --pre-commit --staged --redact --no-banner --no-color \
+  --config "$repo_root/.gitleaks.toml" "$repo_root" >"$out" 2>&1 || status=$?
+cat "$out" >&2
+[ "$status" -eq 0 ] || exit "$status"
+# gitleaks logs git errors but still exits 0 having scanned nothing; treat that as a failure.
+if grep -q '\bERR\b' "$out"; then
+  echo "pre-commit: gitleaks reported an error (see above). Refusing to commit." >&2
+  exit 1
+fi
