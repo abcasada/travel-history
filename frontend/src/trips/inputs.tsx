@@ -2,8 +2,10 @@
  * airport and city searches, and a local date-time in an IANA zone. */
 import { useId, useState } from "react";
 import {
+  type AirlineOut,
   type AirportOut,
   type GazetteerPlaceOut,
+  useSearchAirlines,
   useSearchAirports,
   useSearchPlaces,
 } from "../api/generated";
@@ -58,6 +60,61 @@ export function AirportSearch({
                 }}
               >
                 {airportLabel(a)}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+export function airlineLabel(a: { name: string; iata?: string; icao?: string; code?: string }) {
+  const code = a.code ?? (a.iata || a.icao || "");
+  return code ? `${code} ${a.name}` : a.name;
+}
+
+/** Type an airline's code or name; pick one (defunct airlines too, for old flights). */
+export function AirlineSearch({
+  label,
+  onSelect,
+}: {
+  label: string;
+  onSelect: (airline: AirlineOut) => void;
+}) {
+  const [q, setQ] = useState("");
+  const term = q.trim();
+  const results = useSearchAirlines(
+    { q: term, limit: 8 },
+    { query: { enabled: term.length >= 2, staleTime: 5 * 60_000 } },
+  );
+  return (
+    <div className="relative">
+      <input
+        type="search"
+        aria-label={label}
+        placeholder="Airline code or name"
+        className={inputClass}
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+      />
+      {term.length >= 2 && results.data && (
+        <ul className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded border bg-white shadow">
+          {results.data.length === 0 && (
+            <li className="px-2 py-1 text-sm text-slate-500">No airlines match.</li>
+          )}
+          {results.data.map((a) => (
+            <li key={a.id}>
+              <button
+                type="button"
+                className="block w-full px-2 py-1 text-left text-sm hover:bg-slate-100"
+                onClick={() => {
+                  onSelect(a);
+                  setQ("");
+                }}
+              >
+                {airlineLabel(a)}
+                {!a.active && <span className="text-slate-500"> (defunct)</span>}
               </button>
             </li>
           ))}

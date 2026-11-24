@@ -3,7 +3,13 @@
  * the list pane that edits it and the map that draws the same trips share one source of truth,
  * and a filtered view can be bookmarked. Repeated parameters mean any-of (the API's rule).
  */
-import type { GetTripMapParams, ListTripsParams, TravelMode, Visibility } from "../api/generated";
+import type {
+  GetTripMapParams,
+  ListTripsParams,
+  TravelMode,
+  TripStatus,
+  Visibility,
+} from "../api/generated";
 
 export type TripFilter = {
   q: string;
@@ -15,6 +21,8 @@ export type TripFilter = {
   /** Trips this person is on (the API takes one). */
   person: number | null;
   visibility: Visibility | null;
+  /** Confirmed trips or detection candidates (item 19); null = both. */
+  status: TripStatus | null;
   /** Only trips with something inside the current map view (`bbox` from the map store). */
   inView: boolean;
 };
@@ -28,12 +36,14 @@ export const EMPTY_FILTER: TripFilter = {
   mode: [],
   person: null,
   visibility: null,
+  status: null,
   inView: false,
 };
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const MODES = new Set(["drive", "flight", "train", "bus", "boat", "walk", "other"]);
 const VISIBILITIES = new Set(["private", "participants", "family", "public"]);
+const STATUSES = new Set(["candidate", "confirmed"]);
 
 function ids(params: URLSearchParams, key: string): number[] {
   return params
@@ -58,6 +68,7 @@ export function readTripFilter(params: URLSearchParams): TripFilter {
     visibility: VISIBILITIES.has(params.get("visibility") ?? "")
       ? (params.get("visibility") as Visibility)
       : null,
+    status: STATUSES.has(params.get("status") ?? "") ? (params.get("status") as TripStatus) : null,
     inView: params.get("in_view") === "1",
   };
 }
@@ -71,6 +82,7 @@ const FILTER_KEYS = [
   "mode",
   "person",
   "visibility",
+  "status",
   "in_view",
 ];
 
@@ -86,6 +98,7 @@ export function writeTripFilter(params: URLSearchParams, filter: TripFilter): UR
   for (const mode of filter.mode) next.append("mode", mode);
   if (filter.person !== null) next.set("person", String(filter.person));
   if (filter.visibility) next.set("visibility", filter.visibility);
+  if (filter.status) next.set("status", filter.status);
   if (filter.inView) next.set("in_view", "1");
   return next;
 }
@@ -105,6 +118,7 @@ export function apiParams(filter: TripFilter, bbox?: string | null): GetTripMapP
   if (filter.mode.length) params.mode = filter.mode;
   if (filter.person !== null) params.person = filter.person;
   if (filter.visibility) params.visibility = filter.visibility;
+  if (filter.status) params.status = filter.status;
   if (filter.inView && bbox) params.bbox = bbox;
   return params;
 }

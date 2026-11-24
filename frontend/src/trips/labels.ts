@@ -1,5 +1,5 @@
 /** Display labels for the API's enum values (one place, so every page says the same). */
-import type { StopKind, TravelMode, Visibility } from "../api/generated";
+import type { CabinClass, StopKind, TravelMode, TripStatus, Visibility } from "../api/generated";
 
 export const MODE_LABELS: Record<TravelMode, string> = {
   drive: "Drive",
@@ -34,6 +34,19 @@ export const VISIBILITY_LABELS: Record<Visibility, string> = {
   participants: "Participants",
   family: "Family",
   public: "Public",
+};
+
+export const STATUS_LABELS: Record<TripStatus, string> = {
+  confirmed: "Confirmed",
+  candidate: "Candidate (detected)",
+};
+
+export const CABIN_LABELS: Record<CabinClass, string> = {
+  economy: "Economy",
+  premium_economy: "Premium economy",
+  business: "Business",
+  first: "First",
+  other: "Other",
 };
 
 export const MODES = Object.keys(MODE_LABELS) as TravelMode[];

@@ -1,6 +1,7 @@
 import { useSearchParams } from "react-router";
 import {
   type TravelMode,
+  type TripStatus,
   useListPersons,
   useListPurposes,
   useListTags,
@@ -15,7 +16,7 @@ import {
   type TripFilter,
   writeTripFilter,
 } from "./filter";
-import { MODE_LABELS, MODES, VISIBILITY_LABELS } from "./labels";
+import { MODE_LABELS, MODES, STATUS_LABELS, VISIBILITY_LABELS } from "./labels";
 import { useFollowedText } from "./useFollowedText";
 
 function toggle<T>(values: T[], value: T): T[] {
@@ -106,6 +107,21 @@ export function TripFilters() {
             {(Object.keys(VISIBILITY_LABELS) as Visibility[]).map((v) => (
               <option key={v} value={v}>
                 {VISIBILITY_LABELS[v]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col text-xs">
+          Status
+          <select
+            className="rounded border px-1 py-0.5 text-sm"
+            value={filter.status ?? ""}
+            onChange={(e) => update({ status: (e.target.value || null) as TripStatus | null })}
+          >
+            <option value="">Any</option>
+            {(Object.keys(STATUS_LABELS) as TripStatus[]).map((v) => (
+              <option key={v} value={v}>
+                {STATUS_LABELS[v]}
               </option>
             ))}
           </select>

@@ -5,11 +5,31 @@
  */
 import { type QueryClient, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
-import { getGetTripMapQueryKey, getGetTripQueryKey, getListTripsQueryKey } from "../api/generated";
+import {
+  getGetTripMapQueryKey,
+  getGetTripQueryKey,
+  getListNotesQueryKey,
+  getListTagsQueryKey,
+  getListTripsQueryKey,
+  getListTripTagsQueryKey,
+} from "../api/generated";
 
 export function invalidateTrip(client: QueryClient, tripId?: number) {
-  const keys: readonly unknown[][] = [[...getListTripsQueryKey()], [...getGetTripMapQueryKey()]];
-  const all = tripId === undefined ? keys : [...keys, [...getGetTripQueryKey(tripId)]];
+  // Own tags' trip counts change with tagging, so the tag list is refreshed too.
+  const keys: readonly unknown[][] = [
+    [...getListTripsQueryKey()],
+    [...getGetTripMapQueryKey()],
+    [...getListTagsQueryKey()],
+  ];
+  const all =
+    tripId === undefined
+      ? keys
+      : [
+          ...keys,
+          [...getGetTripQueryKey(tripId)],
+          [...getListTripTagsQueryKey(tripId)],
+          [...getListNotesQueryKey(tripId)],
+        ];
   return Promise.all(all.map((queryKey) => client.invalidateQueries({ queryKey })));
 }
 

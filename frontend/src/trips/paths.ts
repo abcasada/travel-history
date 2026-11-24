@@ -9,6 +9,9 @@ export const paths = {
   edit: (tripId: number) => `/trips/${tripId}/edit`,
   /** The leg's route view; the routing editor (items 25-26) mounts here. */
   legRoute: (tripId: number, legId: number) => `/trips/${tripId}/legs/${legId}/route`,
+  tags: "/tags",
+  purposes: "/purposes",
+  people: "/people",
 };
 
 /** The trip a URL is about (`/trips/12`, `/trips/12/edit`, …), else null. */

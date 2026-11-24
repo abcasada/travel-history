@@ -2,6 +2,9 @@ import { type FormEvent, useState } from "react";
 import { Link } from "react-router";
 import { fieldErrors } from "../api/errors";
 import {
+  type AirlineRef,
+  type AirportRef,
+  type CabinClass,
   type LegIn,
   type LegOut,
   type TravelMode,
@@ -15,12 +18,13 @@ import { browserZone, isValidZone, utcToZoned, zonedToUtc } from "../lib/time";
 import { Button, Field, inputClass, Section } from "../ui/form";
 import { MutationError } from "../ui/QueryState";
 import { useInvalidateTrip } from "./cache";
-import { AirportSearch, airportLabel, ZonedTimeInput } from "./inputs";
-import { MODE_LABELS, MODES } from "./labels";
+import { AirlineSearch, AirportSearch, airlineLabel, airportLabel, ZonedTimeInput } from "./inputs";
+import { LegPeople } from "./LegPeople";
+import { CABIN_LABELS, MODE_LABELS, MODES } from "./labels";
 import { paths } from "./paths";
 import { legEnds, stopName } from "./TripDetailPage";
 
-type LegValues = {
+export type LegValues = {
   mode: TravelMode;
   origin_stop_id: string;
   destination_stop_id: string;
@@ -31,12 +35,15 @@ type LegValues = {
   end: string;
   end_tz: string;
   flight_number: string;
-  origin_airport_id: number | null;
-  destination_airport_id: number | null;
+  origin_airport: AirportRef | null;
+  destination_airport: AirportRef | null;
+  airline: AirlineRef | null;
+  seat: string;
+  cabin_class: CabinClass | "";
   notes: string;
 };
 
-function initial(trip: TripDetailOut, leg?: LegOut): LegValues {
+export function initialLeg(trip: TripDetailOut, leg?: LegOut): LegValues {
   const previous = trip.legs[trip.legs.length - 1];
   const zone = browserZone();
   return {
@@ -53,8 +60,11 @@ function initial(trip: TripDetailOut, leg?: LegOut): LegValues {
     end: leg?.end_utc ? utcToZoned(leg.end_utc, leg.end_tz || zone) : "",
     end_tz: leg?.end_tz || previous?.end_tz || zone,
     flight_number: leg?.flight_number ?? "",
-    origin_airport_id: leg?.origin_airport_id ?? null,
-    destination_airport_id: leg?.destination_airport_id ?? null,
+    origin_airport: leg?.origin_airport ?? null,
+    destination_airport: leg?.destination_airport ?? null,
+    airline: leg?.airline ?? null,
+    seat: leg?.seat ?? "",
+    cabin_class: (leg?.cabin_class as CabinClass | "" | undefined) ?? "",
     notes: leg?.notes ?? "",
   };
 }
@@ -70,7 +80,7 @@ export function validateLeg(v: LegValues): Record<string, string> {
   return errors;
 }
 
-function toPayload(v: LegValues): LegIn {
+export function toLegPayload(v: LegValues): LegIn {
   const flight = v.mode === "flight";
   return {
     mode: v.mode,
@@ -83,8 +93,12 @@ function toPayload(v: LegValues): LegIn {
     end_utc: v.end ? zonedToUtc(v.end, v.end_tz) : null,
     end_tz: v.end ? v.end_tz : "",
     flight_number: flight ? v.flight_number.trim() : "",
-    origin_airport_id: flight ? v.origin_airport_id : null,
-    destination_airport_id: flight ? v.destination_airport_id : null,
+    origin_airport_id: flight ? (v.origin_airport?.id ?? null) : null,
+    destination_airport_id: flight ? (v.destination_airport?.id ?? null) : null,
+    airline_id: flight ? (v.airline?.id ?? null) : null,
+    seat: flight ? v.seat.trim() : "",
+    cabin_class: flight && v.cabin_class ? v.cabin_class : null,
+    // TODO(item 23, T21): a vehicle picker once `GET /vehicles` exists (vehicle_id).
     notes: v.notes,
   };
 }
@@ -93,6 +107,7 @@ function toPayload(v: LegValues): LegIn {
  * and each leg's route view (the routing editor's slot, items 25-26). Core editors only. */
 export function LegsEditor({ trip }: { trip: TripDetailOut }) {
   const [editing, setEditing] = useState<number | "new" | null>(null);
+  const [people, setPeople] = useState<number | null>(null);
   const invalidate = useInvalidateTrip();
   const remove = useDeleteLeg();
   const reorder = useReorderLegs();
@@ -141,6 +156,7 @@ export function LegsEditor({ trip }: { trip: TripDetailOut }) {
                     {leg.notes}
                   </span>
                 )}
+                {people === leg.id && <LegPeople trip={trip} leg={leg} />}
               </span>
               {editing === null && (
                 <span className="flex shrink-0 items-center gap-2">
@@ -166,6 +182,13 @@ export function LegsEditor({ trip }: { trip: TripDetailOut }) {
                   >
                     Route
                   </Link>
+                  <Button
+                    variant="link"
+                    aria-label={`People on ${name}`}
+                    onClick={() => setPeople(people === leg.id ? null : leg.id)}
+                  >
+                    People
+                  </Button>
                   {leg.can_edit && (
                     <Button variant="link" onClick={() => setEditing(leg.id)}>
                       Edit
@@ -199,8 +222,18 @@ export function LegsEditor({ trip }: { trip: TripDetailOut }) {
   );
 }
 
-function LegForm({ trip, leg, onDone }: { trip: TripDetailOut; leg?: LegOut; onDone: () => void }) {
-  const [values, setValues] = useState(() => initial(trip, leg));
+/** Add or edit one leg. Core editors use it on the edit page; participants who may contribute
+ * use it on the trip page for their own legs (the API makes those `participant_scope: author`). */
+export function LegForm({
+  trip,
+  leg,
+  onDone,
+}: {
+  trip: TripDetailOut;
+  leg?: LegOut;
+  onDone: () => void;
+}) {
+  const [values, setValues] = useState(() => initialLeg(trip, leg));
   const [shown, setShown] = useState<Record<string, string>>({});
   const invalidate = useInvalidateTrip();
   const create = useCreateLeg();
@@ -220,8 +253,8 @@ function LegForm({ trip, leg, onDone }: { trip: TripDetailOut; leg?: LegOut; onD
         onDone();
       },
     };
-    if (leg) update.mutate({ legId: leg.id, data: toPayload(values) }, done);
-    else create.mutate({ tripId: trip.id, data: toPayload(values) }, done);
+    if (leg) update.mutate({ legId: leg.id, data: toLegPayload(values) }, done);
+    else create.mutate({ tripId: trip.id, data: toLegPayload(values) }, done);
   };
 
   const stopSelect = (key: "origin_stop_id" | "destination_stop_id", text: string) => (
@@ -273,7 +306,24 @@ function LegForm({ trip, leg, onDone }: { trip: TripDetailOut; leg?: LegOut; onD
             <span className="mb-0.5 block text-sm font-medium text-slate-700">From airport</span>
             <AirportSearch
               label="From airport"
-              onSelect={(a) => set({ origin_airport_id: a.id, origin_label: airportLabel(a) })}
+              onSelect={(a) =>
+                set({
+                  origin_airport: {
+                    id: a.id,
+                    name: a.name,
+                    code: a.iata_code || a.icao_code || a.ident,
+                  },
+                  origin_label: airportLabel(a),
+                })
+              }
+            />
+            <Chosen
+              text={
+                values.origin_airport &&
+                `${values.origin_airport.code} ${values.origin_airport.name}`
+              }
+              what="origin airport"
+              onClear={() => set({ origin_airport: null })}
             />
           </div>
           <div>
@@ -281,8 +331,23 @@ function LegForm({ trip, leg, onDone }: { trip: TripDetailOut; leg?: LegOut; onD
             <AirportSearch
               label="To airport"
               onSelect={(a) =>
-                set({ destination_airport_id: a.id, destination_label: airportLabel(a) })
+                set({
+                  destination_airport: {
+                    id: a.id,
+                    name: a.name,
+                    code: a.iata_code || a.icao_code || a.ident,
+                  },
+                  destination_label: airportLabel(a),
+                })
               }
+            />
+            <Chosen
+              text={
+                values.destination_airport &&
+                `${values.destination_airport.code} ${values.destination_airport.name}`
+              }
+              what="destination airport"
+              onClear={() => set({ destination_airport: null })}
             />
           </div>
         </div>
@@ -310,15 +375,55 @@ function LegForm({ trip, leg, onDone }: { trip: TripDetailOut; leg?: LegOut; onD
         </Field>
       </div>
       {values.mode === "flight" && (
-        <Field label="Flight number" htmlFor="leg-flight-number" error={errors.flight_number}>
-          <input
-            id="leg-flight-number"
-            className={inputClass}
-            maxLength={16}
-            value={values.flight_number}
-            onChange={(e) => set({ flight_number: e.target.value })}
-          />
-        </Field>
+        <>
+          <div className="mb-3">
+            <span className="mb-0.5 block text-sm font-medium text-slate-700">Airline</span>
+            <AirlineSearch
+              label="Airline"
+              onSelect={(a) => set({ airline: { id: a.id, name: a.name, code: a.iata || a.icao } })}
+            />
+            <Chosen
+              text={values.airline && airlineLabel(values.airline)}
+              what="airline"
+              onClear={() => set({ airline: null })}
+            />
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <Field label="Flight number" htmlFor="leg-flight-number" error={errors.flight_number}>
+              <input
+                id="leg-flight-number"
+                className={inputClass}
+                maxLength={16}
+                value={values.flight_number}
+                onChange={(e) => set({ flight_number: e.target.value })}
+              />
+            </Field>
+            <Field label="Seat" htmlFor="leg-seat" error={errors.seat}>
+              <input
+                id="leg-seat"
+                className={inputClass}
+                maxLength={8}
+                value={values.seat}
+                onChange={(e) => set({ seat: e.target.value })}
+              />
+            </Field>
+            <Field label="Cabin" htmlFor="leg-cabin" error={errors.cabin_class}>
+              <select
+                id="leg-cabin"
+                className={inputClass}
+                value={values.cabin_class}
+                onChange={(e) => set({ cabin_class: e.target.value as CabinClass | "" })}
+              >
+                <option value="">Not recorded</option>
+                {(Object.keys(CABIN_LABELS) as CabinClass[]).map((c) => (
+                  <option key={c} value={c}>
+                    {CABIN_LABELS[c]}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+        </>
       )}
       <div className="mb-3 grid gap-2">
         <ZonedTimeInput
@@ -357,5 +462,31 @@ function LegForm({ trip, leg, onDone }: { trip: TripDetailOut; leg?: LegOut; onD
         <Button onClick={onDone}>Cancel</Button>
       </div>
     </form>
+  );
+}
+
+/** What a search picked, with a way to clear it. */
+function Chosen({
+  text,
+  what,
+  onClear,
+}: {
+  text: string | null | false;
+  what: string;
+  onClear: () => void;
+}) {
+  if (!text) return null;
+  return (
+    <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-600">
+      {text}
+      <button
+        type="button"
+        className="text-slate-500 hover:text-red-700"
+        aria-label={`Clear ${what}`}
+        onClick={onClear}
+      >
+        ×
+      </button>
+    </p>
   );
 }

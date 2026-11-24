@@ -1,6 +1,7 @@
 import { Link } from "react-router";
 import { csrfToken } from "../api/client";
 import { useMe } from "../auth/AuthGate";
+import { paths } from "../trips/paths";
 import { type ShellOverride, useShellMode } from "./useShellMode";
 
 const LABELS: Record<ShellOverride, string> = {
@@ -42,6 +43,27 @@ export function ShellMenu() {
           >
             Import trips from a spreadsheet
           </Link>
+        )}
+        {me.role !== "viewer" && (
+          <>
+            {/* Lists behind the trip pages (item 21b): tags, purposes, people. */}
+            {(
+              [
+                [paths.tags, "My tags"],
+                [paths.purposes, "My purposes"],
+                [paths.people, "People"],
+              ] as const
+            ).map(([to, text]) => (
+              <Link
+                key={to}
+                to={to}
+                className="mb-1 block rounded px-2 py-1 hover:bg-slate-100"
+                onClick={(e) => e.currentTarget.closest("details")?.removeAttribute("open")}
+              >
+                {text}
+              </Link>
+            ))}
+          </>
         )}
         <Link
           to="/trackers"

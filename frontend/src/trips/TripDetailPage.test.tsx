@@ -41,7 +41,8 @@ test("shows who went, the itinerary in order and the stops", async () => {
   expect(people).toHaveTextContent("Synthetic Kid");
   const legs = screen.getByRole("region", { name: "Itinerary" });
   expect(legs).toHaveTextContent(/Drive\s*Synthetic Motel → Synthetic Lake/);
-  expect(legs).toHaveTextContent(/Flight\s*SYA → SYB · SY 12/);
+  expect(legs).toHaveTextContent(/Flight\s*SYA → SYB/);
+  expect(legs).toHaveTextContent("SY 12");
   expect(legs).toHaveTextContent("Synthetic Parent");
   expect(legs).toHaveTextContent("Synthetic: scenic route");
   expect(screen.getByRole("region", { name: "Stops" })).toHaveTextContent(

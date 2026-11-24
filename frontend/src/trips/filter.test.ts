@@ -12,18 +12,21 @@ test("the filter round-trips through the URL and keeps other parameters", () => 
     mode: ["drive" as const, "flight" as const],
     person: 4,
     visibility: "family" as const,
+    status: "confirmed" as const,
     inView: true,
   };
   const params = writeTripFilter(new URLSearchParams("keep=1"), filter);
   expect(params.toString()).toBe(
-    "keep=1&q=lake&from=2024-01-01&purpose=3&tag=1&tag=2&mode=drive&mode=flight&person=4&visibility=family&in_view=1",
+    "keep=1&q=lake&from=2024-01-01&purpose=3&tag=1&tag=2&mode=drive&mode=flight&person=4&visibility=family&status=confirmed&in_view=1",
   );
   expect(readTripFilter(params)).toEqual(filter);
 });
 
 test("junk in the URL is ignored", () => {
   const filter = readTripFilter(
-    new URLSearchParams("from=yesterday&tag=x&tag=-1&mode=teleport&person=me&visibility=everyone"),
+    new URLSearchParams(
+      "from=yesterday&tag=x&tag=-1&mode=teleport&person=me&visibility=everyone&status=resolved",
+    ),
   );
   expect(filter).toEqual(EMPTY_FILTER);
 });
@@ -34,10 +37,13 @@ test("only in view sends the map's bbox; empty filters send nothing", () => {
   expect(apiParams({ ...EMPTY_FILTER, inView: true }, null)).toEqual({});
 });
 
-test("person and visibility go to the API as single values", () => {
-  expect(apiParams({ ...EMPTY_FILTER, person: 4, visibility: "private" })).toEqual({
+test("person, visibility and status go to the API as single values", () => {
+  expect(
+    apiParams({ ...EMPTY_FILTER, person: 4, visibility: "private", status: "candidate" }),
+  ).toEqual({
     person: 4,
     visibility: "private",
+    status: "candidate",
   });
 });
 
