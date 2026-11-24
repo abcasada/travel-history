@@ -21,6 +21,7 @@ import logging
 from collections import defaultdict
 from dataclasses import dataclass, field
 
+from django.conf import settings
 from django.contrib.auth import SESSION_KEY
 from django.contrib.sessions.models import Session
 from django.db import connection, transaction
@@ -29,7 +30,7 @@ from travel.core.devcopy import foreign_keys
 from travel.trips.models import Purpose
 
 from . import oidc, provisioning
-from .models import AuditLog, Person, User
+from .models import AuditLog, Person, Role, User
 
 log = logging.getLogger(__name__)
 
@@ -158,7 +159,7 @@ def _check_rebind(source: User, target: User) -> dict[str, int]:
             f"account {source.pk}'s identity comes from {source.oidc_issuer}, not from the "
             f"configured provider {provider}"
         )
-    if source.role != "member" or not source.is_active:
+    if source.role != Role.MEMBER or not source.is_active:
         raise Refused(
             f"account {source.pk} is not a new account (role {source.role}, "
             f"{'active' if source.is_active else 'deactivated'}); new accounts are active Members"
@@ -195,8 +196,6 @@ def _check_rebind(source: User, target: User) -> dict[str, int]:
 
 
 def _configured_issuer() -> str:
-    from django.conf import settings
-
     if not settings.OIDC_ISSUER:
         raise Refused("no sign-in provider is configured (OIDC_ISSUER)")
     return settings.OIDC_ISSUER
